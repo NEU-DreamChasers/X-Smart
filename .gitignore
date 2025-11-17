@@ -137,3 +137,15 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Next.js build output
+.next/
+
+# Frontend environment
+frontend/.env.local
+
+# Backend environment
+backend/.env
+
+# Database data
+/db

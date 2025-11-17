@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  # PostgreSQL với PostGIS (dùng cho Scorpio + X-Smart)
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: xsmart_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ngb
+      POSTGRES_PASSWORD: ngb
+      POSTGRES_DB: ngb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - x-smart
+    restart: always
+
+  # Kafka (KRaft mode)
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: xsmart_kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      # KRaft Mode Configuration
+      CLUSTER_ID: "MkQkRmVUOTFkZGVhODEwOA=="
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://kafka:9092,CONTROLLER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - x-smart
+    restart: always
+
+  # Scorpio NGSI-LD Broker (All-in-One with Kafka KRaft)
+  scorpio:
+    image: scorpiobroker/all-in-one-runner:v0.99.7-java
+    container_name: xsmart_scorpio
+    ports:
+      - "9090:9090"
+    environment:
+      QUARKUS_HTTP_PORT: 9090
+      DBHOST: postgres
+      DBPORT: 5432
+      DBUSER: ngb
+      DBPASS: ngb
+      DBNAME: ngb
+      BUSHOST: kafka
+      BUSPORT: 9092
+      GATEWAY_HOST: localhost
+      GATEWAY_PORT: 9090
+    depends_on:
+      - postgres
+      - kafka
+    networks:
+      - x-smart
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/ngsi-ld/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Dịch vụ Backend (Nest.js) - kết nối với Scorpio
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: xsmart_backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - scorpio
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgresql://ngb:ngb@postgres:5432/ngb
+      SCORPIO_URL: http://scorpio:9090
+      SCORPIO_API_VERSION: v1
+    networks:
+      - x-smart
+    restart: unless-stopped
+
+  # Dịch vụ Frontend (Next.js)
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: xsmart_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8080/api
+      NEXT_PUBLIC_SCORPIO_URL: http://scorpio:9090
+    networks:
+      - x-smart
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  kafka_data:
+
+networks:
+  x-smart:
+    driver: bridge

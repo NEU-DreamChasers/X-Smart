@@ -1,0 +1,10 @@
+{
+  "name": "@x-smart/shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "scripts": { "build": "tsc" },
+  "devDependencies": { "typescript": "^5.3.3" }
+}
