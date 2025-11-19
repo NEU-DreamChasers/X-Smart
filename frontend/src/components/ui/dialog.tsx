@@ -1,46 +1,103 @@
 "use client";
 
 import * as React from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog@1.1.6";
-import { XIcon } from "lucide-react@0.487.0";
-
+import { createPortal } from "react-dom";
+import { XIcon } from "lucide-react";
 import { cn } from "./utils";
 
-function Dialog({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
+interface DialogContextType {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-function DialogTrigger({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
+const DialogContext = React.createContext<DialogContextType | undefined>(undefined);
+
+function useDialog() {
+  const context = React.useContext(DialogContext);
+  if (!context) {
+    throw new Error("Dialog components must be used within Dialog");
+  }
+  return context;
 }
 
-function DialogPortal({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Portal>) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
+interface DialogProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children: React.ReactNode;
 }
 
-function DialogClose({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Close>) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
+function Dialog({ open = false, onOpenChange, children }: DialogProps) {
+  const [internalOpen, setInternalOpen] = React.useState(open);
+  
+  React.useEffect(() => {
+    setInternalOpen(open);
+  }, [open]);
+
+  const handleOpenChange = React.useCallback((newOpen: boolean) => {
+    setInternalOpen(newOpen);
+    onOpenChange?.(newOpen);
+  }, [onOpenChange]);
+
+  return (
+    <DialogContext.Provider value={{ open: internalOpen, onOpenChange: handleOpenChange }}>
+      {children}
+    </DialogContext.Provider>
+  );
+}
+
+function DialogTrigger({ 
+  children, 
+  asChild,
+  ...props 
+}: React.HTMLAttributes<HTMLElement> & { asChild?: boolean }) {
+  const { onOpenChange } = useDialog();
+  
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    onOpenChange(true);
+  };
+
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children as React.ReactElement, {
+      onClick: handleClick,
+    });
+  }
+
+  return (
+    <button onClick={handleClick} {...props}>
+      {children}
+    </button>
+  );
+}
+
+function DialogPortal({ children }: { children: React.ReactNode }) {
+  const { open } = useDialog();
+  
+  // Chỉ render trên client side để tránh lỗi hydration
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+
+  if (!open || !mounted) return null;
+  
+  // 👇 SỬA Ở ĐÂY: Dùng createPortal từ react-dom
+  return typeof document !== 'undefined' 
+    ? createPortal(children, document.body)
+    : null;
 }
 
 function DialogOverlay({
   className,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+}: React.HTMLAttributes<HTMLDivElement>) {
+  const { onOpenChange } = useDialog();
+  
   return (
-    <DialogPrimitive.Overlay
-      data-slot="dialog-overlay"
+    <div
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
-        className,
+        "fixed inset-0 z-50 bg-black/50 animate-in fade-in-0",
+        className
       )}
+      onClick={() => onOpenChange(false)}
       {...props}
     />
   );
@@ -50,72 +107,110 @@ function DialogContent({
   className,
   children,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: React.HTMLAttributes<HTMLDivElement>) {
+  const { open } = useDialog();
+
+  React.useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [open]);
+
   return (
-    <DialogPortal data-slot="dialog-portal">
+    <DialogPortal>
       <DialogOverlay />
-      <DialogPrimitive.Content
-        data-slot="dialog-content"
+      <div
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
-          className,
+          "fixed top-[50%] left-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%]",
+          "bg-white dark:bg-gray-950 rounded-lg border shadow-lg p-6",
+          "animate-in fade-in-0 zoom-in-95 duration-200",
+          className
         )}
+        onClick={(e) => e.stopPropagation()}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
-          <XIcon />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      </DialogPrimitive.Content>
+        <DialogClose />
+      </div>
     </DialogPortal>
   );
 }
 
-function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
+function DialogClose({ 
+  className,
+  ...props 
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const { onOpenChange } = useDialog();
+  
+  return (
+    <button
+      type="button"
+      className={cn(
+        "absolute top-4 right-4 rounded-sm opacity-70 transition-opacity hover:opacity-100",
+        "focus:outline-none focus:ring-2 focus:ring-offset-2",
+        "disabled:pointer-events-none",
+        className
+      )}
+      onClick={() => onOpenChange(false)}
+      {...props}
+    >
+      <XIcon className="h-4 w-4" />
+      <span className="sr-only">Close</span>
+    </button>
+  );
+}
+
+function DialogHeader({ 
+  className, 
+  ...props 
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      data-slot="dialog-header"
       className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
       {...props}
     />
   );
 }
 
-function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
+function DialogFooter({ 
+  className, 
+  ...props 
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      data-slot="dialog-footer"
       className={cn(
         "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
-        className,
+        className
       )}
       {...props}
     />
   );
 }
 
-function DialogTitle({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Title>) {
+function DialogTitle({ 
+  className, 
+  ...props 
+}: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
-    <DialogPrimitive.Title
-      data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
+    <h2
+      className={cn("text-lg font-semibold leading-none", className)}
       {...props}
     />
   );
 }
 
-function DialogDescription({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Description>) {
+function DialogDescription({ 
+  className, 
+  ...props 
+}: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <DialogPrimitive.Description
-      data-slot="dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
+    <p
+      className={cn("text-sm text-gray-500 dark:text-gray-400", className)}
       {...props}
     />
   );
