@@ -1,7 +1,7 @@
 # backend/Dockerfile
 
 # ----- Giai đoạn 1: Build -----
-FROM node:18-alpine AS builder
+FROM node:20.11-alpine AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ RUN npm run build -w backend
 
 
 # ----- Giai đoạn 2: Production -----
-FROM node:18-alpine AS production
+FROM node:20.11-alpine AS production
 
 WORKDIR /app
 
