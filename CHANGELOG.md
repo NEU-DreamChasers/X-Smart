@@ -58,15 +58,6 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 
 - Thêm shadcn/ui (bộ component UI cho React) vào frontend
 - Thêm giao diện trang chủ (homepage) cho frontend
-- Tích hợp **Scorpio Context Broker** làm NGSI-LD broker chính
-- Module `ngsi-ld` (scaffold): Service, Controller, Module cho tương tác NGSI-LD
-- Cấu hình **Docker Compose** đầy đủ với PostgreSQL, Kafka (KRaft), Scorpio, backend, frontend
-- Mô hình dữ liệu **SOSA/SSN** (W3C ontology)
-- Tài liệu chi tiết: SETUP.md, ARCHITECTURE.md, API.md (tiếng Việt & tham khảo tiếng Anh)
-- Scripts hỗ trợ: `setup.sh`, `setup.bat` cho thiết lập môi trường
-- Chính sách bảo mật: SECURITY.md, Code of Conduct, CONTRIBUTING.md
-- Cấu hình ESLint, TypeScript, NestJS cho backend
-- Next.js skeleton cho frontend
 
 ### Removed
 
@@ -85,17 +76,7 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 
 ### Added
 
-- Thêm shadcn/ui (bộ component UI cho React) vào frontend
 - Thêm giao diện trang chủ (homepage) cho frontend
-- Tích hợp **Scorpio Context Broker** làm NGSI-LD broker chính
-- Module `ngsi-ld` (scaffold): Service, Controller, Module cho tương tác NGSI-LD
-- Cấu hình **Docker Compose** đầy đủ với PostgreSQL, Kafka (KRaft), Scorpio, backend, frontend
-- Mô hình dữ liệu **SOSA/SSN** (W3C ontology)
-- Tài liệu chi tiết: SETUP.md, ARCHITECTURE.md, API.md (tiếng Việt & tham khảo tiếng Anh)
-- Scripts hỗ trợ: `setup.sh`, `setup.bat` cho thiết lập môi trường
-- Chính sách bảo mật: SECURITY.md, Code of Conduct, CONTRIBUTING.md
-- Cấu hình ESLint, TypeScript, NestJS cho backend
-- Next.js skeleton cho frontend
 
 ### Removed
 
@@ -108,3 +89,23 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 ### Changed
 
 - Refactor: kết hợp logic controller và UI
+
+
+## [0.1.2] - 2024-11-21
+
+### Added
+
+- Route groups cho auth và dashboard: `(auth)/login`, `(dashboard)/admin`, `(dashboard)/citizen`
+
+### Removed
+
+- Xóa `LoginScreen.tsx`
+- Xóa `LoginModal.tsx`
+
+### Fixed
+
+- _(Chưa có fix nào được ghi chép)_
+
+### Changed
+
+- Refactor: tái cấu trúc route với folder groups
