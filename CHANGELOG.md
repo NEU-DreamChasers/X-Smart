@@ -52,3 +52,30 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 - **PostGIS**: PostgreSQL + extension PostGIS cho dữ liệu địa lý
 
 ---
+## [0.1.1] - 2024-11-21
+
+### Added
+
+- Thêm shadcn/ui (bộ component UI cho React) vào frontend
+- Thêm giao diện trang chủ (homepage) cho frontend
+- Tích hợp **Scorpio Context Broker** làm NGSI-LD broker chính
+- Module `ngsi-ld` (scaffold): Service, Controller, Module cho tương tác NGSI-LD
+- Cấu hình **Docker Compose** đầy đủ với PostgreSQL, Kafka (KRaft), Scorpio, backend, frontend
+- Mô hình dữ liệu **SOSA/SSN** (W3C ontology)
+- Tài liệu chi tiết: SETUP.md, ARCHITECTURE.md, API.md (tiếng Việt & tham khảo tiếng Anh)
+- Scripts hỗ trợ: `setup.sh`, `setup.bat` cho thiết lập môi trường
+- Chính sách bảo mật: SECURITY.md, Code of Conduct, CONTRIBUTING.md
+- Cấu hình ESLint, TypeScript, NestJS cho backend
+- Next.js skeleton cho frontend
+
+### Removed
+
+- _(Chưa có remove nào được ghi chép)_
+
+### Fixed
+
+- _(Chưa có fix nào được ghi chép)_
+
+### Changed
+
+- _(Chưa có thay đổi nào được ghi chép)_
