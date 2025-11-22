@@ -1,21 +1,30 @@
 'use client';
 
 import { useState } from 'react';
-import { Building2, User, Shield } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Building2, User, Shield, Loader2 } from 'lucide-react';
 
 export function SimpleLogin() {
+  const router = useRouter(); 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'citizen' | 'admin'>('citizen');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleCitizenLogin = (e: React.FormEvent) => {
+  const handleCitizenLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Đăng nhập người dân với email: ${email}`);
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    router.push('/'); 
   };
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Đăng nhập quản trị viên với email: ${email}`);
+    setIsLoading(true);
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    router.push('/admin');
   };
 
   return (
@@ -39,6 +48,7 @@ export function SimpleLogin() {
         {/* Tab Buttons */}
         <div className="flex gap-3 mb-6">
           <button
+            type="button"
             onClick={() => setActiveTab('citizen')}
             className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl transition-all ${
               activeTab === 'citizen'
@@ -50,6 +60,7 @@ export function SimpleLogin() {
             <span>Người dân</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('admin')}
             className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl transition-all ${
               activeTab === 'admin'
@@ -108,9 +119,17 @@ export function SimpleLogin() {
 
                 <button
                   type="submit"
-                  className="w-full bg-gray-900 hover:bg-gray-800 text-white py-4 rounded-xl transition-colors"
+                  disabled={isLoading}
+                  className="w-full bg-gray-900 hover:bg-gray-800 text-white py-4 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
                 >
-                  Đăng nhập
+                  {isLoading ? (
+                    <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Đang xử lý...
+                    </>
+                  ) : (
+                    'Đăng nhập'
+                  )}
                 </button>
 
                 <p className="text-center text-gray-400 text-sm">
@@ -162,9 +181,17 @@ export function SimpleLogin() {
 
                 <button
                   type="submit"
-                  className="w-full bg-gray-900 hover:bg-gray-800 text-white py-4 rounded-xl transition-colors"
+                  disabled={isLoading}
+                  className="w-full bg-gray-900 hover:bg-gray-800 text-white py-4 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
                 >
-                  Đăng nhập quản trị
+                   {isLoading ? (
+                    <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Đang đăng nhập...
+                    </>
+                  ) : (
+                    'Đăng nhập quản trị'
+                  )}
                 </button>
 
                 <p className="text-center text-gray-400 text-sm">

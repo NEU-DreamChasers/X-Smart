@@ -52,3 +52,60 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 - **PostGIS**: PostgreSQL + extension PostGIS cho dữ liệu địa lý
 
 ---
+## [0.1.1] - 2024-11-21
+
+### Added
+
+- Thêm shadcn/ui (bộ component UI cho React) vào frontend
+- Thêm giao diện trang chủ (homepage) cho frontend
+
+### Removed
+
+- _(Chưa có remove nào được ghi chép)_
+
+### Fixed
+
+- _(Chưa có fix nào được ghi chép)_
+
+### Changed
+
+- Add homepage ui and admin ui
+
+
+## [0.1.2] - 2024-11-21
+
+### Added
+
+- Thêm giao diện trang chủ (homepage) cho frontend
+
+### Removed
+
+- Xóa `app.tsx`
+
+### Fixed
+
+- _(Chưa có fix nào được ghi chép)_
+
+### Changed
+
+- Refactor: kết hợp logic controller và UI
+
+
+## [0.1.2] - 2024-11-21
+
+### Added
+
+- Route groups cho auth và dashboard: `(auth)/login`, `(dashboard)/admin`, `(dashboard)/citizen`
+
+### Removed
+
+- Xóa `LoginScreen.tsx`
+- Xóa `LoginModal.tsx`
+
+### Fixed
+
+- _(Chưa có fix nào được ghi chép)_
+
+### Changed
+
+- Refactor: tái cấu trúc route với folder groups
