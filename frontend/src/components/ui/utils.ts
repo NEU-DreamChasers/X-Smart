@@ -1,3 +1,2 @@
-export function cn(...classes: (string | boolean | null | undefined)[]) {
-    return classes.filter(Boolean).join(' ');
-}
+// Re-export from lib/utils
+export { cn } from "@/lib/utils";
