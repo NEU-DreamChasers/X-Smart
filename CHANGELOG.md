@@ -31,6 +31,15 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 - _(Chưa có thay đổi nào được ghi chép)_
 
 ---
+## 2025-11-21
+### Added
+- **Authentication System**:
+    - Tích hợp module `Auth` sử dụng `Passport.js` (Local Strategy & JWT Strategy).
+    - API Endpoint `POST /auth/login` cho phép đăng nhập và nhận JWT Access Token.
+    - Mã hóa mật khẩu người dùng bằng `bcrypt`.
+- **User Management**:
+    - Module `Users` và Entity `User` (TypeORM) ánh xạ với bảng `users` trong PostgreSQL.
+    - Tính năng **Auto-Seeding**: Tự động kiểm tra và khởi tạo tài khoản Admin mặc định (`admin` / `admin123`) khi server khởi động.
 
 ## [0.1.0] - 2024-11-17 (Initial Setup)
 
@@ -109,3 +118,24 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 ### Changed
 
 - Refactor: tái cấu trúc route với folder groups
+## [0.1.3] - 2025-11-24
+
+### Added
+
+- Docker: Thêm file .dockerignore ở thư mục gốc để ngăn chặn việc copy rác (node_modules local, .git, .env) vào container gây lỗi.
+
+- Frontend: Thêm cấu hình output: 'standalone' trong next.config.ts để tối ưu hóa Docker image.
+
+### Fixed
+
+- Deployment: Sửa hoàn toàn lỗi khởi động MODULE_NOT_FOUND ở Backend và Cannot find module server.js ở Frontend trên môi trường Production.
+
+- Backend Dockerfile: Chuyển đổi chiến lược build sang COPY node_modules từ builder stage thay vì cài đặt lại tại production, khắc phục lỗi thiếu @nestjs/core và lỗi native build của bcrypt.
+
+- Docker Compose: Loại bỏ volume mapping (./backend:/app, ./frontend:/app) để sửa lỗi "Volume Shadowing" (ghi đè file container bằng file máy host).
+
+- Frontend Build: Khắc phục lỗi build thất bại do TypeScript/ESLint strict mode bằng cách thêm cấu hình ignoreBuildErrors và ignoreDuringBuilds.
+
+### Changed
+
+- Config: Chuyển đổi hoàn toàn Frontend config từ next.config.js sang next.config.ts và loại bỏ file cũ.

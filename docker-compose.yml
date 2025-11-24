@@ -1,5 +1,5 @@
 services:
-  # PostgreSQL với PostGIS (dùng cho Scorpio + X-Smart)
+  # PostgreSQL với PostGIS
   postgres:
     image: postgis/postgis:16-3.4
     container_name: xsmart_postgres
@@ -23,7 +23,6 @@ services:
       - "9092:9092"
       - "9093:9093"
     environment:
-      # KRaft Mode Configuration
       CLUSTER_ID: "MkQkRmVUOTFkZGVhODEwOA=="
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -42,7 +41,7 @@ services:
       xsmart: {}
     restart: always
 
-  # Scorpio NGSI-LD Broker (All-in-One with Kafka KRaft)
+  # Scorpio Broker
   scorpio:
     image: scorpiobroker/all-in-one-runner:java-kafka-latest
     container_name: xsmart_scorpio
@@ -71,7 +70,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Dịch vụ Backend (Nest.js) - kết nối với Scorpio
+  # Dịch vụ Backend (Nest.js)
   backend:
     build:
       context: .
@@ -87,6 +86,8 @@ services:
       DATABASE_URL: postgresql://ngb:ngb@postgres:5432/ngb
       SCORPIO_URL: http://scorpio:9090
       SCORPIO_API_VERSION: v1
+    # QUAN TRỌNG: Đã xóa phần 'volumes' map code nguồn. 
+    # Chúng ta dùng code đã đóng gói trong Image để chạy Production.
     networks:
       xsmart: {}
     restart: unless-stopped
@@ -102,8 +103,10 @@ services:
     depends_on:
       - backend
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:8080/api
-      NEXT_PUBLIC_SCORPIO_URL: http://scorpio:9090
+      # Nếu chạy từ trình duyệt máy thật, phải trỏ về localhost
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api
+      NEXT_PUBLIC_SCORPIO_URL: http://localhost:9090
+    # QUAN TRỌNG: Cũng xóa volumes ở đây để tránh lỗi server.js not found
     networks:
       xsmart: {}
     restart: unless-stopped

@@ -1,13 +1,13 @@
-{
-  "name": "x-smart",
-  "version": "0.1.0",
-  "private": true,
-  "description": "X-Smart: Dự án quản lý dữ liệu mở cho đô thị thông minh",
-  "author": "NEU-DreamChasers",
-  "license": "MIT",
-  "workspaces": [
-    "backend",
-    "frontend",
-    "shared"
-  ]
-}
+  {
+    "name": "x-smart",
+    "version": "0.1.0",
+    "private": true,
+    "description": "X-Smart: Dự án quản lý dữ liệu mở cho đô thị thông minh",
+    "author": "NEU-DreamChasers",
+    "license": "MIT",
+    "workspaces": [
+      "backend",
+      "frontend",
+      "shared"
+    ]
+  }
