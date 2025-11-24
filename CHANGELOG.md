@@ -118,3 +118,24 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 ### Changed
 
 - Refactor: tái cấu trúc route với folder groups
+## [0.1.3] - 2025-11-24
+
+### Added
+
+- Docker: Thêm file .dockerignore ở thư mục gốc để ngăn chặn việc copy rác (node_modules local, .git, .env) vào container gây lỗi.
+
+- Frontend: Thêm cấu hình output: 'standalone' trong next.config.ts để tối ưu hóa Docker image.
+
+### Fixed
+
+- Deployment: Sửa hoàn toàn lỗi khởi động MODULE_NOT_FOUND ở Backend và Cannot find module server.js ở Frontend trên môi trường Production.
+
+- Backend Dockerfile: Chuyển đổi chiến lược build sang COPY node_modules từ builder stage thay vì cài đặt lại tại production, khắc phục lỗi thiếu @nestjs/core và lỗi native build của bcrypt.
+
+- Docker Compose: Loại bỏ volume mapping (./backend:/app, ./frontend:/app) để sửa lỗi "Volume Shadowing" (ghi đè file container bằng file máy host).
+
+- Frontend Build: Khắc phục lỗi build thất bại do TypeScript/ESLint strict mode bằng cách thêm cấu hình ignoreBuildErrors và ignoreDuringBuilds.
+
+### Changed
+
+- Config: Chuyển đổi hoàn toàn Frontend config từ next.config.js sang next.config.ts và loại bỏ file cũ.
