@@ -31,6 +31,15 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 - _(Chưa có thay đổi nào được ghi chép)_
 
 ---
+## 2025-11-21
+### Added
+- **Authentication System**:
+    - Tích hợp module `Auth` sử dụng `Passport.js` (Local Strategy & JWT Strategy).
+    - API Endpoint `POST /auth/login` cho phép đăng nhập và nhận JWT Access Token.
+    - Mã hóa mật khẩu người dùng bằng `bcrypt`.
+- **User Management**:
+    - Module `Users` và Entity `User` (TypeORM) ánh xạ với bảng `users` trong PostgreSQL.
+    - Tính năng **Auto-Seeding**: Tự động kiểm tra và khởi tạo tài khoản Admin mặc định (`admin` / `admin123`) khi server khởi động.
 
 ## [0.1.0] - 2024-11-17 (Initial Setup)
 
@@ -52,3 +61,60 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 - **PostGIS**: PostgreSQL + extension PostGIS cho dữ liệu địa lý
 
 ---
+## [0.1.1] - 2024-11-21
+
+### Added
+
+- Thêm shadcn/ui (bộ component UI cho React) vào frontend
+- Thêm giao diện trang chủ (homepage) cho frontend
+
+### Removed
+
+- _(Chưa có remove nào được ghi chép)_
+
+### Fixed
+
+- _(Chưa có fix nào được ghi chép)_
+
+### Changed
+
+- Add homepage ui and admin ui
+
+
+## [0.1.2] - 2024-11-21
+
+### Added
+
+- Thêm giao diện trang chủ (homepage) cho frontend
+
+### Removed
+
+- Xóa `app.tsx`
+
+### Fixed
+
+- _(Chưa có fix nào được ghi chép)_
+
+### Changed
+
+- Refactor: kết hợp logic controller và UI
+
+
+## [0.1.2] - 2024-11-21
+
+### Added
+
+- Route groups cho auth và dashboard: `(auth)/login`, `(dashboard)/admin`, `(dashboard)/citizen`
+
+### Removed
+
+- Xóa `LoginScreen.tsx`
+- Xóa `LoginModal.tsx`
+
+### Fixed
+
+- _(Chưa có fix nào được ghi chép)_
+
+### Changed
+
+- Refactor: tái cấu trúc route với folder groups
