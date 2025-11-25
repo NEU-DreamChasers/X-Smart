@@ -5,8 +5,8 @@ import { UsersService } from './users.service';
 import { User } from './user.entity'; // <-- Import file vừa tạo ở trên
 
 @Module({
-    imports: [TypeOrmModule.forFeature([User])], // <-- QUAN TRỌNG: Đăng ký Entity vào đây
-    providers: [UsersService],
-    exports: [UsersService],
+  imports: [TypeOrmModule.forFeature([User])], // <-- QUAN TRỌNG: Đăng ký Entity vào đây
+  providers: [UsersService],
+  exports: [UsersService],
 })
-export class UsersModule { }
+export class UsersModule {}
