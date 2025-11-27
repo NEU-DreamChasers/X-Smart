@@ -1,0 +1,228 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Header,
+  HttpException,
+  HttpStatus,
+  Logger,
+  Param,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
+import { AdapterFactory } from './factory/adapter.factory';
+import { ScorpioService } from '../scorpio/scorpio.service';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody, ApiResponse } from '@nestjs/swagger';
+
+@ApiTags('Ingestion')
+@Controller()
+export class ContextController {
+  private readonly logger = new Logger(ContextController.name);
+
+  constructor(
+    private readonly adapterFactory: AdapterFactory,
+    private readonly scorpioService: ScorpioService,
+  ) {}
+
+  // --- HÀM TIỆN ÍCH: ĐOÁN URN TỪ ID NGẮN ---
+  // Giúp chuyển đổi id ngắn (vd: device_1) thành URN chuẩn NGSI-LD
+  private guessUrn(domain: string, shortId: string): string {
+    if (shortId.startsWith('urn:ngsi-ld:')) {
+      return shortId;
+    }
+
+    // Logic map Domain -> Prefix ID
+    switch (domain) {
+      case 'weather':
+      case 'environment':
+        return `urn:ngsi-ld:WeatherObserved:OpenWeatherMap:${shortId}`;
+      case 'air':
+        return `urn:ngsi-ld:AirQualityObserved:OpenWeatherMap:${shortId}`;
+      case 'bus':
+        return `urn:ngsi-ld:PointOfInterest:OSM:bus_stop:${shortId}`;
+      case 'parking':
+        return `urn:ngsi-ld:OffStreetParking:OSM:${shortId}`;
+      default:
+        return `urn:ngsi-ld:Thing:${domain}:${shortId}`;
+    }
+  }
+
+  // --- GET: Lấy dữ liệu chi tiết ---
+  @Get(':domain/status')
+  @Header('Content-Type', 'application/ld+json')
+  @ApiOperation({ summary: 'Lấy danh sách dữ liệu theo lĩnh vực (Weather, Air, Bus, Parking)' })
+  @ApiParam({ name: 'domain', example: 'weather', description: 'Lĩnh vực cần lấy dữ liệu' })
+  @ApiQuery({ name: 'category', required: false, example: 'hospital', description: 'Lọc theo danh mục (dành cho POI)' })
+  async getAllData(@Param('domain') domain: string, @Query('category') category?: string) {
+    this.logger.log(`GET ALL Request cho domain: ${domain}, category: ${category}`);
+
+    let type = '';
+    let query = '';
+
+    switch (domain) {
+      case 'weather':
+        type = 'WeatherObserved';
+        break;
+      case 'air':
+        type = 'AirQualityObserved';
+        break;
+      case 'parking':
+        type = 'OffStreetParking';
+        break;
+      case 'bus':
+      case 'poi':
+        type = 'PointOfInterest';
+        if (domain === 'bus') query = 'category=="bus_stop"';
+        if (category) query = `category=="${category}"`;
+        break;
+      default:
+        throw new HttpException('Domain không hỗ trợ lấy danh sách', HttpStatus.BAD_REQUEST);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return this.scorpioService.getEntitiesByType(type, query);
+  }
+
+  // URI: GET /weather/status/device_01
+  @Get(':domain/status/:id')
+  @Header('Content-Type', 'application/ld+json')
+  @ApiOperation({ summary: 'Lấy chi tiết một thiết bị/địa điểm theo ID' })
+  @ApiParam({ name: 'id', example: 'device_01', description: 'ID thiết bị hoặc tên địa điểm' })
+  async getData(@Param('domain') domain: string, @Param('id') id: string) {
+    try {
+      const urn = this.guessUrn(domain, id);
+      this.logger.log(`GET Request cho URN: ${urn}`);
+
+      const data = (await this.scorpioService.getEntity(urn)) as Record<string, any>;
+      return data;
+    } catch (error) {
+      const err = error as Error;
+      throw new HttpException(
+        {
+          status: HttpStatus.NOT_FOUND,
+          error: 'Không tìm thấy dữ liệu',
+          message: err.message,
+        },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+  }
+
+  // --- DELETE: Xóa dữ liệu ---
+  // URI: DELETE /weather/status/device_01
+  @Delete(':domain/status/:id')
+  @ApiOperation({ summary: 'Xóa dữ liệu thiết bị khỏi hệ thống (Delete)' })
+  @ApiParam({
+    name: 'id',
+    example: 'device_01',
+    description: 'ID thiết bị muốn xóa',
+  })
+  @ApiResponse({ status: 200, description: 'Xóa thành công.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy ID để xóa.' })
+  async deleteData(@Param('domain') domain: string, @Param('id') id: string) {
+    try {
+      const urn = this.guessUrn(domain, id);
+      this.logger.log(`DELETE Request cho URN: ${urn}`);
+
+      await this.scorpioService.deleteEntity(urn);
+      return { message: `Đã xóa thành công thiết bị: ${id}`, urn };
+    } catch (error) {
+      const err = error as Error;
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'Xóa thất bại',
+          message: err.message,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  // --- POST: Tạo mới / Nhập liệu ---
+  // URI: POST /weather/status/device_01
+  @Post(':domain/status/:id')
+  @Header('Content-Type', 'application/ld+json')
+  @ApiOperation({ summary: 'Gửi dữ liệu thô từ thiết bị lên hệ thống (Upsert)' })
+  @ApiBody({
+    schema: { example: { main: { temp: 30 }, name: 'Sensor 1' } },
+    description: 'Dữ liệu JSON thô từ cảm biến',
+  })
+  async createData(
+    @Param('domain') domain: string,
+    @Param('id') id: string,
+    @Body() rawData: any,
+    @Query('type') adapterType?: string,
+  ) {
+    return this.processIngestion(domain, id, rawData, adapterType);
+  }
+
+  // --- PUT: Cập nhật ---
+  // URI: PUT /weather/status/device_01
+  @Put(':domain/status/:id')
+  @Header('Content-Type', 'application/ld+json')
+  @ApiOperation({ summary: 'Cập nhật dữ liệu cho thiết bị (Update)' })
+  @ApiParam({
+    name: 'id',
+    example: 'device_01',
+    description: 'ID thiết bị cần cập nhật',
+  })
+  @ApiBody({
+    description: 'Dữ liệu JSON mới cần cập nhật',
+    schema: {
+      example: {
+        main: { temp: 35, humidity: 50 }, //Ví dụ nhiệt độ tăng lên
+        wind: { speed: 10 },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Cập nhật thành công, trả về dữ liệu mới.' })
+  async updateData(
+    @Param('domain') domain: string,
+    @Param('id') id: string,
+    @Body() rawData: any,
+    @Query('type') adapterType?: string,
+  ) {
+    this.logger.log(`PUT Request (Update) cho: ${id}`);
+    return this.processIngestion(domain, id, rawData, adapterType);
+  }
+
+  // --- LOGIC CHUNG CHO POST & PUT ---
+  private async processIngestion(domain: string, id: string, rawData: any, adapterType?: string) {
+    this.logger.log(`Processing Ingestion cho domain: ${domain}, ID: ${id}`);
+
+    try {
+      let typeToUse = adapterType;
+      if (!typeToUse) {
+        if (domain === 'weather' || domain === 'environment') typeToUse = 'openweathermap';
+        else if (domain === 'air') typeToUse = 'openweathermap_aqi';
+        else if (domain === 'bus') typeToUse = 'overpass_bus';
+        else if (domain === 'parking') typeToUse = 'overpass_parking';
+        else throw new Error(`Chưa hỗ trợ domain: ${domain}`);
+      }
+
+      const adapter = this.adapterFactory.getAdapter(typeToUse);
+      const ngsiEntity = await adapter.convert(rawData);
+
+      // Đảm bảo ID trong database khớp với ID trên URL mà người dùng gửi
+      ngsiEntity.id = this.guessUrn(domain, id);
+
+      await this.scorpioService.publishEntity(ngsiEntity);
+
+      return ngsiEntity;
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(err);
+      throw new HttpException(
+        {
+          status: HttpStatus.BAD_REQUEST,
+          error: 'Xử lý dữ liệu thất bại',
+          message: err.message || err,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+}
