@@ -1,4 +1,3 @@
-// src/ingestion/factory/adapter.factory.ts
 import { Injectable } from '@nestjs/common';
 import { BaseAdapter } from '../strategies/base.adapter';
 import { OpenWeatherMapAdapter } from '../strategies/openweathermap.adapter';
@@ -8,7 +7,6 @@ import { OverpassAdapter } from '../strategies/overpass.adapter';
 @Injectable()
 export class AdapterFactory {
   constructor(
-    // Inject các Adapter con vào đây
     private readonly openWeatherMapAdapter: OpenWeatherMapAdapter,
     private readonly airQualityAdapter: AirQualityAdapter,
     private readonly overPassAdapter: OverpassAdapter,

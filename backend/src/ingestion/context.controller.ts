@@ -14,7 +14,9 @@ import {
 } from '@nestjs/common';
 import { AdapterFactory } from './factory/adapter.factory';
 import { ScorpioService } from '../scorpio/scorpio.service';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody, ApiResponse } from '@nestjs/swagger';
 
+@ApiTags('Ingestion')
 @Controller()
 export class ContextController {
   private readonly logger = new Logger(ContextController.name);
@@ -27,7 +29,6 @@ export class ContextController {
   // --- HÀM TIỆN ÍCH: ĐOÁN URN TỪ ID NGẮN ---
   // Giúp chuyển đổi id ngắn (vd: device_1) thành URN chuẩn NGSI-LD
   private guessUrn(domain: string, shortId: string): string {
-    // Nếu người dùng đã gửi URN đầy đủ thì giữ nguyên
     if (shortId.startsWith('urn:ngsi-ld:')) {
       return shortId;
     }
@@ -44,44 +45,42 @@ export class ContextController {
       case 'parking':
         return `urn:ngsi-ld:OffStreetParking:OSM:${shortId}`;
       default:
-        // Mặc định nếu không biết domain là gì
         return `urn:ngsi-ld:Thing:${domain}:${shortId}`;
     }
   }
 
-  // --- 1. GET: Lấy dữ liệu chi tiết (READ) ---
-  // URI: GET /weather/status
-  // (Chú ý: Không có /:id ở cuối)
+  // --- GET: Lấy dữ liệu chi tiết ---
   @Get(':domain/status')
   @Header('Content-Type', 'application/ld+json')
-  async getAllData(@Param('domain') domain: string) {
-    this.logger.log(`GET ALL Request cho domain: ${domain}`);
+  @ApiOperation({ summary: 'Lấy danh sách dữ liệu theo lĩnh vực (Weather, Air, Bus, Parking)' })
+  @ApiParam({ name: 'domain', example: 'weather', description: 'Lĩnh vực cần lấy dữ liệu' })
+  @ApiQuery({ name: 'category', required: false, example: 'hospital', description: 'Lọc theo danh mục (dành cho POI)' })
+  async getAllData(@Param('domain') domain: string, @Query('category') category?: string) {
+    this.logger.log(`GET ALL Request cho domain: ${domain}, category: ${category}`);
 
     let type = '';
     let query = '';
 
-    // 1. Map Domain sang Type chuẩn của Scorpio
     switch (domain) {
       case 'weather':
-      case 'environment':
-        type = 'https://smartdatamodels.org/dataModel.Weather/WeatherObserved';
+        type = 'WeatherObserved';
         break;
       case 'air':
-        type = 'https://smartdatamodels.org/dataModel.Environment/AirQualityObserved';
+        type = 'AirQualityObserved';
         break;
       case 'parking':
-        type = 'OffStreetParking'; // Tên ngắn (do adapter lưu tên ngắn)
+        type = 'OffStreetParking';
         break;
       case 'bus':
-        type = 'https://smartdatamodels.org/dataModel.PointOfInterest/PointOfInterest';
-        // Với Bus, phải lọc thêm category
-        query = 'category=="bus_stop"';
+      case 'poi':
+        type = 'PointOfInterest';
+        if (domain === 'bus') query = 'category=="bus_stop"';
+        if (category) query = `category=="${category}"`;
         break;
       default:
         throw new HttpException('Domain không hỗ trợ lấy danh sách', HttpStatus.BAD_REQUEST);
     }
 
-    // 2. Gọi Service
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return this.scorpioService.getEntitiesByType(type, query);
   }
@@ -89,6 +88,8 @@ export class ContextController {
   // URI: GET /weather/status/device_01
   @Get(':domain/status/:id')
   @Header('Content-Type', 'application/ld+json')
+  @ApiOperation({ summary: 'Lấy chi tiết một thiết bị/địa điểm theo ID' })
+  @ApiParam({ name: 'id', example: 'device_01', description: 'ID thiết bị hoặc tên địa điểm' })
   async getData(@Param('domain') domain: string, @Param('id') id: string) {
     try {
       const urn = this.guessUrn(domain, id);
@@ -109,9 +110,17 @@ export class ContextController {
     }
   }
 
-  // --- 2. DELETE: Xóa dữ liệu (DELETE) ---
+  // --- DELETE: Xóa dữ liệu ---
   // URI: DELETE /weather/status/device_01
   @Delete(':domain/status/:id')
+  @ApiOperation({ summary: 'Xóa dữ liệu thiết bị khỏi hệ thống (Delete)' })
+  @ApiParam({
+    name: 'id',
+    example: 'device_01',
+    description: 'ID thiết bị muốn xóa',
+  })
+  @ApiResponse({ status: 200, description: 'Xóa thành công.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy ID để xóa.' })
   async deleteData(@Param('domain') domain: string, @Param('id') id: string) {
     try {
       const urn = this.guessUrn(domain, id);
@@ -132,10 +141,15 @@ export class ContextController {
     }
   }
 
-  // --- 3. POST: Tạo mới / Nhập liệu (CREATE) ---
+  // --- POST: Tạo mới / Nhập liệu ---
   // URI: POST /weather/status/device_01
   @Post(':domain/status/:id')
   @Header('Content-Type', 'application/ld+json')
+  @ApiOperation({ summary: 'Gửi dữ liệu thô từ thiết bị lên hệ thống (Upsert)' })
+  @ApiBody({
+    schema: { example: { main: { temp: 30 }, name: 'Sensor 1' } },
+    description: 'Dữ liệu JSON thô từ cảm biến',
+  })
   async createData(
     @Param('domain') domain: string,
     @Param('id') id: string,
@@ -145,11 +159,26 @@ export class ContextController {
     return this.processIngestion(domain, id, rawData, adapterType);
   }
 
-  // --- 4. PUT: Cập nhật (UPDATE) ---
+  // --- PUT: Cập nhật ---
   // URI: PUT /weather/status/device_01
-  // Trong ngữ cảnh này, PUT hoạt động giống POST (Upsert)
   @Put(':domain/status/:id')
   @Header('Content-Type', 'application/ld+json')
+  @ApiOperation({ summary: 'Cập nhật dữ liệu cho thiết bị (Update)' })
+  @ApiParam({
+    name: 'id',
+    example: 'device_01',
+    description: 'ID thiết bị cần cập nhật',
+  })
+  @ApiBody({
+    description: 'Dữ liệu JSON mới cần cập nhật',
+    schema: {
+      example: {
+        main: { temp: 35, humidity: 50 }, //Ví dụ nhiệt độ tăng lên
+        wind: { speed: 10 },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Cập nhật thành công, trả về dữ liệu mới.' })
   async updateData(
     @Param('domain') domain: string,
     @Param('id') id: string,
@@ -165,7 +194,6 @@ export class ContextController {
     this.logger.log(`Processing Ingestion cho domain: ${domain}, ID: ${id}`);
 
     try {
-      // A. Xác định Adapter
       let typeToUse = adapterType;
       if (!typeToUse) {
         if (domain === 'weather' || domain === 'environment') typeToUse = 'openweathermap';
@@ -175,15 +203,12 @@ export class ContextController {
         else throw new Error(`Chưa hỗ trợ domain: ${domain}`);
       }
 
-      // B. Convert
       const adapter = this.adapterFactory.getAdapter(typeToUse);
       const ngsiEntity = await adapter.convert(rawData);
 
-      // C. GHI ĐÈ ID (Quan trọng)
-      // Để đảm bảo ID trong database khớp với ID trên URL mà người dùng gửi
+      // Đảm bảo ID trong database khớp với ID trên URL mà người dùng gửi
       ngsiEntity.id = this.guessUrn(domain, id);
 
-      // D. Lưu vào Scorpio
       await this.scorpioService.publishEntity(ngsiEntity);
 
       return ngsiEntity;

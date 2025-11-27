@@ -1,4 +1,3 @@
-// src/ingestion/ingestion.module.ts
 import { Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { HttpModule } from '@nestjs/axios';
@@ -30,7 +29,6 @@ import { OverpassAdapter } from './strategies/overpass.adapter';
           transport: Transport.KAFKA,
           options: {
             client: {
-              // Đọc từ biến môi trường, nếu không có thì fallback về localhost (cho Dev)
               brokers: [configService.get<string>('KAFKA_BROKER') || 'localhost:9092'],
             },
             consumer: {
@@ -46,6 +44,6 @@ import { OverpassAdapter } from './strategies/overpass.adapter';
     ]),
   ],
   providers: [IngestionService, AdapterFactory, OpenWeatherMapAdapter, AirQualityAdapter, OverpassAdapter],
-  controllers: [DataProcessor, ContextController], // Đăng ký Consumer như một Controller
+  controllers: [DataProcessor, ContextController],
 })
 export class IngestionModule {}

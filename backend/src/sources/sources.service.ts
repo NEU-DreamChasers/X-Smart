@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DataSource } from './entities/data-source.entity';
@@ -12,13 +12,12 @@ export class SourcesService implements OnModuleInit {
     private dataSourceRepo: Repository<DataSource>,
   ) {}
 
-  // --- 1. HÀM TỰ ĐỘNG CHẠY KHI KHỞI ĐỘNG (SEEDING) ---
+  // --- HÀM TỰ ĐỘNG CHẠY KHI KHỞI ĐỘNG ---
   async onModuleInit() {
     await this.seedDefaultSources();
   }
 
   async seedDefaultSources() {
-    // Kiểm tra nếu DB đã có dữ liệu thì thôi
     const count = await this.dataSourceRepo.count();
     if (count > 0) {
       this.logger.log('Database đã có dữ liệu. Bỏ qua bước Seeding.');
@@ -54,7 +53,7 @@ export class SourcesService implements OnModuleInit {
     const newSources: DataSource[] = [];
 
     for (const location of hcmLocations) {
-      // 1. Trạm Thời tiết
+      // Trạm Thời tiết
       newSources.push(
         this.dataSourceRepo.create({
           name: `Weather - ${location.name}`,
@@ -65,7 +64,7 @@ export class SourcesService implements OnModuleInit {
         }),
       );
 
-      // 2. Trạm Chất lượng không khí (AQI)
+      // Trạm Chất lượng không khí
       newSources.push(
         this.dataSourceRepo.create({
           name: `Air Monitor - ${location.name}`,
@@ -76,7 +75,7 @@ export class SourcesService implements OnModuleInit {
         }),
       );
 
-      // 3. Trạm POI (Tiện ích công cộng)
+      // Trạm POI (Tiện ích công cộng)
       newSources.push(
         this.dataSourceRepo.create({
           name: `POI - ${location.name}`,
@@ -87,7 +86,7 @@ export class SourcesService implements OnModuleInit {
         }),
       );
 
-      // 4. Bến xe Bus (Bus Stops)
+      // Bến xe Bus
       newSources.push(
         this.dataSourceRepo.create({
           name: `Bus Stop - ${location.name}`,
@@ -98,7 +97,7 @@ export class SourcesService implements OnModuleInit {
         }),
       );
 
-      // 5. Bãi đỗ xe (Parking)
+      // Bãi đỗ xe
       newSources.push(
         this.dataSourceRepo.create({
           name: `Parking - ${location.name}`,
@@ -114,7 +113,7 @@ export class SourcesService implements OnModuleInit {
     this.logger.log(`✅ Đã lắp đặt ${newSources.length} cảm biến ảo phủ kín TP.HCM!`);
   }
 
-  // --- 2. CÁC HÀM CRUD CƠ BẢN ---
+  // --- CÁC HÀM CRUD CHO NGUỒN DỮ LIỆU ---
 
   create(data: Partial<DataSource>) {
     const newSource = this.dataSourceRepo.create(data);
@@ -122,11 +121,23 @@ export class SourcesService implements OnModuleInit {
   }
 
   findAll() {
-    return this.dataSourceRepo.find({ where: { isActive: true } });
+    return this.dataSourceRepo.find();
+  }
+
+  async findOne(id: string) {
+    const source = await this.dataSourceRepo.findOne({ where: { id } });
+    if (!source) throw new NotFoundException(`Không tìm thấy nguồn có ID: ${id}`);
+    return source;
+  }
+
+  async update(id: string, changes: Partial<DataSource>) {
+    const source = await this.findOne(id);
+    this.dataSourceRepo.merge(source, changes);
+    return this.dataSourceRepo.save(source);
   }
 
   async remove(id: string) {
-    await this.dataSourceRepo.delete(id);
-    return { deleted: true };
+    const source = await this.findOne(id);
+    return this.dataSourceRepo.remove(source);
   }
 }

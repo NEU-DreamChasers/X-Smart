@@ -1,4 +1,3 @@
-// src/ingestion/data.processor.ts
 import { Controller, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { AdapterFactory } from './factory/adapter.factory';
@@ -18,7 +17,6 @@ export class DataProcessor {
     private readonly scorpioService: ScorpioService,
   ) {}
 
-  // Lắng nghe Topic 'raw_data_topic'
   @EventPattern('raw_data_topic')
   async handleRawData(@Payload() message: KafkaMessage) {
     const { sourceType, payload } = message;
@@ -26,13 +24,10 @@ export class DataProcessor {
     this.logger.log(`--- [Consumer] Nhận dữ liệu loại: ${sourceType} ---`);
 
     try {
-      // 1. Chọn Adapter (Logic cũ của bạn tái sử dụng ở đây)
       const adapter = this.adapterFactory.getAdapter(sourceType);
 
-      // 2. Convert sang NGSI-LD
       const ngsiEntity = await adapter.convert(payload);
 
-      // 3. Đẩy vào Scorpio
       await this.scorpioService.publishEntity(ngsiEntity);
 
       this.logger.log(`[Consumer] Xử lý xong & Đẩy thành công: ${ngsiEntity.id}`);
