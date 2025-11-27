@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { BaseAdapter } from './base.adapter';
 import { NgsiEntity } from '../../common/interfaces/ngsi-ld.interface';
 
-// Interface giúp gợi ý code (Intellisense)
 interface OpenWeatherRaw {
   clouds?: { all: number };
   rain?: { '1h'?: number };
@@ -21,13 +20,12 @@ interface OpenWeatherRaw {
 export class OpenWeatherMapAdapter extends BaseAdapter {
   sourceType = 'openweathermap';
   targetModel = 'WeatherObserved';
-  contextUrl = 'https://smartdatamodels.org/context.jsonld';
+  contextUrl = 'https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.9.jsonld';
 
   convert(data: any): NgsiEntity {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const rawData: OpenWeatherRaw = data;
 
-    // 2. GIÁ TRỊ MẶC ĐỊNH AN TOÀN (Safe Fallbacks)
     const main = rawData.main || { temp: 0, humidity: 0 };
     const wind = rawData.wind || { speed: 0, deg: 0 };
     const sys = rawData.sys || { country: 'VN' };
@@ -36,19 +34,19 @@ export class OpenWeatherMapAdapter extends BaseAdapter {
     const rain = rawData.rain || {};
     const rain1h = rain['1h'] || 0;
 
-    // Xử lý mảng weather an toàn
+    // Xử lý mô tả thời tiết
     const weatherList = rawData.weather || [];
     const weatherDescription = weatherList.length > 0 ? weatherList[0].description : 'Clear';
 
-    // 3. Xử lý thời gian
+    // Xử lý thời gian
     const observationTime = rawData.dt ? new Date(rawData.dt * 1000).toISOString() : new Date().toISOString();
 
-    // 4. Tạo ID
+    // Tạo ID
     const uniqueSuffix = rawData.id ? `OpenWeatherMap:${rawData.id}` : `OpenWeatherMap:${rawData.name || 'Unknown'}`;
 
     const id = this.generateId(uniqueSuffix);
 
-    // 5. Mapping dữ liệu
+    // Mapping dữ liệu
     const attributes = {
       temperature: this.createProperty(main.temp, 'CEL', observationTime),
 

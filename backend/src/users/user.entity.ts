@@ -1,6 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity('users') // Tên bảng trong DB
+@Entity('users')
 export class User {
   @PrimaryGeneratedColumn()
   id: number;

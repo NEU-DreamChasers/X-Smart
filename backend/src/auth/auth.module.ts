@@ -13,7 +13,7 @@ import { AuthController } from './auth.controller';
     PassportModule,
     JwtModule.register({
       secret: jwtConstants.secret,
-      signOptions: { expiresIn: '60m' }, // Token sống 60 phút
+      signOptions: { expiresIn: '60m' },
     }),
   ],
   controllers: [AuthController],

@@ -73,8 +73,8 @@ services:
   # Dịch vụ Backend (Nest.js)
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: xsmart_backend
     ports:
       - "8080:8080"
@@ -96,6 +96,7 @@ services:
       SCORPIO_URL: http://scorpio:9090
       SCORPIO_API_VERSION: v1
 
+      OPENWEATHER_API_KEY: eb3a4947904547285aa7bdecca8cc396
     networks:
       xsmart: {}
     restart: unless-stopped
@@ -103,8 +104,8 @@ services:
   # Dịch vụ Frontend (Next.js)
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: xsmart_frontend
     ports:
       - "3000:3000"

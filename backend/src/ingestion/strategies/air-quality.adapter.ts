@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { BaseAdapter } from './base.adapter';
 import { NgsiEntity } from '../../common/interfaces/ngsi-ld.interface';
 
-// Interface cho dữ liệu Air Pollution của OpenWeatherMap
 interface AirQualityRaw {
   list?: Array<{
     main?: { aqi: number };
@@ -25,7 +24,7 @@ interface AirQualityRaw {
 export class AirQualityAdapter extends BaseAdapter {
   sourceType = 'openweathermap_aqi';
   targetModel = 'AirQualityObserved';
-  contextUrl = 'https://raw.githubusercontent.com/smart-data-models/dataModel.Environment/master/context.jsonld';
+  contextUrl = 'https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.9.jsonld';
 
   convert(data: any): NgsiEntity {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -44,10 +43,7 @@ export class AirQualityAdapter extends BaseAdapter {
       location: this.createGeoProperty(coord.lat, coord.lon),
       dateObserved: this.createProperty(observationTime),
 
-      // --- CÁC CHỈ SỐ Ô NHIỄM ---
-      // GP = Micrograms per cubic meter (µg/m³) - Đơn vị chuẩn Smart City
-
-      airQualityIndex: this.createProperty(main.aqi), // 1 = Tốt, 5 = Kém
+      airQualityIndex: this.createProperty(main.aqi),
 
       pm25: this.createProperty(components.pm2_5, 'GP', observationTime),
       pm10: this.createProperty(components.pm10, 'GP', observationTime),
@@ -58,7 +54,6 @@ export class AirQualityAdapter extends BaseAdapter {
       so2: this.createProperty(components.so2, 'GP', observationTime),
     };
 
-    // Xóa các trường undefined (ví dụ nếu API không trả về nh3)
     Object.keys(attributes).forEach((key) => attributes[key] === undefined && delete attributes[key]);
 
     return this.buildEntity(id, attributes);

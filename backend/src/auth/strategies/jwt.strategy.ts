@@ -2,7 +2,6 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
 
-// LƯU Ý: Trong dự án thật, hãy đưa KEY này vào file .env
 export const jwtConstants = {
   secret: 'DAY_LA_BI_MAT_KHONG_DUOC_LO_RA_NGOAI',
 };
@@ -18,7 +17,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    // Payload đã giải mã từ Token. Trả về cái này để gán vào req.user
     return {
       userId: payload.sub,
       username: payload.username,

@@ -17,7 +17,7 @@ export class ScorpioService {
   ) {
     this.scorpioUrl = this.configService.get<string>('SCORPIO_URL', 'http://localhost:9090');
   }
-  //1. POST/PUT Entity
+  // POST/PUT Entity
   async publishEntity(entity: NgsiEntity): Promise<void> {
     try {
       const url = `${this.scorpioUrl}/ngsi-ld/v1/entityOperations/upsert`;
@@ -46,18 +46,15 @@ export class ScorpioService {
     }
   }
 
-  // --- 2. GET: Lấy chi tiết Entity theo Type hoặc Query ---
+  // --- GET: Lấy chi tiết Entity theo Type hoặc Query ---
   async getEntitiesByType(type: string, query?: string): Promise<any> {
     try {
-      // Xây dựng URL: /ngsi-ld/v1/entities?type=...
       let url = `${this.scorpioUrl}/ngsi-ld/v1/entities?type=${encodeURIComponent(type)}`;
 
-      // Nếu có thêm query phụ (ví dụ lọc bus_stop)
       if (query) {
         url += `&q=${encodeURIComponent(query)}`;
       }
 
-      // Thêm limit để tránh lấy quá nhiều (vd: 100)
       url += '&limit=100';
 
       const response = await firstValueFrom(
@@ -75,7 +72,7 @@ export class ScorpioService {
     }
   }
 
-  //GET: Lấy chi tiết Entity theo ID
+  // GET: Lấy chi tiết Entity theo ID
   async getEntity(urn: string): Promise<any> {
     try {
       const url = `${this.scorpioUrl}/ngsi-ld/v1/entities/${urn}`;
@@ -98,7 +95,7 @@ export class ScorpioService {
     }
   }
 
-  // --- 3. DELETE: Xóa Entity theo ID ---
+  // --- DELETE: Xóa Entity theo ID ---
   async deleteEntity(urn: string): Promise<void> {
     try {
       const url = `${this.scorpioUrl}/ngsi-ld/v1/entities/${urn}`;
@@ -115,9 +112,7 @@ export class ScorpioService {
     }
   }
 
-  // ==========================================
-  // CÁC HÀM TIỆN ÍCH (HELPER) XỬ LÝ LỖI
-  // ==========================================
+  // CÁC HÀM TIỆN ÍCH XỬ LÝ LỖI
 
   private isNotFoundError(error: any): boolean {
     return error.response?.status === 404;

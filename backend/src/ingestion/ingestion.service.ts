@@ -7,6 +7,8 @@ import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
 import { SourcesService } from '../sources/sources.service';
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 @Injectable()
 export class IngestionService {
   private readonly logger = new Logger(IngestionService.name);
@@ -42,7 +44,7 @@ export class IngestionService {
         let apiUrl = '';
         let isOverpass = false;
 
-        // --- 1. TẠO URL ĐỘNG ---
+        // --- TẠO URL ĐỘNG ---
         if (source.adapterType === 'openweathermap') {
           apiUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${source.latitude}&lon=${source.longitude}&appid=${this.openWeatherApiKey}&units=metric`;
         } else if (source.adapterType === 'openweathermap_aqi') {
@@ -59,7 +61,7 @@ export class IngestionService {
           isOverpass = true;
         } else if (source.adapterType === 'overpass_parking') {
           // Lấy Bãi đỗ xe (tag amenity=parking)
-          // Lấy cả Node (điểm) và Way (vùng), dùng 'out center' để lấy tâm
+          // Lấy cả Node (điểm) và Way (vùng), dùng out center để lấy tâm
           const query = `[out:json];(node(around:1000,${source.latitude},${source.longitude})["amenity"="parking"];way(around:1000,${source.latitude},${source.longitude})["amenity"="parking"];);out center;`;
           apiUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
           isOverpass = true;
@@ -70,17 +72,17 @@ export class IngestionService {
           continue;
         }
 
-        // --- 2. GỌI API (Chỉ gọi 1 lần duy nhất ở đây) ---
+        // --- GỌI API ---
         const response = await firstValueFrom(this.httpService.get(apiUrl));
-        const responseData = response.data; // Lấy data ra biến riêng cho dễ dùng
+        const responseData = response.data;
 
-        // --- 3. XỬ LÝ DỮ LIỆU & BẮN KAFKA ---
+        // --- XỬ LÝ DỮ LIỆU & BẮN KAFKA ---
         if (isOverpass) {
           // Xử lý Overpass (Mảng elements)
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           const elements: any[] = responseData.elements || [];
 
-          // Giới hạn số lượng để demo mượt hơn (Bus lấy 20, Parking lấy 10)
+          // Giới hạn số lượng (Bus lấy 20, Parking lấy 10)
           const limit = source.adapterType === 'overpass_bus' ? 20 : 10;
           const limitedElements = elements.slice(0, limit);
 
@@ -92,17 +94,27 @@ export class IngestionService {
           }
           this.logger.log(`[Producer] Đã gửi ${limitedElements.length} địa điểm từ ${source.name}`);
         } else {
-          // Xử lý Weather/Air (1 object duy nhất)
           this.kafkaClient.emit('raw_data_topic', {
             sourceType: source.adapterType,
             payload: responseData,
           });
 
           this.logger.log(`[Producer] Đã gửi: ${source.name} (${source.adapterType})`);
+          await sleep(3000);
         }
       } catch (error) {
-        const err = error as Error;
+        const err = error;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         this.logger.error(`[Producer] Lỗi nguồn ${source.name}: ${err.message}`);
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const statusCode = err.response?.status;
+        if (statusCode === 429) {
+          this.logger.warn('⚠️ Bị chặn Rate Limit (429). Đang tạm dừng 20s để hồi phục...');
+          await sleep(20000);
+        } else {
+          await sleep(5000);
+        }
       }
     }
   }

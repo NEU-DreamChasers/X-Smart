@@ -31,6 +31,106 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 - _(Chưa có thay đổi nào được ghi chép)_
 
 ---
+
+## [0.2.0] - 2025-11-27 (Data Ingestion & Adapter System)
+
+### Added
+
+- **Hệ thống Data Ingestion & Adapter (Data Converter)**:
+  - Module `IngestionModule` với kiến trúc Adapter Pattern cho việc chuẩn hóa dữ liệu từ nhiều nguồn khác nhau
+  - `AdapterFactory` để quản lý và khởi tạo các adapter động theo loại nguồn dữ liệu
+  - `BaseAdapter` (abstract class) cung cấp các helper methods chuẩn cho việc xây dựng NGSI-LD entities
+  - **Các Adapter cụ thể**:
+    - `OpenWeatherMapAdapter`: Chuyển đổi dữ liệu thời tiết từ OpenWeatherMap API sang `WeatherObserved`
+    - `AirQualityAdapter`: Chuyển đổi dữ liệu chất lượng không khí sang `AirQualityObserved`
+    - `OverpassAdapter`: Chuyển đổi dữ liệu từ OpenStreetMap (POI, Bus Stops, Parking) sang `PointOfInterest` và `OffStreetParking`
+
+- **Scorpio Integration Service**:
+  - `ScorpioService` với đầy đủ CRUD operations cho NGSI-LD entities
+  - Hỗ trợ Upsert operations (POST/PUT) để tránh duplicate entities
+  - Query filtering theo type và custom query parameters
+  - Error handling và logging chi tiết cho các operations với Scorpio Broker
+
+- **REST API cho Ingestion** (`ContextController`):
+  - **GET /:domain/status** - Lấy danh sách entities theo domain (weather, air, bus, parking, poi)
+  - **GET /:domain/status/:id** - Lấy chi tiết một entity cụ thể
+  - **POST /:domain/status/:id** - Tạo/nhập dữ liệu mới (upsert)
+  - **PUT /:domain/status/:id** - Cập nhật dữ liệu entity
+  - **DELETE /:domain/status/:id** - Xóa entity khỏi hệ thống
+  - URN auto-generation: Tự động chuyển đổi ID ngắn sang URN chuẩn NGSI-LD
+  - Query parameter `type` để chỉ định adapter động
+
+- **Data Sources Management**:
+  - Module `SourcesModule` để quản lý nguồn dữ liệu (sensors, API endpoints)
+  - Entity `DataSource` với TypeORM cho PostgreSQL
+  - Auto-seeding: Tự động khởi tạo 5 điểm quan sát tại TP.HCM (Weather, Air, POI, Bus, Parking) khi server khởi động
+  - **REST API CRUD cho Sources** (`SourcesController`):
+    - POST /sources - Tạo nguồn dữ liệu mới
+    - GET /sources - Lấy danh sách tất cả nguồn
+    - GET /sources/:id - Chi tiết một nguồn
+    - PATCH /sources/:id - Cập nhật nguồn
+    - DELETE /sources/:id - Xóa nguồn
+  - JWT Authentication Guard cho tất cả endpoints của Sources
+
+- **Kafka Integration (Producer & Consumer)**:
+  - `IngestionService`: Producer tự động thu thập dữ liệu từ external APIs theo schedule (Cron 5 phút/lần)
+  - `DataProcessor`: Consumer lắng nghe topic `raw_data_topic` và xử lý dữ liệu thời gian thực
+  - Rate limiting handling: Tự động retry với backoff khi gặp HTTP 429
+  - Batch processing cho Overpass data (Bus: 20 items, Parking: 10 items)
+
+- **Swagger API Documentation**:
+  - Tích hợp `@nestjs/swagger` với DocumentBuilder
+  - API documentation tại `/api/docs`
+  - Đầy đủ decorators: `@ApiTags`, `@ApiOperation`, `@ApiParam`, `@ApiBody`, `@ApiResponse`
+  - Bearer Auth support cho protected endpoints
+  - Descriptions và examples chi tiết cho tất cả endpoints
+
+- **NGSI-LD Interfaces & Standards**:
+  - `NgsiEntity`, `NgsiProperty`, `NgsiGeoProperty`, `NgsiRelationship` interfaces
+  - Tuân thủ chuẩn NGSI-LD v1.9 (ETSI context URL)
+  - Smart Data Models context support
+  - Unit codes chuẩn (CEL, GP, MTS, etc.)
+  - GeoJSON Point support cho location properties
+
+### Changed
+
+- **Docker Configuration**:
+  - Đổi build context từ root sang subfolder (`./backend`, `./frontend`)
+  - Cập nhật Dockerfile paths để phù hợp với context mới
+  - Thêm biến môi trường `OPENWEATHER_API_KEY` vào docker-compose
+
+- **ESLint Configuration**:
+  - Thêm rule `prettier/prettier` với `endOfLine: "auto"` để tương thích Windows/Linux
+  - Disable `@typescript-eslint/no-explicit-any` cho flexibility trong data transformation
+  - Set `@typescript-eslint/no-floating-promises` và `@typescript-eslint/no-unsafe-argument` thành warning
+
+- **Main Application**:
+  - Enable CORS cho tất cả origins
+  - Kafka microservice với consumer group `ingestion-consumer-group`
+  - Dynamic port từ environment variable (default: 8080)
+  - Console logging cho Swagger URL
+
+- **Auth System**:
+  - Thêm `LocalAuthGuard` và `JwtAuthGuard` classes
+  - Swagger decorators cho login endpoint với DTO example
+  - Cleaner code: Loại bỏ comments verbose, giữ logic
+
+### Removed
+
+- Loại bỏ `AppController` và `AppService` khỏi `AppModule` (chức năng được thay thế bởi `ContextController`)
+- Xóa các comment dài dòng trong code (giữ lại code sạch hơn)
+- Loại bỏ hardcoded Smart Data Models context URLs (chuyển sang ETSI standard context)
+
+### Fixed
+
+- **Ingestion Service**: Thêm `sleep()` delay giữa các API calls để tránh rate limiting
+- **Error Handling**: Improved error messages với proper HTTP status codes
+- **TypeORM Auto-seeding**: Sử dụng `OnModuleInit` lifecycle hook để seed data đúng thời điểm
+- **NGSI-LD Context**: Cập nhật context URLs sang `https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.9.jsonld`
+- **Overpass Adapter**: Xử lý cả `node` và `way` elements với `center` coordinates
+- **Scorpio Service**: Proper handling cho 404 errors và rejected entities
+
+---
 ## 2025-11-21
 ### Added
 - **Authentication System**:
