@@ -52,18 +52,18 @@ export class IngestionService {
         } else if (source.adapterType === 'overpass_poi') {
           //Lấy tiện ích chung (bệnh viện, trường học, ...)
           const query = `[out:json];node(around:1000,${source.latitude},${source.longitude})["amenity"];out;`;
-          apiUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+          apiUrl = `https://maps.mail.ru/osm/tools/overpass/api/interpreter?data=${encodeURIComponent(query)}`;
           isOverpass = true;
         } else if (source.adapterType === 'overpass_bus') {
           // Lấy Bến xe Bus (tag highway=bus_stop)
           const query = `[out:json];node(around:1000,${source.latitude},${source.longitude})["highway"="bus_stop"];out;`;
-          apiUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+          apiUrl = `https://maps.mail.ru/osm/tools/overpass/api/interpreter?data=${encodeURIComponent(query)}`;
           isOverpass = true;
         } else if (source.adapterType === 'overpass_parking') {
           // Lấy Bãi đỗ xe (tag amenity=parking)
           // Lấy cả Node (điểm) và Way (vùng), dùng out center để lấy tâm
           const query = `[out:json];(node(around:1000,${source.latitude},${source.longitude})["amenity"="parking"];way(around:1000,${source.latitude},${source.longitude})["amenity"="parking"];);out center;`;
-          apiUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+          apiUrl = `https://maps.mail.ru/osm/tools/overpass/api/interpreter?data=${encodeURIComponent(query)}`;
           isOverpass = true;
         }
 

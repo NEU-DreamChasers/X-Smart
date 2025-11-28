@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Body,
   Controller,
@@ -15,6 +17,8 @@ import {
 import { AdapterFactory } from './factory/adapter.factory';
 import { ScorpioService } from '../scorpio/scorpio.service';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody, ApiResponse } from '@nestjs/swagger';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 
 @ApiTags('Ingestion')
 @Controller()
@@ -24,10 +28,10 @@ export class ContextController {
   constructor(
     private readonly adapterFactory: AdapterFactory,
     private readonly scorpioService: ScorpioService,
+    private readonly httpService: HttpService,
   ) {}
 
   // --- HÀM TIỆN ÍCH: ĐOÁN URN TỪ ID NGẮN ---
-  // Giúp chuyển đổi id ngắn (vd: device_1) thành URN chuẩn NGSI-LD
   private guessUrn(domain: string, shortId: string): string {
     if (shortId.startsWith('urn:ngsi-ld:')) {
       return shortId;
@@ -49,7 +53,7 @@ export class ContextController {
     }
   }
 
-  // --- GET: Lấy dữ liệu chi tiết ---
+  // --- GET: Lấy tất cả dữ liệu theo domain ---
   @Get(':domain/status')
   @Header('Content-Type', 'application/ld+json')
   @ApiOperation({ summary: 'Lấy danh sách dữ liệu theo lĩnh vực (Weather, Air, Bus, Parking)' })
@@ -110,6 +114,59 @@ export class ContextController {
     }
   }
 
+  // GET: Tìm kiếm bãi đỗ xe xung quanh địa điểm được yêu cầu
+  @Get('map/search-nearby')
+  @ApiOperation({ summary: 'Tìm kiếm địa điểm xung quanh' })
+  @ApiQuery({ name: 'lat', required: true })
+  @ApiQuery({ name: 'lon', required: true })
+  @ApiQuery({ name: 'category', enum: ['bus', 'parking', 'poi'], required: false, description: 'Mặc định là parking' })
+  @ApiQuery({ name: 'radius', required: false })
+  async searchNearby(
+    @Query('lat') lat: number,
+    @Query('lon') lon: number,
+    @Query('category') category: string = 'parking',
+    @Query('radius') radius: number = 1000,
+  ): Promise<Record<string, unknown>[]> {
+    let query = '';
+    let adapterType = 'overpass_parking';
+
+    if (category === 'parking') {
+      query = `[out:json][timeout:25];(node(around:${radius},${lat},${lon})["amenity"="parking"];way(around:${radius},${lat},${lon})["amenity"="parking"];);out center;`;
+      adapterType = 'overpass_parking';
+    } else if (category === 'bus') {
+      query = `[out:json][timeout:25];node(around:${radius},${lat},${lon})["highway"="bus_stop"];out;`;
+      adapterType = 'overpass_bus';
+    } else {
+      query = `[out:json][timeout:25];node(around:${radius},${lat},${lon})["amenity"];out;`;
+      adapterType = 'overpass_poi';
+    }
+
+    const apiUrl = `https://maps.mail.ru/osm/tools/overpass/api/interpreter?data=${encodeURIComponent(query)}`;
+
+    this.logger.debug(`Calling Overpass: ${apiUrl}`);
+
+    try {
+      const response = await firstValueFrom(this.httpService.get(apiUrl));
+      const rawDataList = response.data.elements || [];
+
+      const adapter = this.adapterFactory.getAdapter(adapterType);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      const ngsiList = rawDataList.map((item: any) => adapter.convert(item));
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      return ngsiList;
+    } catch (error) {
+      const err = error;
+      if (err.response) {
+        this.logger.error(`Overpass Error Status: ${err.response.status}`);
+        this.logger.error(`Overpass Error Data: ${JSON.stringify(err.response.data)}`);
+      } else {
+        this.logger.error(`Network Error: ${err.message}`);
+      }
+
+      throw new HttpException('Lỗi kết nối Overpass API', HttpStatus.BAD_GATEWAY);
+    }
+  }
   // --- DELETE: Xóa dữ liệu ---
   // URI: DELETE /weather/status/device_01
   @Delete(':domain/status/:id')
