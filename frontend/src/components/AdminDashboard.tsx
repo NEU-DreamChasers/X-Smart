@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Shield, LogOut, BarChart3, Database, Settings, Map } from 'lucide-react';
+import { Shield, LogOut, BarChart3, Database, Settings, Map, Inbox } from 'lucide-react';
 import type { User as UserType, UserRole } from '../app/page';
 import { AdminOverview } from './AdminOverview';
 import { AdminDataManagement } from './AdminDataManagement';
 import { AdminAnalytics } from './AdminAnalytics';
 import { AdminMapManagement } from './AdminMapManagement';
+import AdminReportList from '@/components/AdminReportList';
 
 interface AdminDashboardProps {
   user: UserType;
@@ -26,7 +27,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-600 rounded-xl shadow-sm">
+              <div className="p-2 bg-blue-600 rounded-[14px] shadow-sm">
                 <Shield className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -47,12 +48,12 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
           </div>
         </div>
       </header>
-
+      
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
           <div className="flex justify-center w-full">
-            <TabsList className="inline-flex h-14 items-center justify-center !rounded-full bg-gray-100 p-1.5 w-full max-w-2xl gap-2">
+            <TabsList className="inline-flex h-14 items-center justify-center !rounded-full bg-gray-100 p-1.5 w-full max-w-4xl gap-2">
               <TabsTrigger value="overview" className="flex-1 h-full !rounded-full text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-neutral-950 data-[state=active]:shadow-sm text-gray-600 gap-2">
                 <BarChart3 className="w-4 h-4" />
                 <span className="hidden sm:inline">Tổng quan</span>
@@ -64,6 +65,10 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               <TabsTrigger value="map" className="flex-1 h-full !rounded-full text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-neutral-950 data-[state=active]:shadow-sm text-gray-600 gap-2">
                 <Map className="w-4 h-4" />
                 <span className="hidden sm:inline">Bản đồ</span>
+              </TabsTrigger>
+              <TabsTrigger value="reports" className="flex-1 h-full !rounded-full text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-neutral-950 data-[state=active]:shadow-sm text-gray-600 gap-2">
+                <Inbox className="w-4 h-4" />
+                <span className="hidden sm:inline">Phản ánh</span>
               </TabsTrigger>
               <TabsTrigger value="analytics" className="flex-1 h-full !rounded-full text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-neutral-950 data-[state=active]:shadow-sm text-gray-600 gap-2">
                 <Settings className="w-4 h-4" />
@@ -82,6 +87,13 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
 
           <TabsContent value="map">
             <AdminMapManagement />
+          </TabsContent>
+
+          {/* REPORTS TAB: List of citizen reports (Inbox) */}
+          <TabsContent value="reports" className="w-full flex justify-center pb-10">
+             <div className="w-full max-w-4xl">
+                 <AdminReportList />
+             </div>
           </TabsContent>
 
           <TabsContent value="analytics">
