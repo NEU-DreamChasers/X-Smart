@@ -74,39 +74,6 @@ export class SourcesService implements OnModuleInit {
           isActive: true,
         }),
       );
-
-      // Trạm POI (Tiện ích công cộng)
-      newSources.push(
-        this.dataSourceRepo.create({
-          name: `POI - ${location.name}`,
-          adapterType: 'overpass_poi',
-          latitude: location.lat,
-          longitude: location.lon,
-          isActive: true,
-        }),
-      );
-
-      // Bến xe Bus
-      newSources.push(
-        this.dataSourceRepo.create({
-          name: `Bus Stop - ${location.name}`,
-          adapterType: 'overpass_bus',
-          latitude: location.lat,
-          longitude: location.lon,
-          isActive: true,
-        }),
-      );
-
-      // Bãi đỗ xe
-      newSources.push(
-        this.dataSourceRepo.create({
-          name: `Parking - ${location.name}`,
-          adapterType: 'overpass_parking',
-          latitude: location.lat,
-          longitude: location.lon,
-          isActive: true,
-        }),
-      );
     }
 
     await this.dataSourceRepo.save(newSources);

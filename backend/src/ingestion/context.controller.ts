@@ -13,12 +13,15 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { AdapterFactory } from './factory/adapter.factory';
 import { ScorpioService } from '../scorpio/scorpio.service';
-import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { IngestionService } from './ingestion.service';
 
 @ApiTags('Ingestion')
 @Controller()
@@ -29,6 +32,7 @@ export class ContextController {
     private readonly adapterFactory: AdapterFactory,
     private readonly scorpioService: ScorpioService,
     private readonly httpService: HttpService,
+    private readonly ingestionService: IngestionService,
   ) {}
 
   // --- HÀM TIỆN ÍCH: ĐOÁN URN TỪ ID NGẮN ---
@@ -126,7 +130,7 @@ export class ContextController {
     @Query('lon') lon: number,
     @Query('category') category: string = 'parking',
     @Query('radius') radius: number = 1000,
-  ): Promise<Record<string, unknown>[]> {
+  ): Promise<any[]> {
     let query = '';
     let adapterType = 'overpass_parking';
 
@@ -156,7 +160,7 @@ export class ContextController {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return ngsiList;
     } catch (error) {
-      const err = error;
+      const err = error as { response?: { status: number; data: any }; message: string };
       if (err.response) {
         this.logger.error(`Overpass Error Status: ${err.response.status}`);
         this.logger.error(`Overpass Error Data: ${JSON.stringify(err.response.data)}`);
@@ -170,7 +174,9 @@ export class ContextController {
   // --- DELETE: Xóa dữ liệu ---
   // URI: DELETE /weather/status/device_01
   @Delete(':domain/status/:id')
-  @ApiOperation({ summary: 'Xóa dữ liệu thiết bị khỏi hệ thống (Delete)' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Xóa dữ liệu thiết bị khỏi hệ thống (Admin Only)' })
   @ApiParam({
     name: 'id',
     example: 'device_01',
@@ -201,8 +207,10 @@ export class ContextController {
   // --- POST: Tạo mới / Nhập liệu ---
   // URI: POST /weather/status/device_01
   @Post(':domain/status/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Header('Content-Type', 'application/ld+json')
-  @ApiOperation({ summary: 'Gửi dữ liệu thô từ thiết bị lên hệ thống (Upsert)' })
+  @ApiOperation({ summary: 'Gửi dữ liệu thô từ thiết bị lên hệ thống (Admin Only)' })
   @ApiBody({
     schema: { example: { main: { temp: 30 }, name: 'Sensor 1' } },
     description: 'Dữ liệu JSON thô từ cảm biến',
@@ -219,8 +227,10 @@ export class ContextController {
   // --- PUT: Cập nhật ---
   // URI: PUT /weather/status/device_01
   @Put(':domain/status/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Header('Content-Type', 'application/ld+json')
-  @ApiOperation({ summary: 'Cập nhật dữ liệu cho thiết bị (Update)' })
+  @ApiOperation({ summary: 'Cập nhật dữ liệu cho thiết bị (Admin Only)' })
   @ApiParam({
     name: 'id',
     example: 'device_01',
@@ -281,5 +291,13 @@ export class ContextController {
         HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  @Post('admin/import-static')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Kích hoạt Import dữ liệu tĩnh (Admin Only)' })
+  async triggerImport(@Query('category') category: string = 'bus'): Promise<unknown> {
+    return this.ingestionService.importStaticCityData(category);
   }
 }
