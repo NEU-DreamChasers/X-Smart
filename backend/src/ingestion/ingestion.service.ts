@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -6,21 +7,23 @@ import { ClientKafka } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
 import { SourcesService } from '../sources/sources.service';
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+import { ScorpioService } from '../scorpio/scorpio.service';
 
 @Injectable()
 export class IngestionService {
   private readonly logger = new Logger(IngestionService.name);
   private readonly openWeatherApiKey: string;
+  private readonly overpassUrl: string;
 
   constructor(
     @Inject('KAFKA_SERVICE') private readonly kafkaClient: ClientKafka,
     private readonly httpService: HttpService,
     private readonly sourcesService: SourcesService,
     private readonly configService: ConfigService,
+    private readonly scorpioService: ScorpioService,
   ) {
     const key = this.configService.get<string>('OPENWEATHER_API_KEY');
+    this.overpassUrl = 'https://maps.mail.ru/osm/tools/overpass/api/interpreter';
 
     if (!key || key.trim() === '') {
       throw new Error('❌ LỖI CẤU HÌNH: Chưa tìm thấy OPENWEATHER_API_KEY!');
@@ -28,94 +31,101 @@ export class IngestionService {
     this.openWeatherApiKey = key || '';
   }
 
-  @Cron(CronExpression.EVERY_5_MINUTES) // Chạy 5 phút/lần
-  async handleCron() {
-    this.logger.debug('--- [Producer] Bắt đầu quét Database tìm nguồn dữ liệu ---');
-
+  // LUỒNG 1: THU THẬP CẢM BIẾN (Weather/Air) - Chạy 5 phút/lần
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async handleSensorIngestion() {
+    this.logger.debug('📡 [Ingestion] Đang thu thập dữ liệu Môi trường...');
     const sources = await this.sourcesService.findAll();
 
-    if (sources.length === 0) {
-      this.logger.warn('Database chưa có nguồn nào. Hãy chạy Seeding hoặc thêm thủ công.');
-      return;
-    }
-
     for (const source of sources) {
+      if (!source.adapterType.includes('openweathermap')) continue;
+
       try {
         let apiUrl = '';
-        let isOverpass = false;
-
-        // --- TẠO URL ĐỘNG ---
         if (source.adapterType === 'openweathermap') {
           apiUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${source.latitude}&lon=${source.longitude}&appid=${this.openWeatherApiKey}&units=metric`;
-        } else if (source.adapterType === 'openweathermap_aqi') {
+        } else {
           apiUrl = `https://api.openweathermap.org/data/2.5/air_pollution?lat=${source.latitude}&lon=${source.longitude}&appid=${this.openWeatherApiKey}`;
-        } else if (source.adapterType === 'overpass_poi') {
-          //Lấy tiện ích chung (bệnh viện, trường học, ...)
-          const query = `[out:json];node(around:1000,${source.latitude},${source.longitude})["amenity"];out;`;
-          apiUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-          isOverpass = true;
-        } else if (source.adapterType === 'overpass_bus') {
-          // Lấy Bến xe Bus (tag highway=bus_stop)
-          const query = `[out:json];node(around:1000,${source.latitude},${source.longitude})["highway"="bus_stop"];out;`;
-          apiUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-          isOverpass = true;
-        } else if (source.adapterType === 'overpass_parking') {
-          // Lấy Bãi đỗ xe (tag amenity=parking)
-          // Lấy cả Node (điểm) và Way (vùng), dùng out center để lấy tâm
-          const query = `[out:json];(node(around:1000,${source.latitude},${source.longitude})["amenity"="parking"];way(around:1000,${source.latitude},${source.longitude})["amenity"="parking"];);out center;`;
-          apiUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-          isOverpass = true;
         }
 
-        if (!apiUrl) {
-          this.logger.warn(`Chưa hỗ trợ loại adapter: ${source.adapterType}`);
-          continue;
-        }
-
-        // --- GỌI API ---
         const response = await firstValueFrom(this.httpService.get(apiUrl));
-        const responseData = response.data;
 
-        // --- XỬ LÝ DỮ LIỆU & BẮN KAFKA ---
-        if (isOverpass) {
-          // Xử lý Overpass (Mảng elements)
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          const elements: any[] = responseData.elements || [];
+        this.kafkaClient.emit('raw_data_topic', {
+          sourceType: source.adapterType,
+          payload: response.data,
+        });
 
-          // Giới hạn số lượng (Bus lấy 20, Parking lấy 10)
-          const limit = source.adapterType === 'overpass_bus' ? 20 : 10;
-          const limitedElements = elements.slice(0, limit);
-
-          for (const element of limitedElements) {
-            this.kafkaClient.emit('raw_data_topic', {
-              sourceType: source.adapterType,
-              payload: element,
-            });
-          }
-          this.logger.log(`[Producer] Đã gửi ${limitedElements.length} địa điểm từ ${source.name}`);
-        } else {
-          this.kafkaClient.emit('raw_data_topic', {
-            sourceType: source.adapterType,
-            payload: responseData,
-          });
-
-          this.logger.log(`[Producer] Đã gửi: ${source.name} (${source.adapterType})`);
-          await sleep(3000);
-        }
+        await new Promise((r) => setTimeout(r, 2000));
       } catch (error) {
-        const err = error;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        this.logger.error(`[Producer] Lỗi nguồn ${source.name}: ${err.message}`);
-
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        const statusCode = err.response?.status;
-        if (statusCode === 429) {
-          this.logger.warn('⚠️ Bị chặn Rate Limit (429). Đang tạm dừng 20s để hồi phục...');
-          await sleep(20000);
-        } else {
-          await sleep(5000);
-        }
+        this.logger.error(`Lỗi nguồn ${source.name}: ${error.message}`);
       }
     }
+  }
+
+  // LUỒNG 2: GIẢ LẬP BÃI ĐỖ XE - Chạy 1 phút/lần
+  @Cron(CronExpression.EVERY_MINUTE)
+  async handleParkingSimulation() {
+    this.logger.debug('🚗 [Simulation] Đang cập nhật trạng thái bãi đỗ xe...');
+
+    const parkingLots = await this.scorpioService.getEntitiesByType('OffStreetParking');
+
+    if (!parkingLots || parkingLots.length === 0) return;
+
+    for (const lot of parkingLots) {
+      const total = lot.totalSpotNumber?.value || 50;
+      const hour = new Date().getHours();
+
+      const isPeak = hour >= 8 && hour <= 18;
+      const baseOccupancy = isPeak ? 0.8 : 0.2;
+      const randomVar = Math.random() * 0.2;
+      const occupancyRate = baseOccupancy + randomVar;
+
+      const occupied = Math.floor(total * Math.min(occupancyRate, 1));
+      const available = Math.max(0, total - occupied);
+
+      const updatePayload = {
+        id: lot.id,
+        type: 'OffStreetParking',
+        availableSpotNumber: { type: 'Property', value: available, observedAt: new Date().toISOString() },
+        occupancy: { type: 'Property', value: parseFloat(occupancyRate.toFixed(2)) },
+      };
+
+      await this.scorpioService.publishEntity(updatePayload as any);
+    }
+    this.logger.log(`✅ Đã cập nhật trạng thái cho ${parkingLots.length} bãi xe.`);
+  }
+
+  // LUỒNG 3: IMPORT DỮ LIỆU TĨNH
+  async importStaticCityData(category: string) {
+    this.logger.log(`🏗️ Bắt đầu Import toàn thành phố cho: ${category}...`);
+
+    const bbox = '10.37,106.34,11.16,107.02';
+    let query = '';
+    let adapterType = '';
+
+    if (category === 'bus') {
+      query = `[out:json][timeout:180];node["highway"="bus_stop"](${bbox});out;`;
+      adapterType = 'overpass_bus';
+    } else if (category === 'parking') {
+      query = `[out:json][timeout:180];(node["amenity"="parking"](${bbox});way["amenity"="parking"](${bbox}););out center;`;
+      adapterType = 'overpass_parking';
+    } else {
+      query = `[out:json][timeout:180];node["amenity"](${bbox});out;`;
+      adapterType = 'overpass_poi';
+    }
+
+    const apiUrl = `${this.overpassUrl}?data=${encodeURIComponent(query)}`;
+
+    const response = await firstValueFrom(this.httpService.get(apiUrl));
+    const elements = response.data.elements || [];
+    this.logger.log(`📦 Tìm thấy ${elements.length} điểm. Đang đẩy vào Kafka...`);
+
+    for (const element of elements) {
+      this.kafkaClient.emit('raw_data_topic', {
+        sourceType: adapterType,
+        payload: element,
+      });
+    }
+    return { count: elements.length, status: 'Processing' };
   }
 }

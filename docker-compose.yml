@@ -70,6 +70,63 @@ services:
       timeout: 5s
       retries: 5
 
+  # HISTORY STORAGE - TimescaleDB
+  timescale:
+    image: timescale/timescaledb:latest-pg14
+    container_name: xsmart_timescale
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: ngb
+      POSTGRES_PASSWORD: ngb
+      POSTGRES_DB: ngb
+    networks:
+      xsmart: {}
+    restart: always
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+
+  # HISTORY ADAPTER - QuantumLeap
+  quantumleap:
+    image: orchestracities/quantumleap:1.0.0
+    container_name: xsmart_quantumleap
+    ports:
+      - "8668:8668"
+    depends_on:
+      - timescale
+      - scorpio
+    environment:
+      # Force sử dụng Timescale backend
+      QL_DEFAULT_DB: timescale
+      USE_GEOCODING: "false"
+      CACHE_QUERIES: "true"
+      
+      # Timescale connection
+      POSTGRES_HOST: timescale
+      POSTGRES_PORT: 5432
+      POSTGRES_DB_NAME: ngb
+      POSTGRES_DB_USER: ngb
+      POSTGRES_DB_PASS: ngb
+      POSTGRES_USE_SSL: "False"
+      
+      # Disable CrateDB
+      CRATE_WAIT_ACTIVE_SHARDS: 0
+      
+      # NGSI-LD Support
+      KEEP_RAW_ENTITY: "true"
+      
+      # Logging
+      LOG_LEVEL: DEBUG
+      LOGLEVEL: DEBUG
+    networks:
+      xsmart: {}
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8668/v2/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # Dịch vụ Backend (Nest.js)
   backend:
     build:
@@ -121,6 +178,7 @@ services:
 volumes:
   postgres_data:
   kafka_data:
+  timescale_data:
 
 networks:
   xsmart:

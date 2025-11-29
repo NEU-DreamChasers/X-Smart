@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module';
 import { SourcesModule } from './sources/sources.module';
 import { ScorpioModule } from './scorpio/scorpio.module';
 import { IngestionModule } from './ingestion/ingestion.module';
+import { HistoryModule } from './history/history.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { IngestionModule } from './ingestion/ingestion.module';
     SourcesModule,
     ScorpioModule,
     IngestionModule,
+    HistoryModule,
   ],
   controllers: [],
   providers: [],
