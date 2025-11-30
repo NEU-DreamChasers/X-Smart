@@ -7,6 +7,21 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// 1. Thêm Interceptor: Tự động lấy Token từ localStorage gửi kèm request
+api.interceptors.request.use((config) => {
+  // Lưu ý: Kiểm tra window để tránh lỗi khi render phía server (Next.js)
+  if (typeof window !== 'undefined') {
+    // Key bạn đang dùng trong SensorManagement là 'access_token'
+    const token = localStorage.getItem('access_token'); 
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
 // Helper to parse NGSI-LD response to flat object for UI
 const parseNgsi = (item: any) => {
   const result: any = { id: item.id, type: item.type };
@@ -21,7 +36,19 @@ const parseNgsi = (item: any) => {
 };
 
 export const ApiService = {
-  // Weather
+  // --- MỚI: Quản lý Sources (Cảm biến) ---
+  sources: {
+    getAll: async () => {
+      // Backend trả về mảng DataSource thuần (TypeORM entity), không phải NGSI-LD
+      const res = await api.get('/sources');
+      return res.data;
+    },
+    create: (data: any) => api.post('/sources', data),
+    update: (id: string, data: any) => api.patch(`/sources/${id}`, data),
+    delete: (id: string) => api.delete(`/sources/${id}`),
+  },
+
+  // ... (Giữ nguyên các phần Weather, Air, Bus, Parking cũ của bạn)
   weather: {
     getAll: async () => {
       const res = await api.get('/weather/status');
@@ -30,7 +57,6 @@ export const ApiService = {
     create: (id: string, data: any) => api.post(`/weather/status/${id}`, data, { params: { type: 'openweathermap' } }),
     delete: (id: string) => api.delete(`/weather/status/${id}`),
   },
-  // Air Quality
   air: {
     getAll: async () => {
       const res = await api.get('/air/status');
@@ -39,7 +65,6 @@ export const ApiService = {
     create: (id: string, data: any) => api.post(`/air/status/${id}`, data, { params: { type: 'openweathermap_aqi' } }),
     delete: (id: string) => api.delete(`/air/status/${id}`),
   },
-  // Bus
   bus: {
     getAll: async () => {
       const res = await api.get('/bus/status');
@@ -47,7 +72,6 @@ export const ApiService = {
     },
     delete: (id: string) => api.delete(`/bus/status/${id}`),
   },
-  // Parking
   parking: {
     getAll: async () => {
       const res = await api.get('/parking/status');
