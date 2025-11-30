@@ -1,4 +1,4 @@
-  {
+{
     "name": "x-smart",
     "version": "0.1.0",
     "private": true,
@@ -6,8 +6,12 @@
     "author": "NEU-DreamChasers",
     "license": "MIT",
     "workspaces": [
-      "backend",
-      "frontend",
-      "shared"
-    ]
-  }
+        "backend",
+        "frontend",
+        "shared"
+    ],
+    "dependencies": {
+        "@nestjs/axios": "^4.0.1",
+        "axios": "^1.13.2"
+    }
+}

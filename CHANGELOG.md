@@ -463,3 +463,33 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 ### Changed
 
 - Config: Chuyển đổi hoàn toàn Frontend config từ next.config.js sang next.config.ts và loại bỏ file cũ.
+
+
+## [0.1.4] - 2025-11-27
+
+### Added
+
+- Tính năng mới: **Report Form** (báo cáo từ công dân)
+  - Frontend:
+    - Thêm component `CitizenReportForm.tsx` — form báo cáo cho công dân, validation, gửi dữ liệu tới API
+  - Backend:
+    - Thêm `report.service.ts` — service xử lý lưu trữ và quản lý báo cáo
+  - UI/Integration:
+    - `CitizenDashboard.tsx`: tích hợp `CitizenReportForm.tsx` và hiển thị trạng thái báo cáo
+    - `AdminDashboard.tsx`: thêm giao diện quản lý/duyệt báo cáo từ công dân
+- Thêm service HTTP chung: `api.service.ts` — wrapper để gọi API từ frontend (axios/fetch)
+
+### Updated
+
+- Gọi API cho môi trường và dữ liệu cho admin:
+  - `CitizenEnvironment.tsx`: gọi API hiển thị dữ liệu môi trường cho người dùng công dân
+  - `AdminDataManagement.tsx`: gọi API để quản lý dữ liệu/hiển thị dữ liệu cho admin
+
+### Fixed
+
+- _(Chưa có fix nào được ghi chép)_
+
+### Changed
+
+- Add: added report form ui for citizen and admin
+- Update: Gọi API cho môi trường cho người dùng và dữ liệu cho admin
