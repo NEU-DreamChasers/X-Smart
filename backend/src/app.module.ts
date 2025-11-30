@@ -45,4 +45,4 @@ import { HistoryModule } from './history/history.module';
   controllers: [],
   providers: [],
 })
-export class AppModule {}
+export class AppModule { }

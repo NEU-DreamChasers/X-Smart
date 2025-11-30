@@ -1,27 +1,39 @@
-import { Controller, Post, UseGuards, Request, Body } from '@nestjs/common';
+import { Controller, Get, Post, Req, Res, UseGuards, Body } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
-import { LocalAuthGuard } from './guards/local-auth.guard';
-import { ApiBody, ApiOperation, ApiTags, ApiProperty } from '@nestjs/swagger';
+import type { Response } from 'express';
+import { Public } from 'src/common/decorators/public.decorator';
 
-class LoginDto {
-  @ApiProperty({ example: 'admin', description: 'Tên đăng nhập' })
-  username: string;
-
-  @ApiProperty({ example: '123456', description: 'Mật khẩu' })
-  password: string;
-}
-
-@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) { }
 
-  // API: POST /auth/login
-  @UseGuards(LocalAuthGuard)
+  // 1. LOGIN ADMIN (User/Pass)
+  @Public()
+  @UseGuards(AuthGuard('local'))
   @Post('login')
-  @ApiOperation({ summary: 'Đăng nhập hệ thống (Lấy Access Token)' })
-  @ApiBody({ type: LoginDto })
-  async login(@Request() req, @Body() loginData: LoginDto) {
+  async login(@Req() req) {
     return this.authService.login(req.user);
+  }
+
+  // 2. LOGIN GOOGLE (Bước 1: Chuyển hướng sang Google)
+  @Public()
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth(@Req() req) { }
+
+  // 3. LOGIN GOOGLE (Bước 2: Google trả về)
+  @Public()
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthRedirect(@Req() req, @Res() res: Response) {
+    // SỬA: Không cần gọi validate nữa, req.user chính là user đã được validate
+    const user = req.user;
+
+    // Tạo Token
+    const jwt = await this.authService.login(user);
+
+    // Redirect về Frontend kèm Token
+    return res.redirect(`http://localhost:3000/auth/success?token=${jwt.access_token}`);
   }
 }

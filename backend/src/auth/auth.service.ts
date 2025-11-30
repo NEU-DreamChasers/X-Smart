@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { UsersService } from '../users/users.service';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { UsersService } from 'src/users/users.service';
+import { UserRole } from 'src/users/user.entity';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -8,27 +9,61 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-  ) {}
+  ) { }
 
-  //Hàm xác thực: Kiểm tra username và password có khớp không
+  // 1. LOGIC CHO ADMIN (Đăng nhập Username/Pass)
   async validateUser(username: string, pass: string): Promise<any> {
-    const user = await this.usersService.findOne(username);
-    if (user && (await bcrypt.compare(pass, user.passwordHash))) {
+    const user = await this.usersService.findByUsername(username);
+
+    // Nếu user tồn tại & có pass & pass đúng
+    if (user && user.passwordHash && (await bcrypt.compare(pass, user.passwordHash))) {
+      if (user.role !== UserRole.ADMIN) {
+        throw new UnauthorizedException('Công dân vui lòng đăng nhập bằng Google!');
+      }
       const { passwordHash, ...result } = user;
       return result;
     }
     return null;
   }
 
-  //Hàm đăng nhập: Tạo ra Token trả về cho người dùng
+  // 2. LOGIC CHO DÂN (Đăng nhập Google)
+  async validateGoogleUser(profile: any) {
+    const { email, firstName, lastName, picture } = profile;
+    let user = await this.usersService.findByEmail(email);
+    if (!user) {
+      try {
+        user = await this.usersService.create({
+          email: email,
+          username: email.split('@')[0],
+          fullName: `${firstName} ${lastName}`.trim(),
+          passwordHash: null,
+          provider: 'google',
+          role: UserRole.USER,
+          avatar: picture,
+        });
+      } catch (error) {
+        throw error;
+      }
+    } else {
+      console.log('User cũ đã quay lại:', user.email);
+    }
+
+    return user;
+  }
+
+  // 3. CẤP VÉ (Tạo JWT Token)
   async login(user: any) {
-    const payload = {
-      username: user.username,
-      sub: user.userId,
-      role: user.role,
-    };
+    const payload = { email: user.email, sub: user.id, role: user.role };
+
     return {
       access_token: this.jwtService.sign(payload),
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        avatar: user.avatar
+      }
     };
   }
 }
