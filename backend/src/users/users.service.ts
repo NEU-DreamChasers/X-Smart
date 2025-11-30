@@ -2,7 +2,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from './user.entity';
+import { User, UserRole } from './user.entity';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -10,32 +10,49 @@ export class UsersService implements OnModuleInit {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
-  ) {}
+  ) { }
 
   // Hàm này tự chạy ngay khi Server khởi động
   async onModuleInit() {
     await this.seedAdminUser();
   }
 
-  async findOne(username: string): Promise<User | null> {
+  async findByUsername(username: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { username } });
+  }
+
+  // 2. Hàm tìm user bằng Email (Dùng cho Google Login)
+  async findByEmail(email: string): Promise<User | null> {
+    const user = await this.usersRepository.findOne({
+      where: { email: email }
+    });
+
+    return user;
+  }
+
+  // 3. Hàm tạo User mới (Dùng khi Dân đăng ký lần đầu qua Google)
+  async create(userDetails: Partial<User>): Promise<User> {
+    const newUser = this.usersRepository.create(userDetails);
+    return this.usersRepository.save(newUser);
   }
 
   // Tự động tạo Admin
   private async seedAdminUser() {
     try {
-      const adminExists = await this.findOne('admin');
+      const adminExists = await this.findByUsername('admin');
 
       if (!adminExists) {
-        console.log('⚡ Đang khởi tạo tài khoản Admin...');
+        console.log('Đang khởi tạo tài khoản Admin...');
 
         const salt = await bcrypt.genSalt();
         const passwordHash = await bcrypt.hash('admin123', salt);
 
         const admin = this.usersRepository.create({
           username: 'admin',
+          email: 'admin@x-smart.system', // Thêm email giả để tránh null
           passwordHash,
-          role: 'admin',
+          role: UserRole.ADMIN, // <--- 4. QUAN TRỌNG: Dùng Enum
+          provider: 'local',    // Đánh dấu là tài khoản nội bộ
         });
 
         await this.usersRepository.save(admin);
@@ -44,7 +61,7 @@ export class UsersService implements OnModuleInit {
         console.log('Tài khoản Admin đã tồn tại.');
       }
     } catch (error) {
-      console.error('LỖI KHỞI TẠO ADMIN:', error);
+      console.error('❌ LỖI KHỞI TẠO ADMIN:', error);
     }
   }
 }

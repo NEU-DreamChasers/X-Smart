@@ -10,6 +10,7 @@ import { ScorpioModule } from './scorpio/scorpio.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { HistoryModule } from './history/history.module';
 
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -45,4 +46,4 @@ import { HistoryModule } from './history/history.module';
   controllers: [],
   providers: [],
 })
-export class AppModule {}
+export class AppModule { }

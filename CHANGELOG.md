@@ -31,6 +31,15 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 - _(Chưa có thay đổi nào được ghi chép)_
 
 ---
+## 2025-11-21
+### Added
+- **Authentication System**:
+    - Tích hợp module `Auth` sử dụng `Passport.js` (Local Strategy & JWT Strategy).
+    - API Endpoint `POST /auth/login` cho phép đăng nhập và nhận JWT Access Token.
+    - Mã hóa mật khẩu người dùng bằng `bcrypt`.
+- **User Management**:
+    - Module `Users` và Entity `User` (TypeORM) ánh xạ với bảng `users` trong PostgreSQL.
+    - Tính năng **Auto-Seeding**: Tự động kiểm tra và khởi tạo tài khoản Admin mặc định (`admin` / `admin123`) khi server khởi động.
 
 ## [0.3.0] - 2025-11-29 (Time-Series Storage & History API)
 
