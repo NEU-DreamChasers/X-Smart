@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Shield, LogOut, BarChart3, Database, Settings, Map, Inbox } from 'lucide-react';
+import { Shield, LogOut, BarChart3, Database, Settings, Map, Inbox, Radio } from 'lucide-react';
 import type { User as UserType, UserRole } from '../app/page';
 import { AdminOverview } from './AdminOverview';
 import { AdminDataManagement } from './AdminDataManagement';
 import { AdminAnalytics } from './AdminAnalytics';
 import { AdminMapManagement } from './AdminMapManagement';
 import AdminReportList from '@/components/AdminReportList';
+import SensorManagement from '@/components/admin/SensorManagement';
 
 interface AdminDashboardProps {
   user: UserType;
@@ -74,6 +75,10 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                 <Settings className="w-4 h-4" />
                 <span className="hidden sm:inline">Phân tích</span>
               </TabsTrigger>
+              <TabsTrigger value="sensors" className="flex-1 h-full !rounded-full text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-neutral-950 data-[state=active]:shadow-sm text-gray-600 gap-2">
+                <Radio className="w-4 h-4" />
+                <span className="hidden sm:inline">Cảm biến</span>
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -98,6 +103,12 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
 
           <TabsContent value="analytics">
             <AdminAnalytics />
+          </TabsContent>
+
+          <TabsContent value="sensors">
+            <div className="mt-4">
+              <SensorManagement />
+            </div>
           </TabsContent>
         </Tabs>
       </main>
