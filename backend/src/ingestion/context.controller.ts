@@ -22,8 +22,14 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { IngestionService } from './ingestion.service';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Public } from 'src/common/decorators/public.decorator';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { UserRole } from 'src/users/user.entity';
 
 @ApiTags('Ingestion')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller()
 export class ContextController {
   private readonly logger = new Logger(ContextController.name);
@@ -57,69 +63,18 @@ export class ContextController {
     }
   }
 
-  // --- GET: Lấy tất cả dữ liệu theo domain ---
-  @Get(':domain/status')
-  @Header('Content-Type', 'application/ld+json')
-  @ApiOperation({ summary: 'Lấy danh sách dữ liệu theo lĩnh vực (Weather, Air, Bus, Parking)' })
-  @ApiParam({ name: 'domain', example: 'weather', description: 'Lĩnh vực cần lấy dữ liệu' })
-  @ApiQuery({ name: 'category', required: false, example: 'hospital', description: 'Lọc theo danh mục (dành cho POI)' })
-  async getAllData(@Param('domain') domain: string, @Query('category') category?: string) {
-    this.logger.log(`GET ALL Request cho domain: ${domain}, category: ${category}`);
-
-    let type = '';
-    let query = '';
-
-    switch (domain) {
-      case 'weather':
-        type = 'WeatherObserved';
-        break;
-      case 'air':
-        type = 'AirQualityObserved';
-        break;
-      case 'parking':
-        type = 'OffStreetParking';
-        break;
-      case 'bus':
-      case 'poi':
-        type = 'PointOfInterest';
-        if (domain === 'bus') query = 'category=="bus_stop"';
-        if (category) query = `category=="${category}"`;
-        break;
-      default:
-        throw new HttpException('Domain không hỗ trợ lấy danh sách', HttpStatus.BAD_REQUEST);
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return this.scorpioService.getEntitiesByType(type, query);
-  }
-
-  // URI: GET /weather/status/device_01
-  @Get(':domain/status/:id')
-  @Header('Content-Type', 'application/ld+json')
-  @ApiOperation({ summary: 'Lấy chi tiết một thiết bị/địa điểm theo ID' })
-  @ApiParam({ name: 'id', example: 'device_01', description: 'ID thiết bị hoặc tên địa điểm' })
-  async getData(@Param('domain') domain: string, @Param('id') id: string) {
-    try {
-      const urn = this.guessUrn(domain, id);
-      this.logger.log(`GET Request cho URN: ${urn}`);
-
-      const data = (await this.scorpioService.getEntity(urn)) as Record<string, any>;
-      return data;
-    } catch (error) {
-      const err = error as Error;
-      throw new HttpException(
-        {
-          status: HttpStatus.NOT_FOUND,
-          error: 'Không tìm thấy dữ liệu',
-          message: err.message,
-        },
-        HttpStatus.NOT_FOUND,
-      );
-    }
+  // POST: Import dữ liệu tĩnh (ADMIN ONLY)
+  @Post('admin/import-static')
+  @ApiBearerAuth()
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Kích hoạt Import dữ liệu tĩnh (Admin Only)' })
+  async triggerImport(@Query('category') category: string = 'bus'): Promise<unknown> {
+    return this.ingestionService.importStaticCityData(category);
   }
 
   // GET: Tìm kiếm bãi đỗ xe xung quanh địa điểm được yêu cầu
   @Get('map/search-nearby')
+  @Public()
   @ApiOperation({ summary: 'Tìm kiếm địa điểm xung quanh' })
   @ApiQuery({ name: 'lat', required: true })
   @ApiQuery({ name: 'lon', required: true })
@@ -171,11 +126,75 @@ export class ContextController {
       throw new HttpException('Lỗi kết nối Overpass API', HttpStatus.BAD_GATEWAY);
     }
   }
+
+  // --- GET: Lấy tất cả dữ liệu theo domain ---
+  @Get(':domain/status')
+  @Public()
+  @Header('Content-Type', 'application/ld+json')
+  @ApiOperation({ summary: 'Lấy danh sách dữ liệu theo lĩnh vực (Weather, Air, Bus, Parking)' })
+  @ApiParam({ name: 'domain', example: 'weather', description: 'Lĩnh vực cần lấy dữ liệu' })
+  @ApiQuery({ name: 'category', required: false, example: 'hospital', description: 'Lọc theo danh mục (dành cho POI)' })
+  async getAllData(@Param('domain') domain: string, @Query('category') category?: string) {
+    this.logger.log(`GET ALL Request cho domain: ${domain}, category: ${category}`);
+
+    let type = '';
+    let query = '';
+
+    switch (domain) {
+      case 'weather':
+        type = 'WeatherObserved';
+        break;
+      case 'air':
+        type = 'AirQualityObserved';
+        break;
+      case 'parking':
+        type = 'OffStreetParking';
+        break;
+      case 'bus':
+      case 'poi':
+        type = 'PointOfInterest';
+        if (domain === 'bus') query = 'category=="bus_stop"';
+        if (category) query = `category=="${category}"`;
+        break;
+      default:
+        throw new HttpException('Domain không hỗ trợ lấy danh sách', HttpStatus.BAD_REQUEST);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return this.scorpioService.getEntitiesByType(type, query);
+  }
+
+  // URI: GET /weather/status/device_01
+  @Get(':domain/status/:id')
+  @Public()
+  @Header('Content-Type', 'application/ld+json')
+  @ApiOperation({ summary: 'Lấy chi tiết một thiết bị/địa điểm theo ID' })
+  @ApiParam({ name: 'id', example: 'device_01', description: 'ID thiết bị hoặc tên địa điểm' })
+  async getData(@Param('domain') domain: string, @Param('id') id: string) {
+    try {
+      const urn = this.guessUrn(domain, id);
+      this.logger.log(`GET Request cho URN: ${urn}`);
+
+      const data = (await this.scorpioService.getEntity(urn)) as Record<string, any>;
+      return data;
+    } catch (error) {
+      const err = error as Error;
+      throw new HttpException(
+        {
+          status: HttpStatus.NOT_FOUND,
+          error: 'Không tìm thấy dữ liệu',
+          message: err.message,
+        },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+  }
+
   // --- DELETE: Xóa dữ liệu ---
   // URI: DELETE /weather/status/device_01
   @Delete(':domain/status/:id')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Xóa dữ liệu thiết bị khỏi hệ thống (Admin Only)' })
   @ApiParam({
     name: 'id',
@@ -207,8 +226,8 @@ export class ContextController {
   // --- POST: Tạo mới / Nhập liệu ---
   // URI: POST /weather/status/device_01
   @Post(':domain/status/:id')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Roles(UserRole.ADMIN)
   @Header('Content-Type', 'application/ld+json')
   @ApiOperation({ summary: 'Gửi dữ liệu thô từ thiết bị lên hệ thống (Admin Only)' })
   @ApiBody({
@@ -227,8 +246,8 @@ export class ContextController {
   // --- PUT: Cập nhật ---
   // URI: PUT /weather/status/device_01
   @Put(':domain/status/:id')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Roles(UserRole.ADMIN)
   @Header('Content-Type', 'application/ld+json')
   @ApiOperation({ summary: 'Cập nhật dữ liệu cho thiết bị (Admin Only)' })
   @ApiParam({
@@ -291,13 +310,5 @@ export class ContextController {
         HttpStatus.BAD_REQUEST,
       );
     }
-  }
-
-  @Post('admin/import-static')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Kích hoạt Import dữ liệu tĩnh (Admin Only)' })
-  async triggerImport(@Query('category') category: string = 'bus'): Promise<unknown> {
-    return this.ingestionService.importStaticCityData(category);
   }
 }
