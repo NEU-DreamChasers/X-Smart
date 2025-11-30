@@ -47,25 +47,44 @@ export class ScorpioService {
   }
 
   // --- GET: Lấy chi tiết Entity theo Type hoặc Query ---
-  async getEntitiesByType(type: string, query?: string): Promise<any> {
-    try {
-      let url = `${this.scorpioUrl}/ngsi-ld/v1/entities?type=${encodeURIComponent(type)}`;
+  async getEntitiesByType(type: string, query?: string): Promise<Record<string, any>[]> {
+    const LIMIT = 1000;
+    let offset = 0;
+    let allEntities: Record<string, any>[] = [];
+    let keepFetching = true;
 
-      if (query) {
-        url += `&q=${encodeURIComponent(query)}`;
+    this.logger.log(`🔄 Đang tải dữ liệu type=${type} (Batch size: ${LIMIT})...`);
+
+    try {
+      while (keepFetching) {
+        let url = `${this.scorpioUrl}/ngsi-ld/v1/entities?type=${encodeURIComponent(type)}`;
+        if (query) url += `&q=${encodeURIComponent(query)}`;
+
+        url += `&limit=${LIMIT}&offset=${offset}`;
+
+        const response = await firstValueFrom(
+          this.httpService.get(url, {
+            headers: { Accept: 'application/ld+json' },
+          }),
+        );
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const data: Record<string, any>[] = response.data;
+
+        if (data.length > 0) {
+          allEntities = allEntities.concat(data);
+          offset += LIMIT;
+
+          if (data.length < LIMIT) {
+            keepFetching = false;
+          }
+        } else {
+          keepFetching = false;
+        }
       }
 
-      url += '&limit=1000';
-
-      const response = await firstValueFrom(
-        this.httpService.get(url, {
-          headers: {
-            Accept: 'application/ld+json',
-          },
-        }),
-      );
-
-      return response.data;
+      this.logger.log(`✅ Đã tải tổng cộng: ${allEntities.length} bản ghi.`);
+      return allEntities;
     } catch (error) {
       this.handleAxiosError(error, `Get List Type: ${type}`);
       throw error;

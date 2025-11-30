@@ -28,10 +28,10 @@ services:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://kafka:9092,CONTROLLER://kafka:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://kafka:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
@@ -55,7 +55,7 @@ services:
       DBPASS: ngb
       DBNAME: ngb
       BUSHOST: kafka
-      BUSPORT: 9092
+      BUSPORT: 29092
       GATEWAY_HOST: localhost
       GATEWAY_PORT: 9090
     depends_on:
@@ -70,24 +70,90 @@ services:
       timeout: 5s
       retries: 5
 
+  # HISTORY STORAGE - TimescaleDB
+  timescale:
+    image: timescale/timescaledb:latest-pg14
+    container_name: xsmart_timescale
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: ngb
+      POSTGRES_PASSWORD: ngb
+      POSTGRES_DB: ngb
+    networks:
+      xsmart: {}
+    restart: always
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+
+  # HISTORY ADAPTER - QuantumLeap
+  quantumleap:
+    image: orchestracities/quantumleap:1.0.0
+    container_name: xsmart_quantumleap
+    ports:
+      - "8668:8668"
+    depends_on:
+      - timescale
+      - scorpio
+    environment:
+      # Force sử dụng Timescale backend
+      QL_DEFAULT_DB: timescale
+      USE_GEOCODING: "false"
+      CACHE_QUERIES: "true"
+      
+      # Timescale connection
+      POSTGRES_HOST: timescale
+      POSTGRES_PORT: 5432
+      POSTGRES_DB_NAME: ngb
+      POSTGRES_DB_USER: ngb
+      POSTGRES_DB_PASS: ngb
+      POSTGRES_USE_SSL: "False"
+      
+      # Disable CrateDB
+      CRATE_WAIT_ACTIVE_SHARDS: 0
+      
+      # NGSI-LD Support
+      KEEP_RAW_ENTITY: "true"
+      
+      # Logging
+      LOG_LEVEL: DEBUG
+      LOGLEVEL: DEBUG
+    networks:
+      xsmart: {}
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8668/v2/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # Dịch vụ Backend (Nest.js)
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: xsmart_backend
     ports:
       - "8080:8080"
     depends_on:
       - postgres
       - scorpio
+      - kafka
     environment:
       PORT: 8080
-      DATABASE_URL: postgresql://ngb:ngb@postgres:5432/ngb
+      
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ngb
+      DB_PASSWORD: ngb
+      DB_DATABASE: ngb
+      
+      KAFKA_BROKER: kafka:29092
+      
       SCORPIO_URL: http://scorpio:9090
       SCORPIO_API_VERSION: v1
-    # QUAN TRỌNG: Đã xóa phần 'volumes' map code nguồn. 
-    # Chúng ta dùng code đã đóng gói trong Image để chạy Production.
+
+      OPENWEATHER_API_KEY: eb3a4947904547285aa7bdecca8cc396
     networks:
       xsmart: {}
     restart: unless-stopped
@@ -95,18 +161,16 @@ services:
   # Dịch vụ Frontend (Next.js)
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: xsmart_frontend
     ports:
       - "3000:3000"
     depends_on:
       - backend
     environment:
-      # Nếu chạy từ trình duyệt máy thật, phải trỏ về localhost
       NEXT_PUBLIC_API_URL: http://localhost:8080/api
       NEXT_PUBLIC_SCORPIO_URL: http://localhost:9090
-    # QUAN TRỌNG: Cũng xóa volumes ở đây để tránh lỗi server.js not found
     networks:
       xsmart: {}
     restart: unless-stopped
@@ -114,6 +178,7 @@ services:
 volumes:
   postgres_data:
   kafka_data:
+  timescale_data:
 
 networks:
   xsmart:

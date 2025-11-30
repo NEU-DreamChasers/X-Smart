@@ -3,13 +3,13 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # 1. Copy package files
-COPY frontend/package*.json ./
+COPY package*.json ./
 
 # 2. Install dependencies
 RUN npm install
 
 # 3. Copy source code
-COPY frontend/ .
+COPY . .
 
 # 4. Build Next.js (This creates .next/standalone because of next.config.js)
 RUN npm run build
