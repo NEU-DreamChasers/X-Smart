@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 
 // Import Routing Machine
 if (typeof window !== 'undefined') {
@@ -15,6 +16,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { 
   CloudSun, Wind, Car, Bus, MapPin, Navigation, Store
 } from 'lucide-react';
+import { formatAddress } from '@/lib/utils';
 
 // --- Interfaces ---
 export interface NgsiEntity {
@@ -24,7 +26,10 @@ export interface NgsiEntity {
     type: 'GeoProperty';
     value: { type: 'Point'; coordinates: [number, number] };
   };
-  address?: { value: any };
+  address?: {
+    addressLocality: any;
+    streetAddress: any; value: any 
+};
   name?: { value: any };
   [key: string]: any;
 }
@@ -197,7 +202,11 @@ export default function RealMap({ domain, searchTerm, onDataLoaded, center, sear
                     // Sidebar mong đợi GeoJSON để đảo ngược lại.
                     value: { type: 'Point', coordinates: [searchMarker[1], searchMarker[0]] } 
                   },
-                  address: { value: { streetAddress: `Tọa độ: ${searchMarker[0].toFixed(4)}, ${searchMarker[1].toFixed(4)}` } }
+                  address: {
+                    value: { streetAddress: `Tọa độ: ${searchMarker[0].toFixed(4)}, ${searchMarker[1].toFixed(4)}` },
+                    addressLocality: undefined,
+                    streetAddress: undefined
+                  }
                 };
                 onSelectEntity(fakeEntity); // Gửi về cha
               }
@@ -215,12 +224,18 @@ export default function RealMap({ domain, searchTerm, onDataLoaded, center, sear
           </Popup>
         </Marker>
       )}
-
+      <MarkerClusterGroup
+        chunkedLoading
+        spiderfyOnMaxZoom={false}
+        maxClusterRadius={40}
+        disableClusteringAtZoom={16}
+      >
       {/* Marker Cảm biến */}
       {filteredEntities.map((entity) => {
         const loc = entity.location?.value;
         if (!loc || loc.type !== 'Point') return null;
         const position: [number, number] = [loc.coordinates[1], loc.coordinates[0]];
+        const rawAddress = entity.address?.value?.streetAddress || entity.address?.value || entity.address;
 
         return (
           <Marker 
@@ -240,6 +255,14 @@ export default function RealMap({ domain, searchTerm, onDataLoaded, center, sear
                       {getValue(entity.name) !== 'N/A' ? getValue(entity.name) : entity.id.split(':').pop()}
                     </h3>
                   </div>
+
+                  <div className="text-xs text-gray-500 mb-2 flex items-start gap-1.5">
+                       <MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />
+                       <span className="italic leading-tight">
+                         {formatAddress(rawAddress)}
+                       </span>
+                    </div>
+
                   <div className="text-sm space-y-1">
                      {domain === 'weather' && <p className="text-orange-600 font-bold">{getValue(entity.temperature)}°C</p>}
                      {domain === 'parking' && <p className="text-blue-600 font-bold">Trống: {getValue(entity.availableSpotNumber)}</p>}
@@ -250,6 +273,7 @@ export default function RealMap({ domain, searchTerm, onDataLoaded, center, sear
           </Marker>
         );
       })}
+      </MarkerClusterGroup>
     </MapContainer>
   );
 }
