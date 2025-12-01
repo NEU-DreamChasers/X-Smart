@@ -9,6 +9,7 @@ import { SourcesModule } from './sources/sources.module';
 import { ScorpioModule } from './scorpio/scorpio.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { HistoryModule } from './history/history.module';
+import { ReportsModule } from './reports/reports.module';
 
 
 @Module({
@@ -42,6 +43,7 @@ import { HistoryModule } from './history/history.module';
     ScorpioModule,
     IngestionModule,
     HistoryModule,
+    ReportsModule,
   ],
   controllers: [],
   providers: [],

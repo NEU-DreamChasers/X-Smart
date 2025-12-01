@@ -31,6 +31,32 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 - _(Chưa có thay đổi nào được ghi chép)_
 
 ---
+## [0.3.0] - 2025-12-01
+
+### Added (Tính năng mới)
+
+#### Citizen Reporting (Báo cáo sự cố)
+- **Smart Report Creation (`POST /reports`)**:
+    - Cho phép cả **Công dân (User)** và **Khách vãng lai (Guest)** gửi báo cáo.
+    - Cơ chế **Soft Authentication** (`OptionalJwtAuthGuard`): Tự động nhận diện người gửi dựa trên Token.
+    - Validate dữ liệu chặt chẽ: Bắt buộc SĐT nếu là khách ẩn danh.
+- **Intelligent Geocoding (Định vị thông minh)**:
+    - Tích hợp **Nominatim OpenStreetMap API**.
+    - **Reverse Geocoding**: Tự động điền địa chỉ khi người dùng chỉ gửi tọa độ.
+    - **Forward Geocoding**: Tự động tìm tọa độ GPS khi người dùng chỉ nhập địa chỉ.
+- **Report Management (Quản lý báo cáo)**:
+    - Entity `Report` hỗ trợ lưu trữ vị trí không gian (**PostGIS Geometry**).
+    - Quy trình duyệt bài đa trạng thái: `PENDING` -> `APPROVED` / `REJECTED` -> `RESOLVED`.
+    - API Admin (`PATCH`) để duyệt hoặc từ chối báo cáo.
+    - API Public (`GET`) chỉ hiển thị các báo cáo đã được duyệt.
+
+#### Security & Auth (Bảo mật)
+- **Role-Based Access Control (RBAC)**:
+    - Triển khai `RolesGuard` và Decorator `@Roles`.
+    - Phân quyền chặt chẽ: Chỉ Admin mới được truy cập các API quản lý.
+- **Enhanced User Entity**:
+    - Thêm quan hệ `OneToMany` giữa User và Reports.
+
 ## 2025-11-21
 ### Added
 - **Authentication System**:
