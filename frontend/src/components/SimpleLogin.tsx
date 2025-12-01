@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, User, Shield, Loader2 } from 'lucide-react';
+import { Building2, User, Shield, Loader2, AlertCircle } from 'lucide-react';
+import axios from 'axios';
+
+// Lấy URL API từ biến môi trường hoặc dùng mặc định
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export function SimpleLogin() {
   const router = useRouter(); 
@@ -10,19 +14,55 @@ export function SimpleLogin() {
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'citizen' | 'admin'>('citizen');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(''); // State để lưu thông báo lỗi
 
   // Xử lý Login Google cho người dân
   const handleCitizenLogin = () => {
     setIsLoading(true);
-    // Chuyển hướng sang Backend để Auth Google (cổng 8080)
-    window.location.href = 'http://localhost:8080/auth/google';
+    // Chuyển hướng trình duyệt sang Backend để bắt đầu quy trình Google OAuth
+    // Backend sẽ tự động redirect sang Google, sau đó trả về Frontend kèm Token
+    window.location.href = `${API_URL}/auth/google`;
   };
 
+  // Xử lý Login Admin (Username/Password)
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    router.push('/admin');
+    setError(''); // Reset lỗi cũ
+
+    try {
+      // Gọi API Login của NestJS
+      // Lưu ý: LocalStrategy mặc định của Passport thường mong đợi field là "username" và "password"
+      const response = await axios.post(`${API_URL}/auth/login`, {
+        username: email, // Mapping email input vào username
+        password: password
+      });
+
+      // Giả sử Backend trả về: { access_token: "...", user: { ... } }
+      const { access_token, user } = response.data;
+
+      // Lưu Token vào LocalStorage để dùng cho các request sau này
+      if (access_token) {
+        localStorage.setItem('accessToken', access_token);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        // Chuyển hướng vào trang Admin
+        router.push('/admin');
+      } else {
+        setError('Không nhận được token xác thực.');
+      }
+
+    } catch (err: any) {
+      console.error('Login error:', err);
+      // Xử lý hiển thị lỗi từ Backend (nếu có message) hoặc lỗi chung
+      if (err.response && err.response.status === 401) {
+        setError('Sai tên đăng nhập hoặc mật khẩu.');
+      } else {
+        setError('Đã có lỗi xảy ra. Vui lòng thử lại sau.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -47,7 +87,7 @@ export function SimpleLogin() {
         <div className="flex gap-3 mb-6">
           <button
             type="button"
-            onClick={() => setActiveTab('citizen')}
+            onClick={() => { setActiveTab('citizen'); setError(''); }}
             className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl transition-all ${
               activeTab === 'citizen'
                 ? 'bg-white shadow-sm text-gray-900'
@@ -59,7 +99,7 @@ export function SimpleLogin() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('admin')}
+            onClick={() => { setActiveTab('admin'); setError(''); }}
             className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl transition-all ${
               activeTab === 'admin'
                 ? 'bg-white shadow-sm text-gray-900'
@@ -73,6 +113,15 @@ export function SimpleLogin() {
 
         {/* Login Card */}
         <div className="bg-white rounded-2xl shadow-sm p-8">
+          
+          {/* Hiển thị lỗi nếu có */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <p className="text-sm">{error}</p>
+            </div>
+          )}
+
           {activeTab === 'citizen' ? (
             // Form Người dân: Chỉ có nút Google
             <div className="text-center py-6">
@@ -88,7 +137,7 @@ export function SimpleLogin() {
                 </button>
             </div>
           ) : (
-            // Form Admin: Giữ nguyên Username/Pass
+            // Form Admin
             <form onSubmit={handleAdminLogin}>
               <div className="mb-8">
                 <h2 className="text-xl text-gray-900 mb-2">
@@ -102,12 +151,12 @@ export function SimpleLogin() {
               <div className="space-y-5">
                 <div>
                   <label htmlFor="admin-email" className="block text-gray-900 mb-2">
-                    Email
+                    Tên đăng nhập / Email
                   </label>
                   <input
                     id="admin-email"
-                    type="email"
-                    placeholder="admin@thanhphox.gov.vn"
+                    type="text" 
+                    placeholder="admin"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
