@@ -6,9 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Shield, LogOut, BarChart3, Database, Settings, Map, Inbox, Radio } from 'lucide-react';
 import type { User as UserType, UserRole } from '../app/page';
 import { AdminOverview } from './AdminOverview';
-import { AdminDataManagement } from './AdminDataManagement';
-import { AdminAnalytics } from './AdminAnalytics';
-import { AdminMapManagement } from './AdminMapManagement';
+import { AdminDataManagement } from '@/components/AdminDataManagement';
+import { AdminAnalytics } from '@/components/AdminAnalytics';
+import { AdminMapManagement } from '@/components/AdminMapManagement';
 import AdminReportList from '@/components/AdminReportList';
 import SensorManagement from '@/components/admin/SensorManagement';
 
