@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Shield, LogOut, BarChart3, Database, Settings, Map, Inbox, Radio } from 'lucide-react';
+// Đã xóa BarChart3 khỏi import
+import { Shield, LogOut, Database, Settings, Map, Inbox, Radio } from 'lucide-react';
 import type { User as UserType, UserRole } from '../app/page';
-import { AdminOverview } from './AdminOverview';
+// Đã xóa import AdminOverview
 import { AdminDataManagement } from '@/components/AdminDataManagement';
 import { AdminAnalytics } from '@/components/AdminAnalytics';
 import { AdminMapManagement } from '@/components/AdminMapManagement';
@@ -19,7 +20,8 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState('overview');
+  // THAY ĐỔI 1: Đặt tab mặc định là 'data' thay vì 'overview'
+  const [activeTab, setActiveTab] = useState('data');
 
   return (
     <div className="min-h-screen bg-[#f5f5f7]">
@@ -55,10 +57,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
           <div className="flex justify-center w-full">
             <TabsList className="inline-flex h-14 items-center justify-center !rounded-full bg-gray-100 p-1.5 w-full max-w-4xl gap-2">
-              <TabsTrigger value="overview" className="flex-1 h-full !rounded-full text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-neutral-950 data-[state=active]:shadow-sm text-gray-600 gap-2">
-                <BarChart3 className="w-4 h-4" />
-                <span className="hidden sm:inline">Tổng quan</span>
-              </TabsTrigger>
+              {/* THAY ĐỔI 2: Đã xóa TabsTrigger value="overview" tại đây */}
+
               <TabsTrigger value="data" className="flex-1 h-full !rounded-full text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-neutral-950 data-[state=active]:shadow-sm text-gray-600 gap-2">
                 <Database className="w-4 h-4" />
                 <span className="hidden sm:inline">Dữ liệu</span>
@@ -82,9 +82,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
             </TabsList>
           </div>
 
-          <TabsContent value="overview">
-            <AdminOverview />
-          </TabsContent>
+          {/* THAY ĐỔI 3: Đã xóa TabsContent value="overview" tại đây */}
 
           <TabsContent value="data">
             <AdminDataManagement />
