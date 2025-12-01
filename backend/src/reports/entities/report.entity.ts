@@ -1,0 +1,60 @@
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
+import { User } from 'src/users/user.entity'; // Kiểm tra đúng đường dẫn file User của bạn
+import type { Point } from 'geojson';
+
+export enum ReportStatus {
+    PENDING = 'PENDING',   // Chờ duyệt
+    APPROVED = 'APPROVED', // Đã duyệt
+    REJECTED = 'REJECTED', // Từ chối
+    RESOLVED = 'RESOLVED', // Đã xử lý xong
+}
+
+@Entity('reports')
+export class Report {
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @Column()
+    title: string;
+
+    @Column({ type: 'text' })
+    description: string;
+
+    @Column({ nullable: true })
+    address: string; // Địa chỉ text (VD: 123 Giải Phóng)
+
+    @Column({ nullable: true })
+    imageUrl: string; // Vẫn giữ cột này, nhưng tạm thời cho phép null
+
+    // --- VỊ TRÍ BẢN ĐỒ (PostGIS) ---
+    @Index({ spatial: true })
+    @Column({
+        type: 'geometry',
+        spatialFeatureType: 'Point',
+        srid: 4326,
+    })
+    location: Point;
+
+    // --- TRẠNG THÁI ---
+    @Column({
+        type: 'enum',
+        enum: ReportStatus,
+        default: ReportStatus.PENDING,
+    })
+    status: ReportStatus;
+
+    // --- NGƯỜI GỬI ---
+    @ManyToOne(() => User, (user) => user.reports, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'userId' })
+    user: User;
+
+    // Thông tin cho khách vãng lai
+    @Column({ nullable: true })
+    guestName: string;
+
+    @Column({ nullable: true })
+    guestPhone: string;
+
+    @CreateDateColumn()
+    createdAt: Date;
+}

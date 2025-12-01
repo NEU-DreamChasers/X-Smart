@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Report } from 'src/reports/entities/report.entity';
 
 export enum UserRole {
   ADMIN = 'ADMIN',
@@ -40,4 +41,7 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => Report, (report) => report.user)
+  reports: Report[];
 }
