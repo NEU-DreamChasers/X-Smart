@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
-
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'; // 1. Import
+import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { SourcesModule } from './sources/sources.module';
@@ -18,7 +19,10 @@ import { ReportsModule } from './reports/reports.module';
       isGlobal: true,
       envFilePath: ['.env', '../.env'],
     }),
-
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 20,
+    }]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -29,7 +33,6 @@ import { ReportsModule } from './reports/reports.module';
         username: config.get<string>('DB_USERNAME') || 'ngb',
         password: config.get<string>('DB_PASSWORD') || 'ngb',
         database: config.get<string>('DB_DATABASE') || 'ngb',
-
         autoLoadEntities: true,
         synchronize: true,
         logging: false,
@@ -46,6 +49,11 @@ import { ReportsModule } from './reports/reports.module';
     ReportsModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule { }

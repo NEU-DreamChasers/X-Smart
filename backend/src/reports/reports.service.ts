@@ -7,7 +7,7 @@ import { User, UserRole } from 'src/users/user.entity';
 import { UpdateReportDto } from './dto/update-report.dto';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-
+import { ReportFilterDto } from './dto/report-filter.dto';
 @Injectable()
 export class ReportsService {
   private readonly logger = new Logger(ReportsService.name);
@@ -115,11 +115,38 @@ export class ReportsService {
   }
 
   // 3. Admin xem tất cả 
-  async findAllAdmin() {
-    return this.reportRepo.find({
-      relations: ['user'],
-      order: { createdAt: 'DESC' }
-    });
+  async findAllAdmin(filter: ReportFilterDto) {
+    const { page = 1, limit = 10, status, search } = filter;
+    const skip = (page - 1) * limit;
+
+    const query = this.reportRepo.createQueryBuilder('report')
+      .leftJoinAndSelect('report.user', 'user')
+      .orderBy('report.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    if (status) {
+      query.andWhere('report.status = :status', { status });
+    }
+
+    if (search) {
+      query.andWhere(
+        '(report.title ILIKE :search OR report.description ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    const [data, total] = await query.getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      }
+    };
   }
 
   // 4. Admin duyệt/từ chối 
@@ -167,5 +194,59 @@ export class ReportsService {
   async remove(id: number, user: User) {
     const report = await this.findAndCheckOwner(id, user);
     return this.reportRepo.remove(report);
+  }
+
+  async getStats() {
+    // 1. Thống kê theo Trạng thái
+    const statusStats = await this.reportRepo
+      .createQueryBuilder('report')
+      .select('report.status', 'status')
+      .addSelect('COUNT(report.id)', 'count')
+      .groupBy('report.status')
+      .getRawMany();
+
+    // 2. Thống kê tổng số
+    const total = await this.reportRepo.count();
+
+    return {
+      totalReports: total,
+      byStatus: statusStats.map(item => ({
+        status: item.status,
+        count: parseInt(item.count)
+      }))
+    };
+  }
+
+
+  // Lấy báo cáo của user
+  async findAllByUser(userId: number) {
+    return this.reportRepo.find({
+      where: { user: { id: userId } },
+      order: { createdAt: 'DESC' }
+    });
+  }
+
+
+  async findOne(id: number, user: User | null) {
+    const report = await this.reportRepo.findOne({
+      where: { id },
+      relations: ['user']
+    });
+
+    if (!report) throw new NotFoundException('Báo cáo không tồn tại');
+
+    // Logic bảo mật xem chi tiết:
+    // 1. Admin xem được hết
+    if (user?.role === UserRole.ADMIN) return report;
+
+    // 2. Chủ sở hữu xem được bài mình
+    if (user && report.user?.id === user.id) return report;
+
+    // 3. Người lạ chỉ xem được bài Đã duyệt/Đã xong
+    if ([ReportStatus.APPROVED, ReportStatus.RESOLVED].includes(report.status)) {
+      return report;
+    }
+
+    throw new ForbiddenException('Bạn không có quyền xem báo cáo này');
   }
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, Req, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards, Req, Delete, Query } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { ReportStatus } from './entities/report.entity';
@@ -9,6 +9,8 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { Public } from 'src/common/decorators/public.decorator';
 import { UserRole } from 'src/users/user.entity';
 import { UpdateReportDto } from './dto/update-report.dto';
+import { ReportFilterDto } from './dto/report-filter.dto';
+import { Throttle } from '@nestjs/throttler'; // Import Decorator
 
 @Controller('reports')
 export class ReportsController {
@@ -22,6 +24,7 @@ export class ReportsController {
   }
 
   // 2. Gửi báo cáo (Dân hoặc Khách)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @Post()
@@ -46,8 +49,8 @@ export class ReportsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @Get('admin/all')
-  getAllReports() {
-    return this.reportsService.findAllAdmin();
+  getAllReports(@Query() filter: ReportFilterDto) {
+    return this.reportsService.findAllAdmin(filter);
   }
 
   // 4. Duyệt đơn (Approve)
@@ -71,5 +74,29 @@ export class ReportsController {
   @Patch(':id/resolve')
   resolve(@Param('id') id: string) {
     return this.reportsService.updateStatus(+id, ReportStatus.RESOLVED);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Get('admin/stats')
+  getStats() {
+    return this.reportsService.getStats();
+  }
+
+  // --- USER TIỆN ÍCH ---
+
+  // 6. Xem danh sách báo cáo CỦA TÔI
+  @UseGuards(JwtAuthGuard)
+  @Get('my-reports')
+  getMyReports(@Req() req) {
+    return this.reportsService.findAllByUser(req.user.id);
+  }
+
+  // 7. Xem chi tiết 1 báo cáo
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get(':id')
+  findOne(@Param('id') id: string, @Req() req) {
+    return this.reportsService.findOne(+id, req.user);
   }
 }
