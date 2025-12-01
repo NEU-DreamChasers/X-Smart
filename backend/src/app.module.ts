@@ -12,7 +12,6 @@ import { IngestionModule } from './ingestion/ingestion.module';
 import { HistoryModule } from './history/history.module';
 import { ReportsModule } from './reports/reports.module';
 
-
 @Module({
   imports: [
     ConfigModule.forRoot({

@@ -1,43 +1,16 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  PlusCircle, 
-  Pencil, 
-  Trash2, 
-  Loader2, 
-  RefreshCcw 
-} from 'lucide-react';
-import { useToast } from '@/hooks/use-toast'; // Hoặc đường dẫn tới hook toast của bạn
+import { PlusCircle, Pencil, Trash2, Loader2, RefreshCcw } from 'lucide-react';
+// import { useToast } from '@/hooks/use-toast'; // Bỏ comment nếu muốn dùng toast
+import { ApiService } from '@/services/api.service'; // Đảm bảo import đúng đường dẫn
 
-// Interface khớp với Entity DataSource trong Backend [cite: 383]
 interface Sensor {
   id: string;
   name: string;
@@ -46,8 +19,6 @@ interface Sensor {
   longitude: number;
   isActive: boolean;
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
 
 export default function SensorManagement() {
   const [sensors, setSensors] = useState<Sensor[]>([]);
@@ -63,28 +34,16 @@ export default function SensorManagement() {
     longitude: 0,
   });
 
-  // Helper: Lấy token (tùy chỉnh theo cách bạn lưu token)
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('access_token'); // Hoặc 'token' tùy key bạn lưu
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    };
-  };
-
   // --- 1. GET: Lấy danh sách ---
   const fetchSensors = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/sources`, {
-        headers: getAuthHeaders(),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSensors(data);
-      }
+      // Sử dụng Service đã cấu hình
+      const data = await ApiService.sources.getAll();
+      setSensors(data);
     } catch (error) {
       console.error("Lỗi tải cảm biến:", error);
+      // Có thể thêm toast error tại đây
     } finally {
       setLoading(false);
     }
@@ -97,24 +56,20 @@ export default function SensorManagement() {
   // --- 2. POST/PATCH: Thêm hoặc Sửa ---
   const handleSubmit = async () => {
     try {
-      const url = editingId 
-        ? `${API_URL}/sources/${editingId}` 
-        : `${API_URL}/sources`;
-      
-      const method = editingId ? 'PATCH' : 'POST';
-
-      const res = await fetch(url, {
-        method,
-        headers: getAuthHeaders(),
-        body: JSON.stringify(formData),
-      });
-
-      if (!res.ok) throw new Error('Thao tác thất bại');
+      if (editingId) {
+        // Gọi API Update
+        await ApiService.sources.update(editingId, formData);
+      } else {
+        // Gọi API Create
+        await ApiService.sources.create(formData);
+      }
 
       setOpen(false);
       resetForm();
       fetchSensors(); // Refresh lại bảng
+      // toast({ title: "Thành công", description: "Đã lưu dữ liệu." });
     } catch (error) {
+      console.error(error);
       alert("Có lỗi xảy ra khi lưu dữ liệu!");
     }
   };
@@ -123,13 +78,12 @@ export default function SensorManagement() {
   const handleDelete = async (id: string) => {
     if (!confirm("Bạn chắc chắn muốn xóa nguồn này?")) return;
     try {
-      await fetch(`${API_URL}/sources/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
+      await ApiService.sources.delete(id);
       fetchSensors();
+      // toast({ title: "Đã xóa", description: "Xóa nguồn thành công." });
     } catch (error) {
-      console.error(error);
+      console.error("Lỗi khi xóa:", error);
+      alert("Không thể xóa nguồn này.");
     }
   };
 

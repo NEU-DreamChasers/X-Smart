@@ -156,6 +156,13 @@ services:
       SCORPIO_API_VERSION: v1
 
       OPENWEATHER_API_KEY: eb3a4947904547285aa7bdecca8cc396
+
+      JWT_SECRET: DAY_LA_BI_MAT_KHONG_DUOC_LO_RA_NGOAI
+
+      GOOGLE_CLIENT_ID: your_google_client_id_here.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: your_google_client_secret_here
+      GOOGLE_CALLBACK_URL: http://localhost:8080/auth/google/callback
+
     networks:
       xsmart: {}
     restart: unless-stopped
