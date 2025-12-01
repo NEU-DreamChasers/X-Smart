@@ -3,16 +3,21 @@ import { SourcesService } from './sources.service';
 import { DataSource } from './entities/data-source.entity';
 import { ApiTags, ApiOperation, ApiParam, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Public } from 'src/common/decorators/public.decorator';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { UserRole } from 'src/users/user.entity';
 
 @ApiTags('Sources')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('sources')
 export class SourcesController {
   constructor(private readonly sourcesService: SourcesService) {}
 
   // --- TẠO MỚI ---
   @Post()
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Thêm mới một nguồn dữ liệu (Create)' })
   @ApiBody({
     description: 'Thông tin nguồn dữ liệu',
@@ -24,13 +29,15 @@ export class SourcesController {
 
   // --- LẤY DANH SÁCH ---
   @Get()
+  @Public()
   @ApiOperation({ summary: 'Lấy danh sách tất cả nguồn dữ liệu (Read All)' })
   findAll() {
     return this.sourcesService.findAll();
   }
 
-  // --- LẤY CHI TIẾT ---
+  // --- LẤY CHI TIẾT --- 
   @Get(':id')
+  @Public()
   @ApiOperation({ summary: 'Xem chi tiết một nguồn theo ID (Read One)' })
   @ApiParam({ name: 'id', description: 'ID của nguồn dữ liệu (UUID)' })
   findOne(@Param('id') id: string) {
@@ -39,6 +46,7 @@ export class SourcesController {
 
   // --- CẬP NHẬT ---
   @Patch(':id')
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Cập nhật thông tin nguồn dữ liệu (Update)' })
   @ApiParam({ name: 'id', description: 'ID của nguồn cần sửa' })
   @ApiBody({
@@ -51,6 +59,7 @@ export class SourcesController {
 
   // --- XÓA ---
   @Delete(':id')
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Xóa bỏ một nguồn dữ liệu (Delete)' })
   @ApiParam({ name: 'id', description: 'ID của nguồn cần xóa' })
   @ApiResponse({ status: 200, description: 'Xóa thành công.' })

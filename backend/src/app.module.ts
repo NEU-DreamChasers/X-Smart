@@ -10,7 +10,6 @@ import { ScorpioModule } from './scorpio/scorpio.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { HistoryModule } from './history/history.module';
 
-
 @Module({
   imports: [
     ConfigModule.forRoot({

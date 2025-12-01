@@ -39,7 +39,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 8080;
   await app.listen(port);
-  console.log(`Application is running on: ${await app.getUrl()}`);
   console.log(`Swagger UI is available at: http://localhost:${port}/api/docs`);
+  console.log(`Frontend is available at: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
 }
 bootstrap();

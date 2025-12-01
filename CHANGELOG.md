@@ -41,6 +41,112 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
     - Module `Users` và Entity `User` (TypeORM) ánh xạ với bảng `users` trong PostgreSQL.
     - Tính năng **Auto-Seeding**: Tự động kiểm tra và khởi tạo tài khoản Admin mặc định (`admin` / `admin123`) khi server khởi động.
 
+## [0.2.2] - 2025-11-30 (Auth & OAuth; FE Log)
+
+### Added
+
+- **Google OAuth 2.0**: Thêm `passport-google-oauth20` và `GoogleStrategy` để đăng nhập bằng Google.
+- **Decorators & Guards**: Bổ sung `@Public()` cho endpoint mở, `@Roles()` + `RolesGuard` cho quyền Admin; cập nhật `JwtAuthGuard` để bỏ qua JWT khi có `@Public()`.
+- **Frontend URL Log**: In ra link FE trong `backend/src/main.ts` bằng env `FRONTEND_URL` (mặc định `http://localhost:3000`).
+
+### Changed
+
+- **SourcesController**: Public cho `GET /sources`, `GET /sources/:id`; yêu cầu `@Roles(Admin)` cho `POST`, `PATCH`, `DELETE`.
+- **ContextController (Ingestion)**: Public cho `GET :domain/status`, `GET :domain/status/:id`, `GET /map/search-nearby`; yêu cầu `@Roles(Admin)` cho `POST/PUT/DELETE :id` và `POST /admin/import-static`.
+- **Google Strategy**: Thêm fallback rỗng cho `clientID`, `clientSecret`, `callbackURL` để tránh crash khi thiếu env.
+
+### Infrastructure
+
+- **docker-compose.yml (backend env)**: Thêm `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`.
+
+### Dependencies
+
+- Backend: thêm `passport-google-oauth20` và dev `@types/passport-google-oauth20`; cập nhật `axios` lên `^1.13.2`.
+
+## [0.3.0] - 2025-11-29 (Time-Series Storage & History API)
+
+### Added
+
+- **QuantumLeap Integration** (Time-Series Data Adapter):
+  - Tích hợp `QuantumLeap 1.0.0` làm NGSI-LD history adapter
+  - Tự động subscribe vào Scorpio Context Broker để lưu lịch sử entities
+  - Hỗ trợ NGSI-LD notifications với `KEEP_RAW_ENTITY: true`
+  - Docker service `quantumleap` với healthcheck endpoint `/v2/version`
+
+- **TimescaleDB Integration** (PostgreSQL Time-Series Extension):
+  - Thêm service `timescale` với image `timescale/timescaledb:latest-pg14`
+  - Tự động tạo hypertables cho time-series data: `etweatherobserved`, `etairqualityobserved`
+  - Port mapping: `5433:5432` để tránh conflict với PostgreSQL chính
+  - Persistent storage với volume `timescale_data`
+
+- **History Module** (Backend API cho Time-Series):
+  - Module `HistoryModule` với `HistoryController` và `HistoryService`
+  - Tích hợp `HttpModule` từ `@nestjs/axios` để gọi QuantumLeap API
+  - **Raw Data Endpoints**:
+    - `GET /history/entities/:type` - Lấy danh sách entities có lịch sử theo type
+    - `GET /history/entities/:entityId/attrs/:attrName` - Lịch sử của một thuộc tính với query params (lastN, fromDate, toDate)
+    - `GET /history/weather/:location` - Lịch sử thời tiết (temperature, humidity, pressure)
+    - `GET /history/air/:location` - Lịch sử chất lượng không khí (AQI, PM2.5, PM10, CO, NO2, O3, SO2)
+  - **Chart Data Endpoints** (Format cho Chart.js/Recharts):
+    - `GET /history/chart/temperature/:location` - Biểu đồ nhiệt độ
+    - `GET /history/chart/precipitation/:location` - Biểu đồ lượng mưa (Bar Chart)
+    - `GET /history/chart/aqi/:location` - Biểu đồ chỉ số AQI
+  - Chart format: `{ labels: string[], datasets: [{ label, data, borderColor, backgroundColor }] }`
+  - Query parameters: `hours`, `lastN`, `fromDate`, `toDate` để lọc dữ liệu
+  - Swagger documentation đầy đủ với examples cho tất cả endpoints
+
+- **QuantumLeap Subscriptions**:
+  - Auto-subscription cho `WeatherObserved` entities
+  - Auto-subscription cho `AirQualityObserved` entities
+  - Notification endpoint: `http://quantumleap:8668/v2/notify`
+  - Tài liệu chi tiết: `docs/QUANTUMLEAP_SUBSCRIPTION.md` với subscription JSON examples, troubleshooting SQL scripts, và frontend integration guide
+
+- **TimescaleDB Schema**:
+  - Bảng `etweatherobserved` với các cột: `entity_id`, `entity_type`, `fiware_servicepath`, `time_index` (primary key), `temperature`, `relativehumidity`, `windspeed`, `winddirection`, `weathertype`, `address` (JSONB), `dateobserved`, `atmosphericpressure`, `visibility`, `cloudcoverage`, `precipitation`, `location`, `location_centroid`, `instanceid`, `__original_ngsi_entity__` (JSONB)
+  - Bảng `etairqualityobserved` với các cột: `entity_id`, `entity_type`, `fiware_servicepath`, `time_index` (primary key), `airqualityindex`, `pm25`, `pm10`, `co`, `no2`, `o3`, `so2`, `location`, `location_centroid`, `dateobserved`, `instanceid`, `__original_ngsi_entity__` (JSONB)
+  - Hypertables với `time_index` làm dimension column cho time-series queries hiệu năng cao
+
+### Changed
+
+- **Docker Compose Configuration**:
+  - Thêm `timescale` service với PostgreSQL 14 + TimescaleDB extension
+  - Thêm `quantumleap` service với dependencies vào `timescale` và `scorpio`
+  - Backend environment: Thêm `QUANTUMLEAP_URL` (default: `http://quantumleap:8668`)
+  - Network configuration: Tất cả services trong cùng `xsmart` bridge network
+
+- **HistoryService**:
+  - Sử dụng `ConfigService` để đọc `QUANTUMLEAP_URL` từ environment variables
+  - HTTP client với proper error handling và logging
+  - Data transformation: QuantumLeap response → Chart.js format
+  - Time formatting: ISO timestamps → readable format (HH:mm DD-MM)
+
+### Fixed
+
+- **QuantumLeap Connection Issues**:
+  - Sửa lỗi "Connection refused" khi QuantumLeap cố kết nối CrateDB port 4200
+  - Thay đổi backend từ `mongo` sang `QL_DEFAULT_DB: timescale`
+  - Thêm đầy đủ connection variables: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB_NAME`, `POSTGRES_DB_USER`, `POSTGRES_DB_PASS`
+  - Disable CrateDB với `CRATE_WAIT_ACTIVE_SHARDS: 0`
+
+- **TimescaleDB Schema Errors**:
+  - Sửa lỗi "column does not exist" cho: `dateobserved`, `address`, `location`, `location_centroid`, `instanceid`, `fiware_servicepath`
+  - Sửa lỗi "relation does not exist" bằng cách tạo tables thủ công với `CREATE TABLE`
+  - Thêm `__original_ngsi_entity__` column (JSONB) để lưu raw entity khi `KEEP_RAW_ENTITY: true`
+  - Tạo hypertables với `SELECT create_hypertable()` để enable time-series features
+
+- **QuantumLeap Configuration**:
+  - Set `USE_GEOCODING: false` để tránh overhead không cần thiết
+  - Set `CACHE_QUERIES: true` để tăng performance
+  - Set `POSTGRES_USE_SSL: False` cho development environment
+  - Set `LOG_LEVEL: DEBUG` để dễ dàng troubleshooting
+
+### Removed
+
+- Loại bỏ phụ thuộc vào CrateDB backend (không cần thiết cho use case hiện tại)
+- Xóa hardcoded QuantumLeap URL trong code (chuyển sang ConfigService)
+
+---
+
 ## [0.3.0] - 2025-11-29 (Time-Series Storage & History API)
 
 ### Added
