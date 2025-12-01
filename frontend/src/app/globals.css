@@ -169,3 +169,30 @@ h3 {
     @apply bg-background text-foreground;
   }
 }
+
+.leaflet-popup-content-wrapper {
+  border-radius: 14px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  padding: 0 !important;
+  border: 0.8px solid rgba(0, 0, 0, 0.05);
+}
+
+.leaflet-popup-content {
+  margin: 8px 10px !important; /* Căn chỉnh lại lề bên trong */
+  line-height: 1.5;
+}
+
+.leaflet-container {
+  font-family: inherit !important; /* Dùng font của Next.js */
+}
+.leaflet-routing-container {
+  background-color: white;
+  padding: 10px;
+  border-radius: 14px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  font-family: inherit;
+  font-size: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 0.8px solid rgba(0,0,0,0.1);
+}
