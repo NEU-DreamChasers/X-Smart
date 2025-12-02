@@ -6,14 +6,11 @@ import { MapPin, Send, AlertTriangle, Loader2, X, ImagePlus, Phone, Type } from 
 
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
-// 1. Thêm Interface Props
 interface Props {
   onSuccess?: () => void;
 }
 
-// 2. Destructure prop
 export default function CitizenReportForm({ onSuccess }: Props) {
-  // Sử dụng Interface ReportFormState
   const [formData, setFormData] = useState<ReportFormState>({
     category: 'traffic',
     title: '', 
@@ -94,20 +91,19 @@ export default function CitizenReportForm({ onSuccess }: Props) {
       return;
     }
 
-    // Validate Phone (for Guest)
-    if (!isLoggedIn && !formData.phoneNumber?.trim()) {
+    // --- SỬA LỖI VALIDATION ---
+    // Luôn bắt buộc nhập SĐT nếu trong form chưa có (bất kể đã đăng nhập hay chưa)
+    if (!formData.phoneNumber?.trim()) {
       setStatusMsg({ type: 'error', text: 'Vui lòng nhập Số điện thoại xác minh.' });
       setIsLoading(false);
       return;
     }
 
     try {
-      // Hàm service sẽ tự động map các trường sang tên đúng (lng -> lon, imageBase64 -> image)
       await createCitizenReport(formData);
       
       setStatusMsg({ type: 'success', text: 'Gửi phản ánh thành công! Cảm ơn đóng góp của bạn.' });
       
-      // Reset form
       setFormData({
         category: 'traffic',
         title: '',
@@ -119,7 +115,6 @@ export default function CitizenReportForm({ onSuccess }: Props) {
         phoneNumber: ''
       });
 
-      // 3. Gọi callback onSuccess để component cha (Dashboard) biết
       if (onSuccess) {
         onSuccess();
       }
@@ -170,7 +165,6 @@ export default function CitizenReportForm({ onSuccess }: Props) {
             </div>
           </div>
 
-          {/* MỚI: Input Tiêu đề */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-900">Tiêu đề <span className="text-red-500">*</span></label>
             <div className="relative">
@@ -201,17 +195,18 @@ export default function CitizenReportForm({ onSuccess }: Props) {
           </div>
 
           <div className="space-y-2">
+            {/* SỬA: Luôn hiện dấu sao bắt buộc */}
             <label className="text-sm font-medium text-gray-900">
-              Số điện thoại liên hệ {!isLoggedIn && <span className="text-red-500">*</span>}
+              Số điện thoại liên hệ <span className="text-red-500">*</span>
             </label>
             <div className="relative">
+              {/* SỬA: Xóa thuộc tính disabled và cập nhật placeholder */}
               <input
                 type="tel"
                 value={formData.phoneNumber}
                 onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                placeholder={isLoggedIn ? "Đã đăng nhập (Tự động lấy)" : "Nhập SĐT để xác minh"}
-                disabled={isLoggedIn}
-                className={`w-full pl-10 pr-4 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all text-sm placeholder:text-gray-400 ${isLoggedIn ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                placeholder="Nhập SĐT để xác minh"
+                className="w-full pl-10 pr-4 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all text-sm placeholder:text-gray-400"
                 style={borderStyle}
               />
               <Phone className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
