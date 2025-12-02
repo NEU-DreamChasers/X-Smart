@@ -44,6 +44,9 @@ export class Report {
     status: ReportStatus;
 
     // --- NGƯỜI GỬI ---
+    @Column({ nullable: true })
+    userId: number;
+
     @ManyToOne(() => User, (user) => user.reports, { nullable: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'userId' })
     user: User;

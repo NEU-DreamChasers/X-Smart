@@ -23,6 +23,12 @@ export function AdminDataManagement() {
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
+  const [offset, setOffset] = useState(0); 
+  const [totalCount, setTotalCount] = useState(0);
+
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
   // State quản lý trạng thái Import
   const [isImporting, setIsImporting] = useState(false);
 
@@ -44,6 +50,27 @@ export function AdminDataManagement() {
     }
   };
 
+
+  // LOGIC ĐIỀU KHIỂN CHUYỂN TRANG
+  const handlePrev = () => {
+    if (offset > 0) {
+      setOffset(offset - PAGE_SIZE);
+    }
+  };
+
+  const handleNext = () => {
+    if (data.length === PAGE_SIZE) {
+      setOffset(offset + PAGE_SIZE);
+    }
+  };
+  
+  useEffect(() => { 
+    setOffset(0); 
+  }, [domain]);
+  
+  useEffect(() => { 
+    fetchData(); 
+  }, [domain, offset]);
 
   // LOGIC ĐIỀU KHIỂN CHUYỂN TRANG
   const handlePrev = () => {
