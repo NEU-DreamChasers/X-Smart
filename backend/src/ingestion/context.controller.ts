@@ -13,8 +13,9 @@ import {
   Post,
   Put,
   Query,
-  UseGuards,
+  UseGuards, Res, ParseIntPipe, DefaultValuePipe
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { AdapterFactory } from './factory/adapter.factory';
 import { ScorpioService } from '../scorpio/scorpio.service';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -131,11 +132,15 @@ export class ContextController {
   @Get(':domain/status')
   @Public()
   @Header('Content-Type', 'application/ld+json')
-  @ApiOperation({ summary: 'Lấy danh sách dữ liệu theo lĩnh vực (Weather, Air, Bus, Parking)' })
+  @ApiOperation({ summary: 'Lấy danh sách dữ liệu theo lĩnh vực (Weather, Air, Bus, Parking), hỗ trợ phân trang/lấy tất cả' })
   @ApiParam({ name: 'domain', example: 'weather', description: 'Lĩnh vực cần lấy dữ liệu' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Số lượng tối đa. Bỏ trống để lấy tất cả' })
+  @ApiQuery({ name: 'offset', required: false, description: 'Vị trí bắt đầu' })
   @ApiQuery({ name: 'category', required: false, example: 'hospital', description: 'Lọc theo danh mục (dành cho POI)' })
-  async getAllData(@Param('domain') domain: string, @Query('category') category?: string) {
-    this.logger.log(`GET ALL Request cho domain: ${domain}, category: ${category}`);
+  async getAllData(@Param('domain') domain: string, @Query('category') category?: string, @Query('limit') limit?: number, 
+    @Query('offset') offset?: number, @Res({ passthrough: true }) res?: Response) {
+
+    this.logger.log(`GET ALL Request cho domain: ${domain}, category: ${category}, limit=${limit}, offset=${offset}`);
 
     let type = '';
     let query = '';
@@ -160,8 +165,13 @@ export class ContextController {
         throw new HttpException('Domain không hỗ trợ lấy danh sách', HttpStatus.BAD_REQUEST);
     }
 
+    const result = await this.scorpioService.getEntitiesByType(type, query, limit, offset);
+    if (res) {
+      res.header('X-Total-Count', result.count.toString());
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return this.scorpioService.getEntitiesByType(type, query);
+    return result.data;
   }
 
   // URI: GET /weather/status/device_01

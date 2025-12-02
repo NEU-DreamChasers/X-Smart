@@ -102,6 +102,7 @@ export default function CitizenReportForm({ onSuccess }: Props) {
     }
 
     try {
+      // Hàm service sẽ tự động map các trường sang tên đúng (lng -> lon, imageBase64 -> image)
       await createCitizenReport(formData);
       
       setStatusMsg({ type: 'success', text: 'Gửi phản ánh thành công! Cảm ơn đóng góp của bạn.' });
