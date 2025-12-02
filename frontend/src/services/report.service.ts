@@ -41,7 +41,7 @@ export interface NgsiReport {
     type: 'GeoProperty';
     value: { type: 'Point'; coordinates: [number, number] };
   };
-  status?: NgsiProperty<'PENDING' | 'APPROVED' | 'REJECTED' | 'RESOLVED'>; // Đồng bộ chữ hoa/thường ở UI
+  status?: NgsiProperty<'PENDING' | 'APPROVED' | 'REJECTED' | 'RESOLVED'>;
   media?: NgsiProperty<string>;
   reporter?: NgsiProperty<string>;
   dateObserved?: NgsiProperty<string>;
@@ -143,3 +143,32 @@ export const rejectReport = async (id: string) => {
 export const resolveReport = async (id: string) => {
   return await api.patch(`/reports/${id}/resolve`);
 };
+
+// --- MỚI THÊM: Lấy lịch sử báo cáo cá nhân ---
+export const getMyReports = async (): Promise<NgsiReport[]> => {
+  try {
+    const response = await api.get('/reports/my-reports');
+    if (Array.isArray(response.data)) {
+      return response.data.map(mapToNgsiReport);
+    }
+    return [];
+  } catch (error) {
+    console.error("Lỗi khi lấy lịch sử báo cáo cá nhân:", error);
+    return [];
+  }
+};
+
+export const getReportById = async (id: string): Promise<NgsiReport | null> => {
+  try {
+    const response = await api.get(`/reports/${id}`);
+    if (response.data) {
+      // Backend có thể trả về object thuần, cần map lại để đảm bảo cấu trúc NGSI
+      return mapToNgsiReport(response.data);
+    }
+    return null;
+  } catch (error) {
+    console.error("Lỗi khi lấy chi tiết báo cáo:", error);
+    return null;
+  }
+};
+
