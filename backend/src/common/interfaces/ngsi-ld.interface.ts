@@ -19,7 +19,7 @@ export interface NgsiGeoProperty {
 
 export interface NgsiRelationship {
   type: 'Relationship';
-  object: string; // URN của đối tượng được liên kết
+  object: string;
 }
 
 //Cấu trúc tổng thể của một Entity hoàn chỉnh

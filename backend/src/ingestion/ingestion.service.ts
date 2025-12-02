@@ -26,7 +26,7 @@ export class IngestionService {
     this.overpassUrl = 'https://maps.mail.ru/osm/tools/overpass/api/interpreter';
 
     if (!key || key.trim() === '') {
-      throw new Error('❌ LỖI CẤU HÌNH: Chưa tìm thấy OPENWEATHER_API_KEY!');
+      throw new Error(' LỖI CẤU HÌNH: Chưa tìm thấy OPENWEATHER_API_KEY!');
     }
     this.openWeatherApiKey = key || '';
   }
@@ -65,7 +65,7 @@ export class IngestionService {
   // LUỒNG 2: GIẢ LẬP BÃI ĐỖ XE - Chạy 1 phút/lần
   @Cron(CronExpression.EVERY_MINUTE)
   async handleParkingSimulation() {
-    this.logger.debug('🚗 [Simulation] Đang cập nhật trạng thái bãi đỗ xe...');
+    this.logger.debug(' [Simulation] Đang cập nhật trạng thái bãi đỗ xe...');
 
     const parkingLots = await this.scorpioService.getEntitiesByType('OffStreetParking');
 
@@ -92,7 +92,7 @@ export class IngestionService {
 
       await this.scorpioService.publishEntity(updatePayload as any);
     }
-    this.logger.log(`✅ Đã cập nhật trạng thái cho ${parkingLots.length} bãi xe.`);
+    this.logger.log(` Đã cập nhật trạng thái cho ${parkingLots.length} bãi xe.`);
   }
 
   // LUỒNG 3: IMPORT DỮ LIỆU TĨNH
@@ -118,7 +118,7 @@ export class IngestionService {
 
     const response = await firstValueFrom(this.httpService.get(apiUrl));
     const elements = response.data.elements || [];
-    this.logger.log(`📦 Tìm thấy ${elements.length} điểm. Đang đẩy vào Kafka...`);
+    this.logger.log(` Tìm thấy ${elements.length} điểm. Đang đẩy vào Kafka...`);
 
     for (const element of elements) {
       this.kafkaClient.emit('raw_data_topic', {

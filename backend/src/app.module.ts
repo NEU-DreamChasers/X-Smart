@@ -11,6 +11,8 @@ import { ScorpioModule } from './scorpio/scorpio.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { HistoryModule } from './history/history.module';
 import { ReportsModule } from './reports/reports.module';
+import { MinioClientModule } from './minio-client/minio-client.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -46,6 +48,8 @@ import { ReportsModule } from './reports/reports.module';
     IngestionModule,
     HistoryModule,
     ReportsModule,
+    MinioClientModule,
+    UploadModule,
   ],
   controllers: [],
   providers: [

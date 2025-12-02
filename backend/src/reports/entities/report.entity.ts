@@ -21,10 +21,10 @@ export class Report {
     description: string;
 
     @Column({ nullable: true })
-    address: string; // Địa chỉ text (VD: 123 Giải Phóng)
+    address: string;
 
     @Column({ nullable: true })
-    imageUrl: string; // Vẫn giữ cột này, nhưng tạm thời cho phép null
+    imageUrl: string;
 
     // --- VỊ TRÍ BẢN ĐỒ (PostGIS) ---
     @Index({ spatial: true })

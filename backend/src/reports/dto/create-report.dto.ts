@@ -1,4 +1,5 @@
 import { IsString, IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateReportDto {
     @IsNotEmpty()
@@ -12,10 +13,12 @@ export class CreateReportDto {
     address?: string;
 
     @IsOptional()
+    @Type(() => Number)
     @IsNumber()
     lat?: number;
 
     @IsOptional()
+    @Type(() => Number)
     @IsNumber()
     lon?: number;
 

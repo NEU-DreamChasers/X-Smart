@@ -31,6 +31,34 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
 - _(Chưa có thay đổi nào được ghi chép)_
 
 ---
+## [0.4.0] - 2025-12-02
+
+### Added (Tính năng mới)
+
+#### 📸 Media & Storage (Hệ thống Lưu trữ & Đa phương tiện)
+- **MinIO Object Storage**:
+    - Tích hợp **MinIO** (S3 Compatible) làm giải pháp lưu trữ ảnh tự host (On-premise), đảm bảo chủ quyền dữ liệu.
+    - Cập nhật `docker-compose.yml` với service `minio` và script tự động tạo bucket `reports`.
+    - Module hóa: Tách biệt `MinioClientModule` (Hạ tầng kết nối) và `UploadModule` (Nghiệp vụ xử lý file).
+- **Image Upload Pipeline**:
+    - Nâng cấp API `POST /reports` hỗ trợ định dạng `multipart/form-data`.
+    - Cho phép người dân gửi kèm ảnh hiện trường khi tạo báo cáo.
+    - Tự động hash tên file (MD5 + Timestamp) để tránh trùng lặp.
+    - Trả về đường dẫn công khai (Public URL) để Frontend hiển thị.
+
+#### 🛡️ Security & Performance (Bảo mật & Hiệu năng)
+- **Rate Limiting (Chống Spam)**:
+    - Tích hợp thư viện `@nestjs/throttler`.
+    - Thiết lập giới hạn toàn cục (Global Limit).
+    - Siết chặt giới hạn riêng cho API Gửi báo cáo (chặn spam từ khách vãng lai).
+- **Proxy Configuration**:
+    - Cấu hình `app.set('trust proxy', 1)` để nhận diện đúng IP người dùng qua Docker/Nginx.
+
+### Changed (Thay đổi)
+- **Refactor `ReportsController`**:
+    - Chuyển đổi logic nhận dữ liệu từ JSON thuần sang `FileInterceptor` (Form-data).
+    - Inject `UploadService` để xử lý file trước khi lưu vào Database.
+
 ## [0.3.0] - 2025-12-01
 
 ### Added (Tính năng mới)
