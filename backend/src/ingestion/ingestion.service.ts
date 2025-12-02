@@ -35,7 +35,7 @@ export class IngestionService {
   @Cron(CronExpression.EVERY_5_MINUTES)
   async handleSensorIngestion() {
     this.logger.debug('📡 [Ingestion] Đang thu thập dữ liệu Môi trường...');
-    const sources = await this.sourcesService.findAll();
+    const [sources] = await this.sourcesService.findAll();
 
     for (const source of sources) {
       if (!source.adapterType.includes('openweathermap')) continue;
@@ -67,7 +67,8 @@ export class IngestionService {
   async handleParkingSimulation() {
     this.logger.debug('🚗 [Simulation] Đang cập nhật trạng thái bãi đỗ xe...');
 
-    const parkingLots = await this.scorpioService.getEntitiesByType('OffStreetParking');
+    const result = await this.scorpioService.getEntitiesByType('OffStreetParking');
+    const parkingLots = result.data;
 
     if (!parkingLots || parkingLots.length === 0) return;
 

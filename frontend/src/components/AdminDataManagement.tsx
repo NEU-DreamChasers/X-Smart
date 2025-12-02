@@ -1,19 +1,27 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
+import { Tabs, TabContent, TabsList, TabsTrigger } from './ui/tabs';
 import { 
   CloudRain, Wind, Bus, ParkingCircle, RefreshCw, 
-  Database, Loader2, CheckCircle2, Play 
+  Database, Loader2, CheckCircle2, Play, ChevronLeft, ChevronRight, Eye, MapPin 
 } from 'lucide-react';
-import { ApiService, api } from '../services/api.service';
+import { ApiService } from '../services/api.service';
 
 const cardStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
+const PAGE_SIZE = 10;
+type DomainKeys = 'weather' | 'air' | 'bus' | 'parking';
 
 export function AdminDataManagement() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [domain, setDomain] = useState('weather');
+  const [domain, setDomain] = useState<DomainKeys>('weather');
+
+  const [offset, setOffset] = useState(0); 
+  const [totalCount, setTotalCount] = useState(0);
+
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   // State quản lý trạng thái Import
   const [isImporting, setIsImporting] = useState(false);
@@ -23,20 +31,40 @@ export function AdminDataManagement() {
     setLoading(true);
     setData([]);
     try {
-      let res = [];
-      if (domain === 'weather') res = await ApiService.weather.getAll();
-      else if (domain === 'air') res = await ApiService.air.getAll();
-      else if (domain === 'bus') res = await ApiService.bus.getAll();
-      else if (domain === 'parking') res = await ApiService.parking.getAll();
-      setData(res);
+      const response = await ApiService[domain].getAll(PAGE_SIZE, offset); 
+      
+      setData(response.data);
+      setTotalCount(response.totalCount)
     } catch (error) {
       console.error("Lỗi tải dữ liệu:", error);
+      setData([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, [domain]);
+
+  // LOGIC ĐIỀU KHIỂN CHUYỂN TRANG
+  const handlePrev = () => {
+    if (offset > 0) {
+      setOffset(offset - PAGE_SIZE);
+    }
+  };
+
+  const handleNext = () => {
+    if (data.length === PAGE_SIZE) {
+      setOffset(offset + PAGE_SIZE);
+    }
+  };
+  
+  useEffect(() => { 
+    setOffset(0); 
+  }, [domain]);
+  
+  useEffect(() => { 
+    fetchData(); 
+  }, [domain, offset]);
 
   // --- HÀM 2: IMPORT TẤT CẢ DỮ LIỆU ---
   const handleImportAll = async () => {
@@ -78,6 +106,11 @@ export function AdminDataManagement() {
     { header: 'Giá trị chính', accessor: 'value', width: 'w-1/4' },
     { header: 'Cập nhật cuối', accessor: 'observedAt', width: 'w-1/4' },
   ];
+
+  const handleTabChange = (value: string) => {
+  setDomain(value as DomainKeys);
+  setOffset(0);
+  };
 
   return (
     <div className="space-y-6">
@@ -133,7 +166,8 @@ export function AdminDataManagement() {
         </button>
       </div>
 
-      <Tabs value={domain} onValueChange={setDomain} className="w-full">
+
+      <Tabs value={domain} onValueChange={handleTabChange} className="w-full">
         <TabsList className="inline-flex h-12 items-center bg-gray-100 p-1 rounded-full mb-6 w-full md:w-auto">
             <TabsTrigger value="weather" className="rounded-full px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"><CloudRain className="w-4 h-4 mr-2"/> Thời tiết</TabsTrigger>
             <TabsTrigger value="air" className="rounded-full px-6 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"><Wind className="w-4 h-4 mr-2"/> Không khí</TabsTrigger>
@@ -178,6 +212,36 @@ export function AdminDataManagement() {
                     </tbody>
                 </table>
             </div>
+
+          { /* FOOTER PHÂN TRANG */}
+          {data.length > 0 && (
+             <div className="p-4 flex justify-between items-center border-t border-gray-100 bg-gray-50">
+                <div className="text-sm text-gray-600">
+                    Hiển thị {offset + 1} - {offset + data.length} trên tổng số <b> {totalCount} </b>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <button 
+                        onClick={handlePrev} 
+                        disabled={offset === 0 || loading}
+                        className="p-1 border rounded-md text-gray-700 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                       <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    
+                    <span className="text-sm font-medium text-gray-700 px-2">
+                        Trang {currentPage}
+                    </span>
+                    
+                    <button 
+                        onClick={handleNext} 
+                        disabled={offset + PAGE_SIZE >= totalCount || loading}
+                        className="p-1 border rounded-md text-gray-700 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <ChevronRight className="w-5 h-5" />
+                    </button>
+                </div>
+            </div>
+          )}
         </div>
       </Tabs>
     </div>

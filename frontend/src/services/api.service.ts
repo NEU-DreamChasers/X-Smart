@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-// Đảm bảo thống nhất URL
+import { create } from 'domain';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 // THÊM: export const api để report.service.ts có thể dùng chung
@@ -13,7 +12,7 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem('access_token');
       // Backend của bạn dùng Bearer Token
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -53,12 +52,45 @@ const parseNgsi = (item: any) => {
   return result;
 };
 
+const createNgsiGetAll = (domain: string) => 
+  async (limit?: number, offset?: number): Promise<{ data: any[]; totalCount: number }> => {
+    const url = `/${domain}/status`;
+    const params: any = {};
+
+    if (limit !== undefined) {
+      params.limit = limit;
+      params.count = 'true';
+    }
+    if (offset !== undefined) {
+      params.offset = offset;
+    }
+
+    const res = await api.get(url, { params });
+    
+    const totalCount = parseInt(res.headers['ngsild-results-count'] || res.headers['x-total-count'] || '0', 10);
+    
+    return {
+        data: Array.isArray(res.data) ? res.data.map(parseNgsi) : [],
+        totalCount: totalCount,
+    };
+  };
+
 export const ApiService = {
   // --- QUẢN LÝ SOURCES (Cảm biến / Nguồn dữ liệu) ---
   sources: {
-    getAll: async () => {
-      const res = await api.get('/sources');
-      return res.data;
+    getAll: async (limit?: number, offset?: number): Promise<{ data: any[]; totalCount: number }> => {
+      const params: any = {};
+      if (limit !== undefined) params.limit = limit;
+      if (offset !== undefined) params.offset = offset;
+      
+      const res = await api.get('/sources', { params });
+      
+      const totalCount = parseInt(res.headers['x-total-count'] || '0', 10);
+      
+      return {
+          data: res.data, 
+          totalCount: totalCount,
+      };
     },
     getOne: async (id: string) => {
       const res = await api.get(`/sources/${id}`);
@@ -80,38 +112,26 @@ export const ApiService = {
 
   // --- DỮ LIỆU NGSI-LD ---
   weather: {
-    getAll: async () => {
-      const res = await api.get('/weather/status');
-      return Array.isArray(res.data) ? res.data.map(parseNgsi) : [];
-    },
+    getAll: createNgsiGetAll('weather'),
     create: (id: string, data: any) =>
       api.post(`/weather/status/${id}`, data, { params: { type: 'openweathermap' } }),
     delete: (id: string) => api.delete(`/weather/status/${id}`),
   },
 
   air: {
-    getAll: async () => {
-      const res = await api.get('/air/status');
-      return Array.isArray(res.data) ? res.data.map(parseNgsi) : [];
-    },
+    getAll: createNgsiGetAll('air'),
     create: (id: string, data: any) =>
       api.post(`/air/status/${id}`, data, { params: { type: 'openweathermap_aqi' } }),
     delete: (id: string) => api.delete(`/air/status/${id}`),
   },
 
   bus: {
-    getAll: async () => {
-      const res = await api.get('/bus/status');
-      return Array.isArray(res.data) ? res.data.map(parseNgsi) : [];
-    },
+    getAll: createNgsiGetAll('bus'),
     delete: (id: string) => api.delete(`/bus/status/${id}`),
   },
 
   parking: {
-    getAll: async () => {
-      const res = await api.get('/parking/status');
-      return Array.isArray(res.data) ? res.data.map(parseNgsi) : [];
-    },
+    getAll: createNgsiGetAll('parking'),
     delete: (id: string) => api.delete(`/parking/status/${id}`),
   },
 };
