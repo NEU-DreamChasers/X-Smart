@@ -8,6 +8,7 @@ import { UpdateReportDto } from './dto/update-report.dto';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { ReportFilterDto } from './dto/report-filter.dto';
+import { NotificationsService } from 'src/notifications/notifications.service';
 @Injectable()
 export class ReportsService {
   private readonly logger = new Logger(ReportsService.name);
@@ -15,6 +16,7 @@ export class ReportsService {
     @InjectRepository(Report)
     private reportRepo: Repository<Report>,
     private httpService: HttpService,
+    private notificationsService: NotificationsService,
   ) { }
 
   private async getAddressFromCoordinates(lat: number, lon: number): Promise<string> {
@@ -152,11 +154,30 @@ export class ReportsService {
   // 4. Admin duyệt/từ chối 
   async updateStatus(id: number, status: ReportStatus) {
     const report = await this.reportRepo.findOne({ where: { id } });
-    if (!report) {
-      throw new NotFoundException('Không tìm thấy báo cáo');
-    }
+    if (!report) throw new Error('Report not found');
+
     report.status = status;
-    return this.reportRepo.save(report);
+    await this.reportRepo.save(report);
+
+    let title = '';
+    let message = '';
+
+    if (status === ReportStatus.APPROVED) { 
+      title = 'Báo cáo được tiếp nhận';
+      message = `Phản ánh "${report.title}" của bạn đã được duyệt và đang xử lý.`;
+    } else if (status === ReportStatus.REJECTED) {
+      title = 'Báo cáo bị từ chối';
+      message = `Phản ánh "${report.title}" chưa hợp lệ. Vui lòng kiểm tra lại.`;
+    } else if (status === ReportStatus.RESOLVED) {
+      title = 'Xử lý hoàn tất';
+      message = `Vấn đề "${report.title}" bạn phản ánh đã được giải quyết!`;
+    }
+
+    if (title) {
+      await this.notificationsService.create(report.userId, title, message, report.id.toString());
+    }
+
+    return report;
   }
   private async findAndCheckOwner(id: number, user: User) {
     const report = await this.reportRepo.findOne({
