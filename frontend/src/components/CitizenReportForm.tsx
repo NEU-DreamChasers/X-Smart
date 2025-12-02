@@ -1,28 +1,40 @@
 'use client';
 
-import React, { useState, ChangeEvent, FormEvent } from 'react';
-import { createCitizenReport, ReportPayload } from '../services/report.service';
-import { MapPin, Send, AlertTriangle, Loader2, X, ImagePlus } from 'lucide-react';
+import React, { useState, ChangeEvent, FormEvent, useEffect } from 'react';
+import { createCitizenReport, ReportFormState } from '../services/report.service';
+import { MapPin, Send, AlertTriangle, Loader2, X, ImagePlus, Phone, Type } from 'lucide-react';
 
-// Define the exact border style from CitizenMapView
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
 export default function CitizenReportForm() {
-  const [formData, setFormData] = useState<ReportPayload>({
+  // Sử dụng Interface ReportFormState
+  const [formData, setFormData] = useState<ReportFormState>({
     category: 'traffic',
+    title: '', // Trường mới bắt buộc
     description: '',
     address: '',
     lat: 0,
     lng: 0,
     imageBase64: null,
+    phoneNumber: '',
   });
 
   const [isLoading, setIsLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    setIsLoggedIn(!!token);
+  }, []);
 
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setStatusMsg({ type: 'error', text: 'Ảnh quá lớn. Vui lòng chọn ảnh dưới 5MB.' });
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, imageBase64: reader.result as string }));
@@ -46,7 +58,7 @@ export default function CitizenReportForm() {
         setFormData(prev => ({
           ...prev,
           lat: pos.coords.latitude,
-          lng: pos.coords.longitude
+          lng: pos.coords.longitude,
         }));
         setIsLoading(false);
       },
@@ -62,18 +74,51 @@ export default function CitizenReportForm() {
     setIsLoading(true);
     setStatusMsg(null);
 
-    if (formData.lat === 0 && formData.lng === 0) {
+    // Validate Title
+    if (!formData.title.trim()) {
+      setStatusMsg({ type: 'error', text: 'Vui lòng nhập tiêu đề báo cáo.' });
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate Location
+    if ((formData.lat === 0 && formData.lng === 0) && !formData.address.trim()) {
       setStatusMsg({ type: 'error', text: 'Vui lòng cung cấp vị trí (Nhập địa chỉ hoặc dùng GPS).' });
       setIsLoading(false);
       return;
     }
 
+    // Validate Phone (for Guest)
+    if (!isLoggedIn && !formData.phoneNumber?.trim()) {
+      setStatusMsg({ type: 'error', text: 'Vui lòng nhập Số điện thoại xác minh.' });
+      setIsLoading(false);
+      return;
+    }
+
     try {
+      // Hàm service sẽ tự động map các trường sang tên đúng (lng -> lon, imageBase64 -> image)
       await createCitizenReport(formData);
-      setStatusMsg({ type: 'success', text: 'Gửi phản ánh thành công!' });
-      setFormData({ category: 'traffic', description: '', address: '', lat: 0, lng: 0, imageBase64: null });
-    } catch (err) {
-      setStatusMsg({ type: 'error', text: 'Gửi thất bại. Vui lòng thử lại sau.' });
+      
+      setStatusMsg({ type: 'success', text: 'Gửi phản ánh thành công! Cảm ơn đóng góp của bạn.' });
+      // Reset form
+      setFormData({
+        category: 'traffic',
+        title: '',
+        description: '',
+        address: '',
+        lat: 0,
+        lng: 0,
+        imageBase64: null,
+        phoneNumber: ''
+      });
+    } catch (err: any) {
+      // Hiển thị lỗi chi tiết từ Backend trả về
+      const resData = err.response?.data;
+      const errorMsg = Array.isArray(resData?.message) 
+        ? resData.message.join(', ') // Nối các lỗi lại nếu có nhiều
+        : (resData?.message || 'Gửi thất bại. Vui lòng thử lại sau.');
+      
+      setStatusMsg({ type: 'error', text: `Lỗi: ${errorMsg}` });
     } finally {
       setIsLoading(false);
     }
@@ -84,9 +129,7 @@ export default function CitizenReportForm() {
       {statusMsg && (
         <div 
           className={`p-4 rounded-[14px] flex items-start gap-3 text-sm font-medium shadow-sm ${
-            statusMsg.type === 'success' 
-              ? 'bg-emerald-50 text-emerald-700' 
-              : 'bg-red-50 text-red-700'
+            statusMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
           }`}
           style={borderStyle}
         >
@@ -96,14 +139,14 @@ export default function CitizenReportForm() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Left Column */}
+        {/* Cột Trái */}
         <div className="space-y-5">
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-900">Danh mục phản ánh</label>
             <div className="relative">
               <select
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 className="w-full pl-4 pr-10 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all text-sm text-gray-700 appearance-none cursor-pointer"
                 style={borderStyle}
               >
@@ -112,9 +155,23 @@ export default function CitizenReportForm() {
                 <option value="environment">🗑️ Môi trường</option>
                 <option value="infrastructure">🚧 Hạ tầng</option>
               </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-              </div>
+            </div>
+          </div>
+
+          {/* MỚI: Input Tiêu đề */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-900">Tiêu đề <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <input
+                required
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Ví dụ: Ùn tắc tại ngã tư..."
+                className="w-full pl-10 pr-4 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all text-sm placeholder:text-gray-400"
+                style={borderStyle}
+              />
+              <Type className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
             </div>
           </div>
 
@@ -130,9 +187,27 @@ export default function CitizenReportForm() {
               style={borderStyle}
             />
           </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-900">
+              Số điện thoại liên hệ {!isLoggedIn && <span className="text-red-500">*</span>}
+            </label>
+            <div className="relative">
+              <input
+                type="tel"
+                value={formData.phoneNumber}
+                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                placeholder={isLoggedIn ? "Đã đăng nhập (Tự động lấy)" : "Nhập SĐT để xác minh"}
+                disabled={isLoggedIn}
+                className={`w-full pl-10 pr-4 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all text-sm placeholder:text-gray-400 ${isLoggedIn ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                style={borderStyle}
+              />
+              <Phone className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
+            </div>
+          </div>
         </div>
 
-        {/* Right Column */}
+        {/* Cột Phải */}
         <div className="space-y-5">
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-900">Vị trí sự cố</label>
@@ -157,7 +232,7 @@ export default function CitizenReportForm() {
               </button>
             </div>
             {formData.lat !== 0 && (
-              <div className="flex items-center gap-1.5 p-2 bg-blue-50/50 rounded-[10px] w-fit" style={{ border: '0.8px solid rgba(59, 130, 246, 0.2)' }}>
+              <div className="flex items-center gap-1.5 p-2 bg-blue-50/50 rounded-[10px] w-fit mt-2" style={{ border: '0.8px solid rgba(59, 130, 246, 0.2)' }}>
                 <MapPin className="w-3.5 h-3.5 text-blue-600" />
                 <span className="text-xs font-medium text-blue-700">
                   {formData.lat.toFixed(5)}, {formData.lng.toFixed(5)}
@@ -167,7 +242,7 @@ export default function CitizenReportForm() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-900">Hình ảnh</label>
+            <label className="text-sm font-medium text-gray-900">Hình ảnh minh chứng</label>
             {!formData.imageBase64 ? (
               <label 
                 className="flex flex-col items-center justify-center w-full h-32 rounded-[14px] cursor-pointer bg-white hover:bg-gray-50 transition-all group shadow-sm"
