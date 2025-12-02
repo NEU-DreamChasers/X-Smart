@@ -1,45 +1,104 @@
 import axios from 'axios';
 
+// Đảm bảo thống nhất URL
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
-const api = axios.create({
+// THÊM: export const api để report.service.ts có thể dùng chung
+export const api = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Helper to parse NGSI-LD response to flat object for UI
+// 1. Interceptor: Tự động gắn Token vào Header
+api.interceptors.request.use(
+  (config) => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('access_token');
+      // Backend của bạn dùng Bearer Token
+      if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// 2. Interceptor: Xử lý lỗi chung
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('API Error Detail:', JSON.stringify(error.response?.data, null, 2));
+    const message = error.response?.data?.message;
+    if (Array.isArray(message)) {
+        console.error('Validation Error:', message[0]);
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Helper: Chuyển đổi dữ liệu NGSI-LD sang Object phẳng cho UI
 const parseNgsi = (item: any) => {
+  if (!item) return null;
   const result: any = { id: item.id, type: item.type };
-  Object.keys(item).forEach(key => {
-    if (item[key] && typeof item[key] === 'object' && 'value' in item[key]) {
-      result[key] = item[key].value;
-    } else {
-      result[key] = item[key];
+  Object.keys(item).forEach((key) => {
+    if (key !== 'id' && key !== 'type') {
+      if (item[key] && typeof item[key] === 'object' && 'value' in item[key]) {
+        result[key] = item[key].value;
+      } else {
+        result[key] = item[key];
+      }
     }
   });
   return result;
 };
 
 export const ApiService = {
-  // Weather
+  // --- QUẢN LÝ SOURCES (Cảm biến / Nguồn dữ liệu) ---
+  sources: {
+    getAll: async () => {
+      const res = await api.get('/sources');
+      return res.data;
+    },
+    getOne: async (id: string) => {
+      const res = await api.get(`/sources/${id}`);
+      return res.data;
+    },
+    create: async (data: any) => {
+      const res = await api.post('/sources', data);
+      return res.data;
+    },
+    update: async (id: string, data: any) => {
+      const res = await api.patch(`/sources/${id}`, data);
+      return res.data;
+    },
+    delete: async (id: string) => {
+      const res = await api.delete(`/sources/${id}`);
+      return res.data;
+    },
+  },
+
+  // --- DỮ LIỆU NGSI-LD ---
   weather: {
     getAll: async () => {
       const res = await api.get('/weather/status');
       return Array.isArray(res.data) ? res.data.map(parseNgsi) : [];
     },
-    create: (id: string, data: any) => api.post(`/weather/status/${id}`, data, { params: { type: 'openweathermap' } }),
+    create: (id: string, data: any) =>
+      api.post(`/weather/status/${id}`, data, { params: { type: 'openweathermap' } }),
     delete: (id: string) => api.delete(`/weather/status/${id}`),
   },
-  // Air Quality
+
   air: {
     getAll: async () => {
       const res = await api.get('/air/status');
       return Array.isArray(res.data) ? res.data.map(parseNgsi) : [];
     },
-    create: (id: string, data: any) => api.post(`/air/status/${id}`, data, { params: { type: 'openweathermap_aqi' } }),
+    create: (id: string, data: any) =>
+      api.post(`/air/status/${id}`, data, { params: { type: 'openweathermap_aqi' } }),
     delete: (id: string) => api.delete(`/air/status/${id}`),
   },
-  // Bus
+
   bus: {
     getAll: async () => {
       const res = await api.get('/bus/status');
@@ -47,7 +106,7 @@ export const ApiService = {
     },
     delete: (id: string) => api.delete(`/bus/status/${id}`),
   },
-  // Parking
+
   parking: {
     getAll: async () => {
       const res = await api.get('/parking/status');

@@ -5,11 +5,15 @@ import dynamic from 'next/dynamic';
 import { Badge } from './ui/badge';
 import { 
   Bus, Hospital, School, MapPin, Search, Filter, 
-  Map, Activity, X, Loader2, Navigation, Clock, Compass, CornerUpRight
+  Map, Activity, X, Loader2, Navigation, Clock, Compass, CornerUpRight,
+  Car,
+  Wind,
+  CloudSun, Droplets, Thermometer, Gauge, CloudFog, AlertTriangle, Biohazard
 } from 'lucide-react';
 
 // Import Interface để type checking (nếu cần)
 import type { NgsiEntity } from './maps/RealMap';
+import { formatAddress } from '@/lib/utils';
 
 // Import Map động (No SSR)
 const RealMap = dynamic(() => import('./maps/RealMap'), { 
@@ -22,12 +26,6 @@ const RealMap = dynamic(() => import('./maps/RealMap'), {
   )
 });
 
-// Dữ liệu mẫu Demo (Fallback khi chưa chọn gì)
-const nearbyEntities = [
-  { id: '001', type: 'BusStop', name: 'Bến xe Bến Thành', distance: 0.3, icon: Bus, color: 'text-blue-600', bgColor: 'bg-blue-50', location: [10.7721, 106.6983] },
-  { id: '002', type: 'Hospital', name: 'Bệnh viện Chợ Rẫy', distance: 0.8, icon: Hospital, color: 'text-red-600', bgColor: 'bg-red-50', location: [10.7558, 106.6622] },
-  { id: '003', type: 'School', name: 'THPT Lê Hồng Phong', distance: 1.2, icon: School, color: 'text-green-600', bgColor: 'bg-green-50', location: [10.7655, 106.6757] },
-];
 
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
@@ -235,11 +233,9 @@ export function CitizenMapView() {
                       <MapPin className="w-4 h-4 text-gray-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      {/* Tên địa danh (In đậm) */}
                       <p className="text-sm font-bold text-gray-900 line-clamp-1">
                         {getDisplayName(item)}
                       </p>
-                      {/* Địa chỉ chi tiết (Nhạt hơn) */}
                       <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
                         {item.display_name}
                       </p>
@@ -267,10 +263,8 @@ export function CitizenMapView() {
               >
                 <option value="weather">⛈️ Thời tiết</option>
                 <option value="air">🌫 Không khí</option>
-                <option value="traffic">🚦 Giao thông</option>
                 <option value="parking">🅿️ Bãi đỗ xe</option>
                 <option value="bus">🚌 Trạm Bus</option>
-                <option value="poi">🏥 Tiện ích</option>
               </select>
               <input 
                 type="text"
@@ -306,6 +300,7 @@ export function CitizenMapView() {
             {/* TRẠNG THÁI 1: ĐÃ CHỌN ĐỊA ĐIỂM */}
             {selectedRealEntity ? (
               <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300">
+                {/* Header & Back Button */}
                 <div className="mb-4 pb-4 border-b border-gray-100">
                   <button 
                     onClick={() => { setSelectedRealEntity(null); setRouteCoords(null); }}
@@ -313,87 +308,301 @@ export function CitizenMapView() {
                   >
                     <CornerUpRight className="w-3 h-3 rotate-180" /> Quay lại danh sách
                   </button>
-                  <h3 className="text-xl font-bold text-gray-900 leading-tight line-clamp-2">{getEntityName()}</h3>
+                  
+                  <h3 className="text-xl font-bold text-gray-900 leading-tight line-clamp-2">
+                    {getEntityName()}
+                  </h3>
+                  
                   <p className="text-sm text-gray-500 mt-2 flex items-start gap-2">
                     <MapPin className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" /> 
-                    <span className="line-clamp-3">{selectedRealEntity.address?.value?.streetAddress || 'Đang cập nhật địa chỉ chi tiết'}</span>
+                    <span className="line-clamp-3 italic">
+                      {/* Hàm formatAddress đã có ở ngoài */}
+                      {formatAddress(selectedRealEntity.address?.value?.streetAddress || selectedRealEntity.address?.value || selectedRealEntity.address)}
+                    </span>
                   </p>
                 </div>
 
-                {/* Info Box Routing */}
-                <div className="bg-blue-50 rounded-[12px] p-4 mb-4 border border-blue-100">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-full">
-                      <Navigation className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Điều hướng thông minh</p>
-                      <p className="text-xs text-blue-600">
-                        {routeCoords ? 'Đang dẫn đường...' : 'Sẵn sàng tính toán lộ trình'}
+                {/* PHÂN LOẠI GIAO DIỆN: THỜI TIẾT vs ĐỊA ĐIỂM KHÁC */}
+                {(() => {
+                  const isWeather = selectedRealEntity.type?.includes('Weather') || selectedRealEntity.temperature?.value !== undefined;
+                  const isAir = selectedRealEntity.type?.includes('Air') || selectedRealEntity.airQualityIndex !== undefined;
+
+                  if (isWeather) {
+                    // --- LOGIC MÀU THEO NHIỆT ĐỘ ---
+                    const temp = selectedRealEntity.temperature?.value ?? 25;
+                    const getTempColors = (temperature: number) => {
+                      if (temperature >= 35) return { gradient: 'from-red-500 to-orange-600', shadow: 'shadow-red-200', text: 'text-red-100', icon: '🔥' };
+                      if (temperature >= 30) return { gradient: 'from-orange-400 to-amber-500', shadow: 'shadow-orange-200', text: 'text-orange-100', icon: '☀️' };
+                      if (temperature >= 25) return { gradient: 'from-yellow-400 to-orange-400', shadow: 'shadow-yellow-200', text: 'text-yellow-100', icon: '🌤️' };
+                      if (temperature >= 20) return { gradient: 'from-green-400 to-teal-500', shadow: 'shadow-green-200', text: 'text-green-100', icon: '🌿' };
+                      if (temperature >= 15) return { gradient: 'from-blue-400 to-cyan-500', shadow: 'shadow-blue-200', text: 'text-blue-100', icon: '❄️' };
+                      return { gradient: 'from-indigo-500 to-blue-600', shadow: 'shadow-indigo-200', text: 'text-indigo-100', icon: '🧊' };
+                    };
+                    const tempColors = getTempColors(temp);
+                    
+                    // --- GIAO DIỆN THỜI TIẾT ---
+                    return (
+                      <div className="space-y-4">
+                        {/* 1. Thẻ Nhiệt độ chính */}
+                        <div className={`bg-gradient-to-br ${tempColors.gradient} rounded-2xl p-6 text-white shadow-lg ${tempColors.shadow} relative overflow-hidden`}>
+                          <div className="absolute top-[-20px] right-[-20px] opacity-20">
+                            <CloudSun size={120} />
+                          </div>
+                          <div className="relative z-10">
+                            <p className={`${tempColors.text} text-sm font-medium uppercase tracking-wider flex items-center gap-2`}>
+                              <span>{tempColors.icon}</span> Nhiệt độ hiện tại
+                            </p>
+                            <div className="flex items-end gap-2 mt-1">
+                              <span className="text-6xl font-bold tracking-tighter">
+                                {selectedRealEntity.temperature?.value ?? '--'}
+                              </span>
+                              <span className="text-3xl font-medium mb-2">°C</span>
+                            </div>
+                            <p className="mt-2 text-white/90 flex items-center gap-2 text-xs">
+                              <Activity className="w-4 h-4" /> 
+                              Cập nhật: {selectedRealEntity.dateObserved?.value ? new Date(selectedRealEntity.dateObserved.value).toLocaleTimeString() : 'Vừa xong'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* 2. Lưới thông tin chi tiết */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                            <div className="flex items-center gap-2 text-blue-600 mb-1">
+                              <Droplets className="w-5 h-5" />
+                              <span className="text-sm font-bold">Độ ẩm</span>
+                            </div>
+                            <p className="text-2xl font-bold text-gray-800">
+                              {selectedRealEntity.humidity?.value ?? selectedRealEntity.relativeHumidity?.value ?? '--'}%
+                            </p>
+                          </div>
+
+                          <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                            <div className="flex items-center gap-2 text-emerald-600 mb-1">
+                              <Wind className="w-5 h-5" />
+                              <span className="text-sm font-bold">Gió</span>
+                            </div>
+                            <p className="text-2xl font-bold text-gray-800">
+                              {selectedRealEntity.windSpeed?.value ?? '--'} <span className="text-sm font-normal text-gray-500">m/s</span>
+                            </p>
+                          </div>
+                          
+                          {selectedRealEntity.rain?.value !== undefined && (
+                             <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 col-span-2">
+                                <div className="flex items-center gap-2 text-indigo-600 mb-1">
+                                  <CloudSun className="w-5 h-5" />
+                                  <span className="text-sm font-bold">Lượng mưa (1h)</span>
+                                </div>
+                                <p className="text-2xl font-bold text-gray-800">
+                                  {selectedRealEntity.rain.value} <span className="text-sm font-normal text-gray-500">mm</span>
+                                </p>
+                             </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  } 
+                  
+                  else if (isAir) {
+                    const aqi = selectedRealEntity.airQualityIndex?.value ?? selectedRealEntity.airQualityIndex ?? 1;
+                    
+                    // Chọn màu và lời khuyên theo AQI (1-5)
+                    const getAqiStatus = (val: number) => {
+                      if (val === 1) return { color: 'from-emerald-400 to-green-600', text: 'Tốt', advice: 'Không khí trong lành, tuyệt vời cho hoạt động ngoài trời.', icon: '🌿' };
+                      if (val === 2) return { color: 'from-yellow-400 to-orange-500', text: 'Trung bình', advice: 'Chất lượng chấp nhận được. Nhóm nhạy cảm nên hạn chế.', icon: '😐' };
+                      if (val === 3) return { color: 'from-orange-500 to-red-500', text: 'Kém', advice: 'Người già và trẻ em nên hạn chế ra ngoài.', icon: '😷' };
+                      if (val === 4) return { color: 'from-red-600 to-rose-700', text: 'Xấu', advice: 'Cảnh báo: Có hại cho sức khỏe. Nên đeo khẩu trang.', icon: '🤢' };
+                      return { color: 'from-purple-600 to-indigo-800', text: 'Nguy hại', advice: 'Khẩn cấp: Tránh mọi hoạt động ngoài trời!', icon: '☠️' };
+                    };
+                    
+                    const status = getAqiStatus(aqi);
+
+                    return (
+                      <div className="space-y-4">
+                        <div className={`bg-gradient-to-br ${status.color} rounded-2xl p-6 text-white shadow-lg relative overflow-hidden`}>
+                          <div className="absolute top-[-20px] right-[-20px] opacity-20">
+                            <CloudFog size={120} />
+                          </div>
+                          <div className="relative z-10">
+                             <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="text-white/80 text-sm font-bold uppercase tracking-wider">Chỉ số AQI</p>
+                                  <div className="flex items-baseline gap-2">
+                                    <span className="text-6xl font-extrabold">{aqi}</span>
+                                    <span className="text-2xl font-medium">/ 5</span>
+                                  </div>
+                                </div>
+                                <span className="text-4xl">{status.icon}</span>
+                             </div>
+                             <div className="mt-2 pt-2 border-t border-white/20">
+                                <p className="text-xl font-bold">{status.text}</p>
+                                <p className="text-sm text-white/90 mt-1 flex gap-2">
+                                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                                  {status.advice}
+                                </p>
+                             </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Chi tiết các chất ô nhiễm */}
+                        <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mt-2">Thành phần ô nhiễm</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                            <p className="text-xs text-gray-500 mb-1">Bụi mịn PM2.5</p>
+                            <p className="text-xl font-bold text-gray-800">
+                              {selectedRealEntity.pm25?.value ?? selectedRealEntity.pm25 ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                            </p>
+                          </div>
+                          <div className="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                            <p className="text-xs text-gray-500 mb-1">Bụi PM10</p>
+                            <p className="text-xl font-bold text-gray-800">
+                              {selectedRealEntity.pm10?.value ?? selectedRealEntity.pm10 ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                            </p>
+                          </div>
+                          <div className="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                            <p className="text-xs text-gray-500 mb-1">Khí CO</p>
+                            <p className="text-xl font-bold text-gray-800">
+                              {selectedRealEntity.co?.value ?? selectedRealEntity.co ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                            </p>
+                          </div>
+                          <div className="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                            <p className="text-xs text-gray-500 mb-1">Khí NO2</p>
+                            <p className="text-xl font-bold text-gray-800">
+                              {selectedRealEntity.no2?.value ?? selectedRealEntity.no2 ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // --- GIAO DIỆN ĐỊA ĐIỂM KHÁC (Parking, Bus...) ---
+                  else {
+                    return (
+                      <>
+                        <div className="bg-blue-50 rounded-[12px] p-4 mb-4 border border-blue-100">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 rounded-full">
+                              <Navigation className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">Điều hướng thông minh</p>
+                              <p className="text-xs text-blue-600">
+                                {routeCoords ? 'Đang dẫn đường...' : 'Sẵn sàng tính toán lộ trình'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-auto space-y-3">
+                          {!routeCoords ? (
+                            <button 
+                              onClick={startNavigation}
+                              disabled={isRoutingLoading}
+                              className="w-full py-3 bg-gray-900 text-white rounded-[12px] font-medium flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-lg shadow-gray-200 disabled:opacity-70"
+                            >
+                              {isRoutingLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Compass className="w-5 h-5" />}
+                              Bắt đầu chỉ đường
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => setRouteCoords(null)}
+                              className="w-full py-3 bg-white border border-gray-200 text-gray-700 rounded-[12px] font-medium hover:bg-gray-50 transition-all active:scale-95"
+                            >
+                              Hủy dẫn đường
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    );
+                  }
+                })()}
+              </div>
+            ) : (
+              // TRẠNG THÁI 2: CHƯA CHỌN GÌ (LIST DEMO)
+              <div className="flex flex-col h-full space-y-4 animate-in fade-in duration-500">
+  
+                {/* 1. CARD THỐNG KÊ REAL-TIME */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+                  <h3 className="text-blue-900 font-bold flex items-center gap-2 mb-3">
+                    <Activity className="w-5 h-5 text-blue-600" /> 
+                    Trạng thái hệ thống
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white p-3 rounded-lg shadow-sm border border-blue-50">
+                      <p className="text-xs text-gray-500 uppercase font-semibold">Điểm giám sát</p>
+                      <p className="text-2xl font-bold text-blue-600 mt-1">
+                        {realEntityCount > 0 ? realEntityCount : '--'}
                       </p>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg shadow-sm border border-blue-50">
+                      <p className="text-xs text-gray-500 uppercase font-semibold">Cập nhật</p>
+                      <p className="text-lg font-bold text-green-600 mt-1">Real-time</p>
+                      <p className="text-[10px] text-gray-400">Mỗi 30 giây</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Routing Actions */}
-                <div className="mt-auto space-y-3">
-                  {!routeCoords ? (
-                    <button 
-                      onClick={startNavigation}
-                      disabled={isRoutingLoading}
-                      className="w-full py-3 bg-gray-900 text-white rounded-[12px] font-medium flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-lg shadow-gray-200 disabled:opacity-70"
-                    >
-                      {isRoutingLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Compass className="w-5 h-5" />}
-                      Bắt đầu chỉ đường
-                    </button>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="p-3 bg-green-50 border border-green-100 rounded-[10px] text-sm text-green-800 flex items-start gap-2">
-                        <Clock className="w-4 h-4 shrink-0 mt-0.5" />
-                        <p>Đường đi đã được vẽ trên bản đồ. Hãy đi theo đường màu xanh.</p>
+                {/* 2. BẢNG CHÚ GIẢI */}
+                <div className="flex-1 bg-gray-50 rounded-xl p-4 border border-gray-100 overflow-y-auto">
+                  <h3 className="text-gray-900 font-bold flex items-center gap-2 mb-4">
+                    <Map className="w-5 h-5 text-gray-600" /> 
+                    Chú giải ký hiệu
+                  </h3>
+                  
+                  <div className="space-y-3">
+                    {/* 1. Trạm Thời tiết */}
+                    <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200 transition-colors hover:bg-gray-50">
+                      <div className="w-9 h-9 rounded-full bg-[#f97316] border-2 border-white shadow-md flex items-center justify-center">
+                        <CloudSun size={20} className="text-white" />
                       </div>
-                      <button 
-                        onClick={() => setRouteCoords(null)}
-                        className="w-full py-3 bg-white border border-gray-200 text-gray-700 rounded-[12px] font-medium hover:bg-gray-50 transition-all active:scale-95"
-                      >
-                        Hủy dẫn đường
-                      </button>
+                      <div>
+                        <p className="text-sm font-bold text-gray-800">Trạm Thời tiết</p>
+                        <p className="text-xs text-gray-500">Nhiệt độ, độ ẩm, gió</p>
+                      </div>
                     </div>
-                  )}
+
+                    {/* 2. Quan trắc Không khí */}
+                    <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200 transition-colors hover:bg-gray-50">
+                      <div className="w-9 h-9 rounded-full bg-[#10b981] border-2 border-white shadow-md flex items-center justify-center">
+                        <Wind size={20} className="text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-800">Quan trắc Không khí</p>
+                        <p className="text-xs text-gray-500">Chỉ số AQI, bụi PM2.5</p>
+                      </div>
+                    </div>
+
+                    {/* 3. Bãi đỗ xe thông minh */}
+                    <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200 transition-colors hover:bg-gray-50">
+                      <div className="w-9 h-9 rounded-full bg-[#2563eb] border-2 border-white shadow-md flex items-center justify-center">
+                        <Car size={20} className="text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-800">Bãi đỗ xe thông minh</p>
+                        <p className="text-xs text-gray-500">Hiển thị số chỗ trống</p>
+                      </div>
+                    </div>
+
+                    {/* 4. Trạm xe Buýt */}
+                    <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200 transition-colors hover:bg-gray-50">
+                      <div className="w-9 h-9 rounded-full bg-[#4f46e5] border-2 border-white shadow-md flex items-center justify-center">
+                        <Bus size={20} className="text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-800">Trạm xe Buýt</p>
+                        <p className="text-xs text-gray-500">Vị trí bến dừng, nhà chờ</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 text-center">
+                    <p className="text-xs text-gray-400 italic">
+                      Dữ liệu được cung cấp bởi OpenStreetMap & OpenWeatherMap
+                    </p>
+                  </div>
                 </div>
               </div>
-            ) : (
-              // TRẠNG THÁI 2: CHƯA CHỌN GÌ (LIST DEMO)
-              <>
-                <div className="mb-4 shrink-0 flex items-center justify-between">
-                  <h3 className="text-gray-900 font-semibold flex items-center gap-2">
-                    <MapPin className="w-4 h-4" /> Tiện ích mẫu
-                  </h3>
-                  <Badge variant="secondary" className="bg-gray-100 text-gray-600 text-xs">Demo</Badge>
-                </div>
-                <div className="space-y-3 overflow-y-auto pr-1 flex-1 custom-scrollbar">
-                  {nearbyEntities.map((entity) => (
-                    <button 
-                      key={entity.id} 
-                      className="w-full text-left p-3 rounded-[12px] bg-white hover:bg-gray-50 border border-gray-100 transition-all group"
-                      // Giả lập click vào entity để hiển thị sidebar chi tiết (nếu muốn)
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2.5 rounded-[10px] ${entity.bgColor} shrink-0 group-hover:scale-110 transition-transform`}>
-                          <entity.icon className={`w-5 h-5 ${entity.color}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-900 font-medium truncate">{entity.name}</p>
-                          <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">0.5 km</span>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-4 pt-4 border-t border-gray-100 text-center">
-                  <p className="text-xs text-gray-400">Chọn một marker hoặc tìm kiếm để xem chi tiết</p>
-                </div>
-              </>
             )}
             
           </div>

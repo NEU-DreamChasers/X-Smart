@@ -1,93 +1,244 @@
 'use client';
 
-import { Card } from './ui/card';
-import { Badge } from './ui/badge';
-import { TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
-import { SimpleLineChart } from './SimpleLineChart';
-import { SimpleBarChart } from './SimpleBarChart';
-import { SimplePieChart } from './SimplePieChart';
+import { useEffect, useState } from 'react';
+import { Database, Wifi, Activity, FileText } from 'lucide-react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { api } from '../services/api.service';
 
-const entityGrowth = [ { month: 'T6', total: 10200, new: 850 }, { month: 'T7', total: 10850, new: 650 }, { month: 'T8', total: 11234, new: 384 }, { month: 'T9', total: 11678, new: 444 }, { month: 'T10', total: 12089, new: 411 }, { month: 'T11', total: 12456, new: 367 } ];
-const dataQuality = [ { name: 'Hoàn chỉnh', value: 92, color: '#10b981' }, { name: 'Chính xác', value: 88, color: '#3b82f6' }, { name: 'Kịp thời', value: 95, color: '#f59e0b' }, { name: 'Nhất quán', value: 90, color: '#8b5cf6' } ];
-const apiUsage = [ { endpoint: '/entities', calls: 156789, avgTime: '45ms' }, { endpoint: '/subs', calls: 23456, avgTime: '32ms' } ];
-
+const DEFAULT_CHART_LOC = '1566083'; // ID mặc định (Hà Nội)
 const cardStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
+// Hàm delay giúp tránh spam server
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export function AdminAnalytics() {
+  const [stats, setStats] = useState({
+    totalEntities: 0,
+    activeSensors: 0,
+    totalReports: 0,
+    pendingReports: 0,
+    apiHealth: 'Checking...'
+  });
+
+  const [tempData, setTempData] = useState([]);
+  const [precipData, setPrecipData] = useState([]);
+  const [aqiData, setAqiData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        console.log("--- 1. Bắt đầu tải dữ liệu Thống kê ---");
+
+        // GIAI ĐOẠN 1: Tải các chỉ số cơ bản (Nhẹ)
+        // Dùng Promise.allSettled để nếu 1 cái lỗi cũng không làm sập toàn bộ
+        const results = await Promise.allSettled([
+           api.get('/weather/status'),
+           api.get('/air/status'),
+           api.get('/bus/status'),
+           api.get('/parking/status'),
+           api.get('/sources'),
+           api.get('/reports/admin/stats')
+        ]);
+
+        // Helper để lấy data an toàn từ Promise.allSettled
+        const getData = (result: PromiseSettledResult<any>) => 
+            result.status === 'fulfilled' ? result.value.data : [];
+
+        const weatherData = getData(results[0]);
+        const airData = getData(results[1]);
+        const busData = getData(results[2]);
+        const parkingData = getData(results[3]);
+        const sourcesData = getData(results[4]);
+        const reportStats = getData(results[5]) || { total: 0, pending: 0 };
+
+        // Tính tổng
+        const totalEnt = (Array.isArray(weatherData) ? weatherData.length : 0) + 
+                         (Array.isArray(airData) ? airData.length : 0) +
+                         (Array.isArray(busData) ? busData.length : 0) +
+                         (Array.isArray(parkingData) ? parkingData.length : 0);
+
+        setStats({
+            totalEntities: totalEnt,
+            activeSensors: Array.isArray(sourcesData) ? sourcesData.length : 0,
+            totalReports: reportStats.total || 0,
+            pendingReports: reportStats.pending || 0,
+            apiHealth: 'Stable'
+        });
+
+        // --- QUAN TRỌNG: Delay 1 giây để tránh lỗi 429 ---
+        console.log("--- Nghỉ 1s trước khi tải biểu đồ ---");
+        await delay(1000); 
+
+        // GIAI ĐOẠN 2: Tải dữ liệu biểu đồ (Nặng hơn)
+        console.log("--- 2. Bắt đầu tải dữ liệu Biểu đồ ---");
+        
+        // Gọi từng API một thay vì Promise.all để giảm tải server tối đa
+        // (Nếu server khỏe có thể dùng Promise.all, nhưng an toàn thì gọi tuần tự)
+        
+        try {
+            const resChartTemp = await api.get(`/history/chart/temperature/${DEFAULT_CHART_LOC}?hours=24`);
+            setTempData(transformChartData(resChartTemp.data));
+        } catch (e) { console.warn("Lỗi tải chart Temp", e); }
+
+        try {
+            const resChartPrecip = await api.get(`/history/chart/precipitation/${DEFAULT_CHART_LOC}?hours=24`);
+            setPrecipData(transformChartData(resChartPrecip.data));
+        } catch (e) { console.warn("Lỗi tải chart Mưa", e); }
+
+        try {
+            const resChartAqi = await api.get(`/history/chart/aqi/${DEFAULT_CHART_LOC}?hours=24`);
+            setAqiData(transformChartData(resChartAqi.data));
+        } catch (e) { console.warn("Lỗi tải chart AQI", e); }
+
+      } catch (error) {
+        console.error("Lỗi chung Dashboard:", error);
+        setStats(prev => ({ ...prev, apiHealth: 'Degraded' }));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // Hàm helper chuyển đổi dữ liệu Chart (tách ra ngoài cho gọn)
+  const transformChartData = (apiData: any) => {
+    if (!apiData?.labels || !apiData?.datasets?.[0]) return [];
+    return apiData.labels.map((l: string, i: number) => ({
+        time: l.includes(' ') ? l.split(' ')[1] : l,
+        value: apiData.datasets[0].data[i]
+    }));
+  };
+
   return (
     <div className="space-y-6">
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Tổng API Calls', value: '238K', change: '+12%', trend: 'up' },
-          { label: 'Uptime', value: '99.9%', change: '+0.1%', trend: 'up' },
-          { label: 'Avg Response', value: '67ms', change: '-15%', trend: 'down' },
-          { label: 'Active Users', value: '8,234', change: '+456', trend: 'up' },
-        ].map((metric, index) => {
-          const TrendIcon = metric.trend === 'up' ? TrendingUp : TrendingDown;
-          const trendColor = metric.trend === 'up' ? 'text-green-600' : 'text-red-600';
-          
-          return (
-            <div key={index} className="bg-white rounded-[14px] p-6 shadow-sm hover:shadow-md transition-shadow" style={cardStyle}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-600">{metric.label}</p>
-                <div className={`flex items-center gap-1 ${trendColor} bg-gray-50 px-2 py-0.5 rounded-md border border-black/5`}>
-                  <TrendIcon className="w-3 h-3" />
-                  <span className="text-xs font-medium">{metric.change}</span>
+      {/* ... Phần giao diện giữ nguyên không thay đổi ... */}
+      
+      {/* Thẻ thống kê */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1 */}
+        <div className="bg-white rounded-[14px] p-5 shadow-sm hover:shadow-md transition-shadow" style={cardStyle}>
+            <div className="flex items-center justify-between mb-3">
+                <div className="p-2.5 rounded-[10px] bg-blue-50 border border-blue-100">
+                  <Database className="w-5 h-5 text-blue-600" />
                 </div>
-              </div>
-              <p className="text-2xl font-bold text-neutral-950">{metric.value}</p>
+                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">IOT</span>
             </div>
-          );
-        })}
+            <p className="text-sm text-gray-500">Tổng Entity IoT</p>
+            <p className="text-2xl font-bold text-neutral-950 mt-1">
+                {loading ? '...' : stats.totalEntities.toLocaleString()}
+            </p>
+        </div>
+
+        {/* Card 2 */}
+        <div className="bg-white rounded-[14px] p-5 shadow-sm hover:shadow-md transition-shadow" style={cardStyle}>
+            <div className="flex items-center justify-between mb-3">
+                <div className="p-2.5 rounded-[10px] bg-green-50 border border-green-100">
+                  <Wifi className="w-5 h-5 text-green-600" />
+                </div>
+            </div>
+            <p className="text-sm text-gray-500">Nguồn dữ liệu</p>
+            <p className="text-2xl font-bold text-neutral-950 mt-1">
+                {loading ? '...' : stats.activeSensors}
+            </p>
+        </div>
+
+        {/* Card 3 */}
+        <div className="bg-white rounded-[14px] p-5 shadow-sm hover:shadow-md transition-shadow" style={cardStyle}>
+            <div className="flex items-center justify-between mb-3">
+                <div className="p-2.5 rounded-[10px] bg-orange-50 border border-orange-100">
+                  <FileText className="w-5 h-5 text-orange-600" />
+                </div>
+                {stats.pendingReports > 0 && (
+                    <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full animate-pulse">
+                        {stats.pendingReports} chờ xử lý
+                    </span>
+                )}
+            </div>
+            <p className="text-sm text-gray-500">Phản ánh người dân</p>
+            <p className="text-2xl font-bold text-neutral-950 mt-1">
+                {loading ? '...' : stats.totalReports}
+            </p>
+        </div>
+
+        {/* Card 4 */}
+        <div className="bg-white rounded-[14px] p-5 shadow-sm hover:shadow-md transition-shadow" style={cardStyle}>
+            <div className="flex items-center justify-between mb-3">
+                <div className="p-2.5 rounded-[10px] bg-purple-50 border border-purple-100">
+                  <Activity className="w-5 h-5 text-purple-600" />
+                </div>
+                <div className={`w-2 h-2 rounded-full ${stats.apiHealth === 'Stable' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            </div>
+            <p className="text-sm text-gray-500">Hệ thống</p>
+            <p className="text-xl font-bold text-neutral-950 mt-1 truncate">
+                {stats.apiHealth}
+            </p>
+        </div>
       </div>
 
+      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Entity Growth */}
+        {/* Nhiệt độ */}
         <div className="bg-white rounded-[14px] p-6 shadow-sm" style={cardStyle}>
-          <div className="mb-6">
-            <h3 className="text-lg font-medium text-neutral-950">Tăng trưởng Entity</h3>
-            <p className="text-sm text-gray-500">6 tháng gần nhất</p>
-          </div>
-          <SimpleLineChart 
-            data={entityGrowth}
-            xAxisKey="month"
-            lines={[{ dataKey: 'total', stroke: '#3b82f6', name: 'Tổng' }, { dataKey: 'new', stroke: '#10b981', name: 'Mới' }]}
-            height={250}
-          />
-        </div>
-
-        {/* Data Quality */}
-        <div className="bg-white rounded-[14px] p-6 shadow-sm" style={cardStyle}>
-          <div className="mb-6">
-            <h3 className="text-lg font-medium text-neutral-950">Chất lượng dữ liệu</h3>
-            <p className="text-sm text-gray-500">Đánh giá theo 4 tiêu chí</p>
-          </div>
-          <SimplePieChart data={dataQuality} />
-        </div>
-      </div>
-
-      {/* API Usage */}
-      <div className="bg-white rounded-[14px] p-6 shadow-sm" style={cardStyle}>
-        <div className="mb-4">
-          <h3 className="text-lg font-medium text-neutral-950">Sử dụng API</h3>
-          <p className="text-sm text-gray-500">NGSI-LD endpoints</p>
-        </div>
-        <div className="space-y-3">
-          {apiUsage.map((api, index) => (
-            <div key={index} className="p-4 bg-gray-50/50 rounded-[14px]" style={cardStyle}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-mono text-neutral-900">{api.endpoint}</p>
-                <Badge variant="outline" className="bg-white text-neutral-950 shadow-none" style={cardStyle}>{api.avgTime}</Badge>
-              </div>
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>{api.calls.toLocaleString()} calls</span>
-                <span>Avg response time</span>
-              </div>
+          <div className="mb-6 flex justify-between items-center">
+            <div>
+                <h3 className="text-lg font-medium text-neutral-950">Biểu đồ Nhiệt độ</h3>
+                <p className="text-sm text-gray-500">Quan trắc 24 giờ qua</p>
             </div>
-          ))}
+          </div>
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={tempData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                    <XAxis dataKey="time" tick={{fontSize: 12}} stroke="#888" />
+                    <YAxis unit="°C" stroke="#888" domain={['auto', 'auto']} />
+                    <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} />
+                    <Line type="monotone" dataKey="value" stroke="#ef4444" strokeWidth={3} dot={false} name="Nhiệt độ"/>
+                </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Lượng mưa */}
+        <div className="bg-white rounded-[14px] p-6 shadow-sm" style={cardStyle}>
+          <div className="mb-6">
+            <h3 className="text-lg font-medium text-neutral-950">Lượng mưa</h3>
+            <p className="text-sm text-gray-500">Dữ liệu 24 giờ qua</p>
+          </div>
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={precipData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                    <XAxis dataKey="time" tick={{fontSize: 12}} stroke="#888" />
+                    <YAxis unit="mm" stroke="#888" />
+                    <Tooltip cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}}/>
+                    <Bar dataKey="value" fill="#3b82f6" name="Lượng mưa" radius={[4,4,0,0]} barSize={20} />
+                </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
+      
+      {/* AQI */}
+      <div className="bg-white rounded-[14px] p-6 shadow-sm" style={cardStyle}>
+          <div className="mb-6">
+            <h3 className="text-lg font-medium text-neutral-950">Chất lượng không khí (PM2.5)</h3>
+            <p className="text-sm text-gray-500">Dữ liệu 24 giờ qua</p>
+          </div>
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={aqiData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                    <XAxis dataKey="time" tick={{fontSize: 12}} stroke="#888" />
+                    <YAxis unit="µg/m³" stroke="#888" />
+                    <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}}/>
+                    <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} dot={false} name="PM2.5"/>
+                </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
     </div>
   );
 }

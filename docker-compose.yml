@@ -156,6 +156,9 @@ services:
       SCORPIO_API_VERSION: v1
 
       OPENWEATHER_API_KEY: eb3a4947904547285aa7bdecca8cc396
+
+      JWT_SECRET: DAY_LA_BI_MAT_KHONG_DUOC_LO_RA_NGOAI
+
     networks:
       xsmart: {}
     restart: unless-stopped

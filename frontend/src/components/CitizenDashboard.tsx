@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { User, LogOut, Map, Store, Leaf, Bell, Building2, MessageSquarePlus } from 'lucide-react';
-import type { User as UserType, UserRole } from '../app/page';
+import { User, LogOut, Map, Leaf, Bell, Building2, MessageSquarePlus } from 'lucide-react'; // Đã xóa Store
+import type { User as UserType } from '../app/page';
 import { CitizenMapView } from './CitizenMapView';
-import { CitizenServices } from './CitizenServices';
 import { CitizenEnvironment } from './CitizenEnvironment';
 import { CitizenNotifications } from './CitizenNotifications';
 import CitizenReportForm from '@/components/CitizenReportForm';
@@ -16,7 +15,6 @@ interface CitizenDashboardProps {
   onLogin: () => void; 
 }
 
-// Define strict border style
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
 export function CitizenDashboard({ user, onLogout, onLogin }: CitizenDashboardProps) {
@@ -78,7 +76,6 @@ export function CitizenDashboard({ user, onLogout, onLogin }: CitizenDashboardPr
           <div className="flex justify-center w-full mb-8">
             <TabsList className="inline-flex h-16 items-center justify-center !rounded-full bg-[#ececf0] p-2 w-full max-w-5xl gap-2">
               <TabsTrigger value="map" className="flex-1 flex items-center justify-center gap-2 h-full !rounded-full text-sm font-medium text-gray-600 data-[state=active]:text-neutral-950 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"><Map className="w-5 h-5" />Bản đồ</TabsTrigger>
-              <TabsTrigger value="services" className="flex-1 flex items-center justify-center gap-2 h-full !rounded-full text-sm font-medium text-gray-600 data-[state=active]:text-neutral-950 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"><Store className="w-5 h-5" />Dịch vụ</TabsTrigger>
               <TabsTrigger value="environment" className="flex-1 flex items-center justify-center gap-2 h-full !rounded-full text-sm font-medium text-gray-600 data-[state=active]:text-neutral-950 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"><Leaf className="w-5 h-5" />Môi trường</TabsTrigger>
               <TabsTrigger value="notifications" className="flex-1 flex items-center justify-center gap-2 h-full !rounded-full text-sm font-medium text-gray-600 data-[state=active]:text-neutral-950 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"><Bell className="w-5 h-5" />Thông báo</TabsTrigger>
               <TabsTrigger value="report" className="flex-1 flex items-center justify-center gap-2 h-full !rounded-full text-sm font-medium text-gray-600 data-[state=active]:text-neutral-950 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"><MessageSquarePlus className="w-5 h-5" />Phản ánh</TabsTrigger>
@@ -86,7 +83,7 @@ export function CitizenDashboard({ user, onLogout, onLogin }: CitizenDashboardPr
           </div>
 
           <TabsContent value="map"><CitizenMapView /></TabsContent>
-          <TabsContent value="services"><CitizenServices isGuest={isGuest} /></TabsContent>
+          {/* Đã xóa TabsContent Services */}
           <TabsContent value="environment"><CitizenEnvironment /></TabsContent>
           <TabsContent value="notifications"><CitizenNotifications isGuest={isGuest} /></TabsContent>
           

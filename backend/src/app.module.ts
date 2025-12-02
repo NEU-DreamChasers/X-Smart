@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'; // 1. Import
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -11,7 +11,6 @@ import { ScorpioModule } from './scorpio/scorpio.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { HistoryModule } from './history/history.module';
 import { ReportsModule } from './reports/reports.module';
-
 
 @Module({
   imports: [
