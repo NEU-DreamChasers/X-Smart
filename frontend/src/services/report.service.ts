@@ -19,7 +19,7 @@ export interface ReportDto {
   address: string;
   lat: number;
   lon: number;
-  image?: string;
+  imageUrl?: string;
   guestPhone?: string;
 }
 
@@ -62,7 +62,7 @@ export const createCitizenReport = async (formData: ReportFormState) => {
     address: formData.address,
     lat: Number(formData.lat),
     lon: Number(formData.lng),
-    image: formData.imageBase64 || undefined,
+    imageUrl: formData.imageBase64 || undefined,
     guestPhone: formData.phoneNumber || undefined,
   };
 
