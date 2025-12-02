@@ -556,6 +556,21 @@ Các thay đổi đáng chú ý cho dự án X-Smart được ghi chép tại tr
   - Kết hợp logic controller và UI components trong cùng file structure
 
 ---
+## [0.1.6] - 2025-12-02
+
+### Fixed
+
+- Backend: Sửa lỗi `TS2307: Cannot find module 'geojson'` trong `backend/src/reports/entities/report.entity.ts` bằng cách bỏ import `geojson` và định nghĩa `Point` interface cục bộ (`type: 'Point'; coordinates: [lng, lat]`). Khắc phục lỗi build Docker ở bước `npm run build`.
+- NPM: Dọn cache/lockfile để xử lý lỗi `must provide string spec` khi cài đặt dependencies trong `backend`.
+
+### Changed
+
+- Frontend Weather Sidebar: Màu nhiệt độ động theo giá trị và chỉ hiển thị card "Lượng mưa (1h)" khi có `rain.value`. Chuẩn hóa truy cập thuộc tính NGSI-LD với `.value` cho `temperature`, `humidity`, `windSpeed`, `rain`, `dateObserved`.
+- Address Formatting: Áp dụng `formatAddress()` cho Popup (`RealMap.tsx`) và Sidebar (`CitizenMapView.tsx`) để tránh render object trực tiếp.
+
+### Infrastructure
+
+- Docker: Xác nhận `docker compose up -d --build` chạy thành công sau khi sửa types GeoJSON và vấn đề npm.
 
 ## [0.1.1] - 2024-11-21
 

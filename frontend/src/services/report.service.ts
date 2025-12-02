@@ -1,75 +1,145 @@
-import axios from 'axios';
+import { api } from './api.service';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+// --- Interface & DTO ---
 
-export interface ReportPayload {
-  category: 'traffic' | 'weather' | 'environment' | 'infrastructure';
+export interface ReportFormState {
+  category: string;
+  title: string;
   description: string;
   address: string;
   lat: number;
   lng: number;
-  imageBase64?: string | null;
-  reporterName?: string;
+  imageBase64: string | null;
+  phoneNumber?: string;
 }
 
-// Interface for the raw NGSI-LD data coming from backend
+export interface ReportDto {
+  title: string;
+  description: string;
+  address: string;
+  lat: number;
+  lon: number;
+  image?: string;
+  guestPhone?: string;
+}
+
+// Cấu trúc NGSI-LD Property
+export interface NgsiProperty<T> {
+  type: 'Property';
+  value: T;
+  observedAt?: string;
+}
+
+// Cấu trúc Report chuẩn NGSI-LD (cho UI Admin)
 export interface NgsiReport {
   id: string;
   type: string;
-  category?: { value: string };
-  description?: { value: string };
-  address?: { value: any }; // Could be string or object
-  location?: { value: { coordinates: [number, number] } };
-  status?: { value: string };
-  dateObserved?: { value: string };
-  media?: { value: string };
-  reporter?: { value: string };
+  category?: NgsiProperty<string>;
+  description?: NgsiProperty<string>;
+  address?: NgsiProperty<string>;
+  location?: {
+    type: 'GeoProperty';
+    value: { type: 'Point'; coordinates: [number, number] };
+  };
+  status?: NgsiProperty<'PENDING' | 'APPROVED' | 'REJECTED' | 'RESOLVED'>; // Đồng bộ chữ hoa/thường ở UI
+  media?: NgsiProperty<string>;
+  reporter?: NgsiProperty<string>;
+  dateObserved?: NgsiProperty<string>;
   [key: string]: any;
 }
 
-export const createCitizenReport = async (data: ReportPayload) => {
-  const reportId = `rep_${Date.now()}`;
-  const domain = 'citizen'; 
+// --- API Calls ---
 
-  // Mapping simple data to NGSI-LD structure for the "Generic Adapter" to handle
-  const body = {
-    id: `urn:ngsi-ld:IssueReporting:${reportId}`,
-    type: 'IssueReporting',
-    category: { type: 'Property', value: data.category },
-    description: { type: 'Property', value: data.description },
-    address: { type: 'Property', value: data.address },
-    location: {
-      type: 'GeoProperty',
-      value: { type: 'Point', coordinates: [data.lng, data.lat] }
-    },
-    media: data.imageBase64 ? { type: 'Property', value: data.imageBase64 } : undefined,
-    reporter: { type: 'Property', value: data.reporterName || 'Anonymous' },
-    status: { type: 'Property', value: 'pending' },
-    dateObserved: { type: 'Property', value: new Date().toISOString() }
+export const createCitizenReport = async (formData: ReportFormState) => {
+  let finalDescription = `[${formData.title}] ${formData.description}`;
+  if (formData.phoneNumber) {
+    finalDescription += `\n\n(SĐT: ${formData.phoneNumber})`;
+  }
+
+  const payload: ReportDto = {
+    title: formData.title,
+    description: finalDescription,
+    address: formData.address,
+    lat: Number(formData.lat),
+    lon: Number(formData.lng),
+    image: formData.imageBase64 || undefined,
+    guestPhone: formData.phoneNumber || undefined,
   };
 
+  const response = await api.post('/reports', payload);
+  return response.data;
+};
+
+// Hàm map dữ liệu từ Backend sang format NGSI-LD cho UI
+const mapToNgsiReport = (item: any): NgsiReport => ({
+  id: item.id,
+  type: 'Report',
+  
+  category: { type: 'Property', value: item.category || 'other' },
+  
+  description: { type: 'Property', value: item.description || item.title || '' },
+  
+  address: { type: 'Property', value: item.address || 'Chưa cập nhật' },
+  
+  // Quan trọng: Backend trả về status, map vào value
+  status: { type: 'Property', value: item.status || 'PENDING' },
+  
+  media: { type: 'Property', value: item.image || '' },
+  
+  dateObserved: { type: 'Property', value: item.createdAt || new Date().toISOString() },
+  
+  reporter: { type: 'Property', value: item.user?.fullName || item.guestPhone || 'Khách vãng lai' },
+  
+  location: {
+    type: 'GeoProperty',
+    value: { 
+      type: 'Point', 
+      coordinates: [Number(item.lon || item.lng || 0), Number(item.lat || 0)] 
+    }
+  }
+});
+
+// Lấy danh sách Public (người dùng thường)
+export const getReports = async (): Promise<NgsiReport[]> => {
   try {
-    // Using the generic "upsert" endpoint
-    const response = await axios.post(
-      `${API_URL}/${domain}/status/${reportId}`,
-      body,
-      { headers: { 'Content-Type': 'application/json' } }
-    );
-    return response.data;
+    const response = await api.get('/reports'); // Endpoint public
+    if (Array.isArray(response.data)) {
+      return response.data.map(mapToNgsiReport);
+    }
+    return [];
   } catch (error) {
-    console.error('Failed to submit report:', error);
-    throw error;
+    console.error("Lỗi khi lấy danh sách báo cáo:", error);
+    return [];
   }
 };
 
-export const getReports = async (): Promise<NgsiReport[]> => {
+// --- ADMIN API ---
+
+// 1. Lấy TẤT CẢ báo cáo (bao gồm Pending, Rejected...)
+export const getAdminReports = async (): Promise<NgsiReport[]> => {
   try {
-    const domain = 'citizen';
-    const response = await axios.get(`${API_URL}/${domain}/status`);
-    // The backend returns an array of NGSI-LD entities
-    return response.data;
+    const response = await api.get('/reports/admin/all');
+    if (Array.isArray(response.data)) {
+      return response.data.map(mapToNgsiReport);
+    }
+    return [];
   } catch (error) {
-    console.error('Failed to fetch reports:', error);
+    console.error("Lỗi khi lấy danh sách Admin reports:", error);
     return [];
   }
+};
+
+// 2. Duyệt báo cáo
+export const approveReport = async (id: string) => {
+  return await api.patch(`/reports/${id}/approve`);
+};
+
+// 3. Từ chối báo cáo
+export const rejectReport = async (id: string) => {
+  return await api.patch(`/reports/${id}/reject`);
+};
+
+// 4. Đánh dấu đã xử lý xong
+export const resolveReport = async (id: string) => {
+  return await api.patch(`/reports/${id}/resolve`);
 };
