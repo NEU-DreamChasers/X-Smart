@@ -1,4 +1,3 @@
-// src/main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
@@ -11,7 +10,12 @@ async function bootstrap() {
 
   app.set('trust proxy', 1);
 
-  app.enableCors();
+  app.enableCors({
+    origin: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+    exposedHeaders: ['X-Total-Count', 'X-Limit', 'X-Offset', 'ngsild-results-count'], 
+  });
 
   app.useGlobalPipes(new ValidationPipe({
     transform: true,
@@ -48,7 +52,8 @@ async function bootstrap() {
   const port = process.env.PORT || 8080;
   await app.listen(port);
 
-  console.log(`Application is running on: ${await app.getUrl()}`);
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  console.log(`Frontend is available at: ${frontendUrl}`);
   console.log(`Swagger UI is available at: http://localhost:${port}/api/docs`);
 }
 bootstrap();

@@ -17,6 +17,7 @@ export class ScorpioService {
   ) {
     this.scorpioUrl = this.configService.get<string>('SCORPIO_URL', 'http://localhost:9090');
   }
+
   // POST/PUT Entity
   async publishEntity(entity: NgsiEntity): Promise<void> {
     try {
@@ -47,20 +48,41 @@ export class ScorpioService {
   }
 
   // --- GET: Lấy chi tiết Entity theo Type hoặc Query ---
-  async getEntitiesByType(type: string, query?: string): Promise<Record<string, any>[]> {
-    const LIMIT = 1000;
-    let offset = 0;
-    let allEntities: Record<string, any>[] = [];
-    let keepFetching = true;
-
-    this.logger.log(`🔄 Đang tải dữ liệu type=${type} (Batch size: ${LIMIT})...`);
-
+  async getEntitiesByType(type: string, query?: string, limit?: number, offset?: number): Promise<{ data: any[], count: number }> {
     try {
+      // CHẾ ĐỘ PHÂN TRANG
+      if (limit && limit > 0) {
+
+        let url = `${this.scorpioUrl}/ngsi-ld/v1/entities?type=${encodeURIComponent(type)}`;
+        if (query) url += `&q=${encodeURIComponent(query)}`;
+        
+        url += `&limit=${limit}&offset=${offset || 0}`;
+        url += `&count=true`;
+
+        const response = await firstValueFrom(
+          this.httpService.get(url, { headers: { Accept: 'application/json' } })
+        );
+        
+        const countHeader = response.headers['ngsild-results-count'];
+        const totalCount = parseInt(countHeader || '0', 10);
+
+        return {
+            data: response.data as any[],
+            count: totalCount
+        };
+      }
+
+      // CHẾ ĐỘ TẢI TOÀN BỘ DỮ LIỆU
+      const BATCH_SIZE = 1000;
+      let currentOffset = 0;
+      let allEntities: Record<string, any>[] = [];
+      let keepFetching = true;
+
       while (keepFetching) {
         let url = `${this.scorpioUrl}/ngsi-ld/v1/entities?type=${encodeURIComponent(type)}`;
         if (query) url += `&q=${encodeURIComponent(query)}`;
 
-        url += `&limit=${LIMIT}&offset=${offset}`;
+        url += `&limit=${BATCH_SIZE}&offset=${currentOffset}`;
 
         const response = await firstValueFrom(
           this.httpService.get(url, {
@@ -68,29 +90,33 @@ export class ScorpioService {
           }),
         );
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const data: Record<string, any>[] = response.data;
 
         if (data.length > 0) {
           allEntities = allEntities.concat(data);
-          offset += LIMIT;
+          currentOffset += BATCH_SIZE;
 
-          if (data.length < LIMIT) {
+          if (data.length < BATCH_SIZE) {
             keepFetching = false;
           }
         } else {
-          keepFetching = false;
+            keepFetching = false;
         }
-      }
+      } 
 
-      this.logger.log(`✅ Đã tải tổng cộng: ${allEntities.length} bản ghi.`);
-      return allEntities;
+      return {
+          data: allEntities,
+          count: allEntities.length
+      };
+
     } catch (error) {
       this.handleAxiosError(error, `Get List Type: ${type}`);
       throw error;
     }
   }
 
+  // ... (Các hàm getEntity, deleteEntity, helper giữ nguyên như cũ) ...
+  
   // GET: Lấy chi tiết Entity theo ID
   async getEntity(urn: string): Promise<any> {
     try {

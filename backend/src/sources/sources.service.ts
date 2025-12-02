@@ -87,8 +87,19 @@ export class SourcesService implements OnModuleInit {
     return this.dataSourceRepo.save(newSource);
   }
 
-  findAll() {
-    return this.dataSourceRepo.find();
+  async findAll(limit?: number, offset?: number) {
+    if (limit) {
+      return this.dataSourceRepo.findAndCount({
+        where: { isActive: true },
+        take: limit,
+        skip: offset || 0,
+        order: { name: 'ASC' }
+      });
+    }
+    
+    const data = await this.dataSourceRepo.find({ where: { isActive: true } });
+    const count = data.length;
+    return [data, count] as [DataSource[], number];
   }
 
   async findOne(id: string) {
