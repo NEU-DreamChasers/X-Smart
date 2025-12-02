@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # 2. Install dependencies
-RUN npm install
+RUN npm install --ignore-scripts
 
 # 3. Copy the rest of the backend source code
 COPY . .
@@ -25,7 +25,7 @@ ENV NODE_ENV production
 COPY package*.json ./
 
 # 6. Install only production dependencies (saves space, fixes missing modules)
-RUN npm install --only=production
+RUN npm install --only=production --ignore-scripts
 
 # 7. Copy the built application from the builder stage
 COPY --from=builder /app/dist ./dist

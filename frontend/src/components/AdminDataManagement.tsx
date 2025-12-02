@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Tabs, TabsList, TabsTrigger } from './ui/tabs'; // Đã bỏ TabContent vì không dùng
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import { 
   CloudRain, Wind, Bus, ParkingCircle, RefreshCw, 
   Database, Loader2, Play, ChevronLeft, ChevronRight 
 } from 'lucide-react';
-import { ApiService } from '../services/api.service';
-// LƯU Ý: Bạn cần đảm bảo đã import biến 'api' (axios instance) nếu muốn dùng hàm handleImportAll
-// import api from '../services/api'; 
+import { api, ApiService } from '../services/api.service';
 
 const cardStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 const PAGE_SIZE = 10;
@@ -19,7 +17,6 @@ export function AdminDataManagement() {
   const [loading, setLoading] = useState(false);
   const [domain, setDomain] = useState<DomainKeys>('weather');
 
-  // --- SỬA LỖI: Chỉ khai báo offset và totalCount MỘT LẦN ---
   const [offset, setOffset] = useState(0); 
   const [totalCount, setTotalCount] = useState(0);
 
@@ -48,7 +45,6 @@ export function AdminDataManagement() {
     }
   };
 
-  // --- SỬA LỖI: Chỉ giữ lại một bộ logic điều khiển trang ---
   const handlePrev = () => {
     if (offset > 0) {
       setOffset(offset - PAGE_SIZE);
@@ -56,19 +52,15 @@ export function AdminDataManagement() {
   };
 
   const handleNext = () => {
-    // Logic cũ: if (data.length === PAGE_SIZE)
-    // Logic mới chính xác hơn: Dựa vào totalCount để tránh bấm Next khi hết dữ liệu
     if (offset + PAGE_SIZE < totalCount) {
       setOffset(offset + PAGE_SIZE);
     }
   };
   
-  // Reset offset về 0 khi đổi domain
   useEffect(() => { 
     setOffset(0); 
   }, [domain]);
   
-  // Gọi API khi domain hoặc offset thay đổi
   useEffect(() => { 
     fetchData(); 
     // eslint-disable-next-line react-hooks/exhaustive-deps

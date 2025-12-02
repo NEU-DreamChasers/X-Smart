@@ -34,7 +34,7 @@ export class IngestionService {
   // LUỒNG 1: THU THẬP CẢM BIẾN (Weather/Air) - Chạy 5 phút/lần
   @Cron(CronExpression.EVERY_5_MINUTES)
   async handleSensorIngestion() {
-    this.logger.debug('📡 [Ingestion] Đang thu thập dữ liệu Môi trường...');
+    this.logger.log('📡 [Ingestion] Đang thu thập dữ liệu Môi trường...');
     const [sources] = await this.sourcesService.findAll();
 
     for (const source of sources) {
@@ -65,7 +65,7 @@ export class IngestionService {
   // LUỒNG 2: GIẢ LẬP BÃI ĐỖ XE - Chạy 1 phút/lần
   @Cron(CronExpression.EVERY_MINUTE)
   async handleParkingSimulation() {
-    this.logger.debug(' [Simulation] Đang cập nhật trạng thái bãi đỗ xe...');
+    this.logger.log(' [Simulation] Đang cập nhật trạng thái bãi đỗ xe...');
 
     const result = await this.scorpioService.getEntitiesByType('OffStreetParking');
     const parkingLots = result.data;
