@@ -6,11 +6,17 @@ import { MapPin, Send, AlertTriangle, Loader2, X, ImagePlus, Phone, Type } from 
 
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
-export default function CitizenReportForm() {
+// 1. Thêm Interface Props
+interface Props {
+  onSuccess?: () => void;
+}
+
+// 2. Destructure prop
+export default function CitizenReportForm({ onSuccess }: Props) {
   // Sử dụng Interface ReportFormState
   const [formData, setFormData] = useState<ReportFormState>({
     category: 'traffic',
-    title: '', // Trường mới bắt buộc
+    title: '', 
     description: '',
     address: '',
     lat: 0,
@@ -24,7 +30,7 @@ export default function CitizenReportForm() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     setIsLoggedIn(!!token);
   }, []);
 
@@ -96,10 +102,10 @@ export default function CitizenReportForm() {
     }
 
     try {
-      // Hàm service sẽ tự động map các trường sang tên đúng (lng -> lon, imageBase64 -> image)
       await createCitizenReport(formData);
       
       setStatusMsg({ type: 'success', text: 'Gửi phản ánh thành công! Cảm ơn đóng góp của bạn.' });
+      
       // Reset form
       setFormData({
         category: 'traffic',
@@ -111,11 +117,16 @@ export default function CitizenReportForm() {
         imageBase64: null,
         phoneNumber: ''
       });
+
+      // 3. Gọi callback onSuccess để component cha (Dashboard) biết
+      if (onSuccess) {
+        onSuccess();
+      }
+
     } catch (err: any) {
-      // Hiển thị lỗi chi tiết từ Backend trả về
       const resData = err.response?.data;
       const errorMsg = Array.isArray(resData?.message) 
-        ? resData.message.join(', ') // Nối các lỗi lại nếu có nhiều
+        ? resData.message.join(', ')
         : (resData?.message || 'Gửi thất bại. Vui lòng thử lại sau.');
       
       setStatusMsg({ type: 'error', text: `Lỗi: ${errorMsg}` });
