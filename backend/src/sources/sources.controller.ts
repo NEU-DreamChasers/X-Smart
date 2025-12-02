@@ -1,12 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, DefaultValuePipe, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { SourcesService } from './sources.service';
 import { DataSource } from './entities/data-source.entity';
-import { ApiTags, ApiOperation, ApiParam, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam, ApiBody, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Public } from 'src/common/decorators/public.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from 'src/users/user.entity';
+import type { Response } from 'express';
 
 @ApiTags('Sources')
 @ApiBearerAuth()
@@ -30,9 +31,21 @@ export class SourcesController {
   // --- LẤY DANH SÁCH ---
   @Get()
   @Public()
-  @ApiOperation({ summary: 'Lấy danh sách tất cả nguồn dữ liệu (Read All)' })
-  findAll() {
-    return this.sourcesService.findAll();
+  @ApiOperation({ summary: 'Lấy danh sách tất cả nguồn dữ liệu (Hỗ trợ phân trang/lấy tất cả)' })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'offset', required: false })
+  async findAll(
+    @Query('limit', new DefaultValuePipe(0), ParseIntPipe) limit: number,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
+    @Res({ passthrough: true }) res?: Response
+  ) {
+    const [data, count] = await this.sourcesService.findAll(limit, offset);
+
+    if (res) {
+      res.header('X-Total-Count', count.toString());
+    }
+
+    return data;
   }
 
   // --- LẤY CHI TIẾT --- 

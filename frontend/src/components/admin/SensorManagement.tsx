@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, Server, MapPin, X, Loader2, Save } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Server, MapPin, X, Loader2, Save, ChevronRight, ChevronLeft } from 'lucide-react';
 import { ApiService } from '@/services/api.service';
 
-// Define interface
 interface Sensor {
   id: string;
   name: string;
@@ -17,10 +16,17 @@ interface Sensor {
 
 // Strict border style match
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
+const PAGE_SIZE = 10;
 
 export default function SensorManagement() {
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [offset, setOffset] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -39,10 +45,18 @@ export default function SensorManagement() {
   const fetchSensors = async () => {
     setLoading(true);
     try {
-      const data = await ApiService.sources.getAll();
-      setSensors(data);
+      const response = await ApiService.sources.getAll(PAGE_SIZE, offset);
+      
+      if (response && Array.isArray(response.data)) {
+         setSensors(response.data);
+         setTotalCount(response.totalCount);
+      } else {
+         setSensors([]);
+         setTotalCount(0);
+      }
     } catch (error) {
       console.error("Lỗi tải cảm biến:", error);
+      setSensors([]);
     } finally {
       setLoading(false);
     }
@@ -50,7 +64,15 @@ export default function SensorManagement() {
 
   useEffect(() => {
     fetchSensors();
-  }, []);
+  }, [offset]);
+
+  const handlePrev = () => {
+    if (offset > 0) setOffset(prev => Math.max(0, prev - PAGE_SIZE));
+  };
+
+  const handleNext = () => {
+    if (offset + PAGE_SIZE < totalCount) setOffset(prev => prev + PAGE_SIZE);
+  };
 
   // --- 2. HANDLERS ---
   const resetForm = () => {
@@ -205,6 +227,32 @@ export default function SensorManagement() {
                     )}
                 </tbody>
             </table>
+        </div>
+
+        {/* FOOTER PHÂN TRANG */}
+        <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center">
+            <span className="text-sm text-gray-600">
+                Hiển thị {sensors.length > 0 ? offset + 1 : 0} - {Math.min(offset + PAGE_SIZE, totalCount)} trên tổng số <b>{totalCount}</b>
+            </span>
+            <div className="flex items-center gap-2">
+                <button 
+                    onClick={handlePrev} 
+                    disabled={offset === 0 || loading}
+                    className="p-2 bg-white border rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm font-medium px-2 text-gray-700">
+                   Trang {currentPage} / {totalPages || 1}
+                </span>
+                <button 
+                    onClick={handleNext} 
+                    disabled={offset + PAGE_SIZE >= totalCount || loading}
+                    className="p-2 bg-white border rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <ChevronRight className="w-4 h-4" />
+                </button>
+            </div>
         </div>
       </div>
 
