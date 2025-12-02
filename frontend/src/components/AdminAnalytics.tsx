@@ -48,8 +48,8 @@ export function AdminAnalytics() {
         ] = await Promise.all([
            api.get('/weather/status').catch(() => ({ data: [] })),
            api.get('/air/status').catch(() => ({ data: [] })),
-           api.get('/bus/status').catch(() => ({ data: [] })),     // Thêm Bus
-           api.get('/parking/status').catch(() => ({ data: [] })), // Thêm Parking
+           api.get('/bus/status').catch(() => ({ data: [] })),
+           api.get('/parking/status').catch(() => ({ data: [] })),
            api.get('/sources').catch(() => ({ data: [] })),
            api.get('/reports/admin/stats').catch(() => ({ data: { totalReports: 0 } }))
         ]);

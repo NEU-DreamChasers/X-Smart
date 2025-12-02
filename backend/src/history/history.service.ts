@@ -7,6 +7,13 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 
+export interface QuantumLeapResponse {
+  entityId: string;
+  attrName: string;
+  index: string[];
+  values: any[];
+}
+
 @Injectable()
 export class HistoryService {
   private readonly logger = new Logger(HistoryService.name);
@@ -43,9 +50,20 @@ export class HistoryService {
       if (options.toDate) url += `toDate=${options.toDate}&`;
 
       const response = await firstValueFrom(this.httpService.get(url));
-      return response.data;
+      return response.data as QuantumLeapResponse;
     } catch (error) {
-      this.logger.error(`Failed to get attribute history: ${error}`);
+      const err = error as any;
+      if (err.response && err.response.status === 404) {
+        this.logger.warn(`Chưa có lịch sử cho Entity ${entityId}. Trả về rỗng.`);
+        return {
+            entityId,
+            attrName,
+            index: [],
+            values: []
+        };
+      }
+
+      this.logger.error(`Lỗi lấy lịch sử ${attrName}: ${err.message}`);
       throw error;
     }
   }
@@ -95,6 +113,7 @@ export class HistoryService {
           data: values,
           borderColor: 'rgb(255, 99, 132)',
           backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          tension: 0.4,
         },
       ],
     };
@@ -150,6 +169,7 @@ export class HistoryService {
           backgroundColor: 'rgba(75, 192, 192, 0.6)',
           borderColor: 'rgb(75, 192, 192)',
           borderWidth: 1,
+          type: 'bar',
         },
       ],
     };
