@@ -157,3 +157,18 @@ export const getMyReports = async (): Promise<NgsiReport[]> => {
     return [];
   }
 };
+
+export const getReportById = async (id: string): Promise<NgsiReport | null> => {
+  try {
+    const response = await api.get(`/reports/${id}`);
+    if (response.data) {
+      // Backend có thể trả về object thuần, cần map lại để đảm bảo cấu trúc NGSI
+      return mapToNgsiReport(response.data);
+    }
+    return null;
+  } catch (error) {
+    console.error("Lỗi khi lấy chi tiết báo cáo:", error);
+    return null;
+  }
+};
+
