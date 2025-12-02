@@ -256,14 +256,10 @@ export class ReportsService {
 
     if (!report) throw new NotFoundException('Báo cáo không tồn tại');
 
-    // Logic bảo mật xem chi tiết:
-    // 1. Admin xem được hết
     if (user?.role === UserRole.ADMIN) return report;
 
-    // 2. Chủ sở hữu xem được bài mình
     if (user && report.user?.id === user.id) return report;
 
-    // 3. Người lạ chỉ xem được bài Đã duyệt/Đã xong
     if ([ReportStatus.APPROVED, ReportStatus.RESOLVED].includes(report.status)) {
       return report;
     }
