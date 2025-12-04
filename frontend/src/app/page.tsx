@@ -1,7 +1,59 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 'use client';
 
-import { SimpleLogin } from '../components/SimpleLogin';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { CitizenDashboard } from '../components/CitizenDashboard';
+import { AdminDashboard } from '../components/AdminDashboard';
+
+export type UserRole = 'citizen' | 'admin' | 'guest' | null;
+
+export interface User {
+  name: string;
+  role: UserRole;
+  email: string;
+}
 
 export default function Home() {
-  return <SimpleLogin />;
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>({
+    name: 'Khách',
+    role: 'guest',
+    email: 'guest@thanhphox.gov.vn',
+  });
+  const handleRedirectToLogin = () => {
+    router.push('/login');
+  };
+
+  const handleLogout = () => {
+    setUser({
+      name: 'Khách',
+      role: 'guest',
+      email: 'guest@thanhphox.gov.vn',
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f5f5f7]">
+      {user?.role === 'admin' ? (
+        <AdminDashboard 
+            user={user} 
+            onLogout={handleLogout} 
+            onLogin={() => {}}
+        />
+      ) : (
+        <CitizenDashboard 
+            user={user} 
+            onLogout={handleLogout} 
+            onLogin={handleRedirectToLogin} 
+        />
+      )}
+    </div>
+  );
 }

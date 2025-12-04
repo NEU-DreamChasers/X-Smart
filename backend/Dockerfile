@@ -1,31 +1,35 @@
-# backend/Dockerfile
-
-# ----- Giai đoạn 1: Build -----
-FROM node:20.11-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# 1. Copy package files from the backend folder
 COPY package*.json ./
-COPY backend/package.json ./backend/
-COPY frontend/package.json ./frontend/
-COPY shared/package.json ./shared/
 
-RUN npm install
+# 2. Install dependencies
+RUN npm install --ignore-scripts
 
+# 3. Copy the rest of the backend source code
 COPY . .
 
-RUN npm run build -w backend
+# 4. Build the application
+RUN npm run build
 
-
-# ----- Giai đoạn 2: Production -----
-FROM node:20.11-alpine AS production
+# --- Production Stage ---
+FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-COPY --from=builder /app/backend/package.json ./package.json
+ENV NODE_ENV production
 
-RUN npm install --production
+# 5. Copy package.json again to install ONLY production dependencies
+COPY package*.json ./
 
-COPY --from=builder /app/backend/dist ./dist
+# 6. Install only production dependencies (saves space, fixes missing modules)
+RUN npm install --only=production --ignore-scripts
+
+# 7. Copy the built application from the builder stage
+COPY --from=builder /app/dist ./dist
+
+EXPOSE 8080
 
 CMD ["node", "dist/main"]

@@ -1,5 +1,5 @@
 services:
-  # PostgreSQL với PostGIS (dùng cho Scorpio + X-Smart)
+  # PostgreSQL với PostGIS
   postgres:
     image: postgis/postgis:16-3.4
     container_name: xsmart_postgres
@@ -23,16 +23,15 @@ services:
       - "9092:9092"
       - "9093:9093"
     environment:
-      # KRaft Mode Configuration
       CLUSTER_ID: "MkQkRmVUOTFkZGVhODEwOA=="
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://kafka:9092,CONTROLLER://kafka:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://kafka:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
@@ -42,7 +41,7 @@ services:
       xsmart: {}
     restart: always
 
-  # Scorpio NGSI-LD Broker (All-in-One with Kafka KRaft)
+  # Scorpio Broker
   scorpio:
     image: scorpiobroker/all-in-one-runner:java-kafka-latest
     container_name: xsmart_scorpio
@@ -56,7 +55,7 @@ services:
       DBPASS: ngb
       DBNAME: ngb
       BUSHOST: kafka
-      BUSPORT: 9092
+      BUSPORT: 29092
       GATEWAY_HOST: localhost
       GATEWAY_PORT: 9090
     depends_on:
@@ -70,23 +69,67 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  
+  # miniio
+  minio:
+    image: minio/minio:latest
+    container_name: xsmart_minio
+    ports:
+      - "9000:9000" # API Port
+      - "9001:9001" # Console UI Port
+    environment:
+      MINIO_ROOT_USER: "minioadmin"
+      MINIO_ROOT_PASSWORD: "minioadminpassword"
+    volumes:
+      - ./minio_data:/data
+    command: server /data --console-address ":9001"
+    restart: always
 
-  # Dịch vụ Backend (Nest.js) - kết nối với Scorpio
+  # (Tùy chọn) Service để tự động tạo Bucket khi khởi động
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadminpassword;
+      /usr/bin/mc mb myminio/x-smart-reports;
+      /usr/bin/mc policy set download myminio/x-smart-reports;
+      exit 0;
+      "
+
+  # Dịch vụ Backend (Nest.js)
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: xsmart_backend
     ports:
       - "8080:8080"
+    env_file:
+      - .env  
     depends_on:
       - postgres
       - scorpio
+      - kafka
     environment:
       PORT: 8080
-      DATABASE_URL: postgresql://ngb:ngb@postgres:5432/ngb
+      
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ngb
+      DB_PASSWORD: ngb
+      DB_DATABASE: ngb
+      
+      KAFKA_BROKER: kafka:29092
+      
       SCORPIO_URL: http://scorpio:9090
       SCORPIO_API_VERSION: v1
+
+      OPENWEATHER_API_KEY: eb3a4947904547285aa7bdecca8cc396
+
+      JWT_SECRET: DAY_LA_BI_MAT_KHONG_DUOC_LO_RA_NGOAI
+
     networks:
       xsmart: {}
     restart: unless-stopped
@@ -94,16 +137,16 @@ services:
   # Dịch vụ Frontend (Next.js)
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: xsmart_frontend
     ports:
       - "3000:3000"
     depends_on:
       - backend
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:8080/api
-      NEXT_PUBLIC_SCORPIO_URL: http://scorpio:9090
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api
+      NEXT_PUBLIC_SCORPIO_URL: http://localhost:9090
     networks:
       xsmart: {}
     restart: unless-stopped

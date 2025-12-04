@@ -1,0 +1,54 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Report } from 'src/reports/entities/report.entity';
+
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  USER = 'USER',
+}
+
+@Entity('users')
+export class User {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ unique: true })
+  email: string;
+
+  @Column({ nullable: true })
+  fullName: string;
+
+  @Column({ nullable: true })
+  username: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  passwordHash: string | null;
+
+  @Column({ nullable: true })
+  avatar: string;
+
+  @Column({ default: 'local' })
+  provider: string;
+
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.USER,
+  })
+  role: UserRole;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+
+  @OneToMany(() => Report, (report) => report.user)
+  reports: Report[];
+}
