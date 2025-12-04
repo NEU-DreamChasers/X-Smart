@@ -7,18 +7,20 @@ import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 
-// Import Routing Machine an toàn cho SSR
-if (typeof window !== 'undefined') {
-  require('leaflet-routing-machine');
-}
-
 import { renderToStaticMarkup } from 'react-dom/server';
 import { 
-  CloudSun, Wind, Car, Bus, MapPin, Navigation, Store
+  CloudSun, Wind, Car, Bus, MapPin, Navigation, Store, 
+  Thermometer, Droplets
 } from 'lucide-react';
 import { formatAddress } from '@/lib/utils';
 
-// --- Interfaces ---
+// Fix lỗi SSR cho Routing Machine
+if (typeof window !== 'undefined') {
+  try {
+    require('leaflet-routing-machine');
+  } catch (e) { console.error(e); }
+}
+
 export interface NgsiEntity {
   id: string;
   type: string;
@@ -26,63 +28,83 @@ export interface NgsiEntity {
     type: 'GeoProperty';
     value: { type: 'Point'; coordinates: [number, number] };
   };
-  address?: {
-    addressLocality: any;
-    streetAddress: any; 
-    value: any 
-  };
-  name?: { value: any };
+  address?: any;
+  name?: { value: any } | any;
   [key: string]: any;
 }
 
 interface RealMapProps {
-  // domain và searchTerm thành optional để Admin không bắt buộc phải truyền
-  domain?: string;
-  searchTerm?: string;
+  domain: string;
+  searchTerm: string;
   onDataLoaded?: (count: number, loading: boolean) => void;
   center?: [number, number];
-  zoom?: number; // Thêm prop zoom
   searchMarker?: [number, number] | null;
-  
-  // Props cho Routing
   routeCoordinates?: { start: [number, number]; end: [number, number] } | null;
   onSelectEntity?: (entity: NgsiEntity) => void; 
-  
-  // MỚI: Cho phép truyền dữ liệu trực tiếp (Dùng cho Admin)
+  zoom?: number;
   entities?: NgsiEntity[];
 }
 
-// --- Helper Functions ---
+// --- 1. HÀM TẠO TÊN TIẾNG VIỆT THÔNG MINH (NÂNG CẤP) ---
+const getSmartName = (entity: NgsiEntity) => {
+  let rawName = entity.name?.value || entity.name || '';
+
+  const badKeywords = [
+    'urn:ngsi-ld',
+    'OpenWeatherMap',
+    'Lat', 'Lon',
+    'Public Parking',
+    'Unknown',
+    'N/A'
+  ];
+
+  const isBadName = badKeywords.some(kw => rawName.includes(kw));
+
+  let typeVN = 'Điểm giám sát';
+  if (entity.type?.includes('Weather')) typeVN = 'Trạm Thời tiết';
+  else if (entity.type?.includes('Air')) typeVN = 'Trạm Không khí';
+  else if (entity.type?.includes('Parking') || entity.type === 'OffStreetParking') typeVN = 'Bãi đỗ xe';
+  else if (entity.type?.includes('Bus') || entity.category?.value?.includes('bus')) typeVN = 'Trạm Xe buýt';
+
+  if (rawName.includes('Weather - ')) return rawName.replace('Weather - ', 'Thời tiết khu vực ');
+  if (rawName.includes('Air Monitor - ')) return rawName.replace('Air Monitor - ', 'Không khí khu vực ');
+  
+  if (isBadName) {
+     const addr = entity.address?.value || entity.address;
+     
+     if (addr?.streetAddress && addr.streetAddress !== 'Unknown Street') {
+        return `${typeVN} ${addr.streetAddress}`;
+     }
+     if (addr?.addressLocality) {
+        return `${typeVN} tại ${addr.addressLocality}`;
+     }
+     return `${typeVN} #${entity.id.split(':').pop()?.substring(0, 5)}`;
+  }
+
+  return rawName;
+};
+
+// --- Routing Component ---
 function RoutingMachine({ routeCoords }: { routeCoords: { start: [number, number]; end: [number, number] } | null | undefined }) {
   const map = useMap();
-
   useEffect(() => {
     if (!routeCoords || !map) return;
-
+    // @ts-ignore
+    if (!L.Routing) return;
     // @ts-ignore
     const routingControl = L.Routing.control({
-      waypoints: [
-        L.latLng(routeCoords.start[0], routeCoords.start[1]),
-        L.latLng(routeCoords.end[0], routeCoords.end[1])
-      ],
-      routeWhileDragging: false,
-      showAlternatives: false,
-      fitSelectedRoutes: true,
+      waypoints: [ L.latLng(routeCoords.start[0], routeCoords.start[1]), L.latLng(routeCoords.end[0], routeCoords.end[1]) ],
+      routeWhileDragging: false, showAlternatives: false, fitSelectedRoutes: true,
       lineOptions: { styles: [{ color: '#3b82f6', weight: 6, opacity: 0.8 }] },
-      createMarker: () => null,
-      addWaypoints: false,
-      draggableWaypoints: false,
-      containerClassName: 'hidden', 
+      createMarker: () => null, addWaypoints: false, draggableWaypoints: false, containerClassName: 'hidden', 
     }).addTo(map);
-
-    return () => {
-      if (map && routingControl) map.removeControl(routingControl);
-    };
+    // @ts-ignore
+    return () => { try { if (map && routingControl) map.removeControl(routingControl); } catch(e){} };
   }, [routeCoords, map]);
-
   return null;
 }
 
+// --- CONFIG MÀU SẮC ---
 const DOMAIN_CONFIG: Record<string, { color: string, icon: any }> = {
   weather: { color: '#f97316', icon: <CloudSun size={20} color="white" /> },
   air: { color: '#10b981', icon: <Wind size={20} color="white" /> },
@@ -91,17 +113,6 @@ const DOMAIN_CONFIG: Record<string, { color: string, icon: any }> = {
   poi: { color: '#7c3aed', icon: <Store size={20} color="white" /> },
   traffic: { color: '#dc2626', icon: <Navigation size={20} color="white" /> },
   default: { color: '#4b5563', icon: <MapPin size={20} color="white" /> },
-};
-
-// Map từ Entity Type (Admin) sang Domain Key (Config)
-const getTypeDomain = (type: string, defaultDomain: string = 'default') => {
-  const t = type.toLowerCase();
-  if (t.includes('bus')) return 'bus';
-  if (t.includes('air')) return 'air';
-  if (t.includes('parking')) return 'parking';
-  if (t.includes('weather')) return 'weather';
-  if (t.includes('traffic')) return 'traffic';
-  return defaultDomain;
 };
 
 const createCustomIcon = (domain: string) => {
@@ -135,42 +146,23 @@ const searchResultIcon = L.divIcon({
   className: '', iconSize: [48, 48], iconAnchor: [24, 48], popupAnchor: [0, -48]
 });
 
-function MapController({ center, zoom }: { center?: [number, number], zoom?: number }) {
+function MapController({ center }: { center?: [number, number] }) {
   const map = useMap();
-  useEffect(() => {
-    if (center) map.flyTo(center, zoom || 16, { duration: 1.5 });
-  }, [center, zoom, map]);
+  useEffect(() => { if (center) map.flyTo(center, 16, { duration: 1.5 }); }, [center, map]);
   return null;
 }
 
-export default function RealMap({ 
-  domain = 'default', 
-  searchTerm = '', // Fix lỗi: Mặc định là rỗng để tránh undefined
-  onDataLoaded, 
-  center, 
-  zoom = 13,
-  searchMarker, 
-  routeCoordinates, 
-  onSelectEntity,
-  entities: externalEntities // Nhận entities từ bên ngoài (Admin)
-}: RealMapProps) {
-  
+export default function RealMap({ domain, searchTerm ='', onDataLoaded, center, searchMarker, routeCoordinates, onSelectEntity, entities: propEntities }: RealMapProps) {
   const [internalEntities, setInternalEntities] = useState<NgsiEntity[]>([]);
 
-  // Quyết định dùng nguồn dữ liệu nào: Bên ngoài truyền vào (Admin) hay Tự fetch (Client)
-  const isExternalMode = !!externalEntities;
-  const activeEntities = isExternalMode ? externalEntities : internalEntities;
+  const entitiesToRender = propEntities || internalEntities;
 
   const fetchEntities = async () => {
-    // Nếu có external entities hoặc không có domain cụ thể thì không tự fetch
-    if (isExternalMode || !domain || domain === 'default') return;
-
     if (onDataLoaded) onDataLoaded(0, true);
     const apiDomain = domain === 'traffic' ? 'poi' : domain; 
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'; 
       const apiUrl = `${baseUrl}/${apiDomain}/status`;
-      
       const res = await fetch(apiUrl, { cache: 'no-store' });
       if (!res.ok) throw new Error(`API Error`);
       const data: NgsiEntity[] = await res.json();
@@ -182,140 +174,147 @@ export default function RealMap({
   };
 
   useEffect(() => {
+    if (propEntities) return;
     fetchEntities();
-    // Chỉ auto-refresh nếu đang ở chế độ tự fetch
-    if (!isExternalMode) {
-        const interval = setInterval(fetchEntities, 30000);
-        return () => clearInterval(interval);
-    }
-  }, [domain, isExternalMode]);
+    const interval = setInterval(fetchEntities, 30000);
+    return () => clearInterval(interval);
+  }, [domain, propEntities]);
 
   const filteredEntities = useMemo(() => {
-    let result = activeEntities || [];
-    // Fix lỗi: Kiểm tra searchTerm tồn tại trước khi trim
+    let result = entitiesToRender;
     if (searchTerm && searchTerm.trim()) {
       const lowerTerm = searchTerm.toLowerCase();
-      result = result.filter(entity => {
-        const name = String(entity.name?.value || entity.name || '').toLowerCase(); // Handle structure differences
+      result = entitiesToRender.filter(entity => {
+        const name = String(entity.name?.value || entity.name || '').toLowerCase();
         return name.includes(lowerTerm);
       });
     }
     if (onDataLoaded) onDataLoaded(result.length, false);
     return result;
-  }, [activeEntities, searchTerm, onDataLoaded]);
+  }, [entitiesToRender, searchTerm, onDataLoaded]);
 
-  const getValue = (prop: any) => (prop && prop.value !== undefined ? prop.value : 'N/A');
+  const getValue = (prop: any) => {
+    if (prop === undefined || prop === null) return 'N/A';
+    if (typeof prop === 'object' && prop.value !== undefined) return prop.value;
+    return prop;
+  };
+  
+  // Helper get Safe Address
+  const getSafeAddress = (entity: NgsiEntity) => {
+    const val = entity.address?.value?.streetAddress || entity.address?.value || entity.address;
+    return formatAddress(val);
+  };
 
   return (
     <MapContainer 
-      center={center || [10.7769, 106.7009]} 
-      zoom={zoom} 
+      center={center || [10.7769, 106.7009]} zoom={13} zoomControl={false} attributionControl={false}
       style={{ height: '100%', width: '100%', borderRadius: '0 0 14px 14px' }}
-      zoomControl={false}
-      attributionControl={false}
     >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      
-      <MapController center={center} zoom={zoom} />
+      <MapController center={center} />
       <RoutingMachine routeCoords={routeCoordinates} />
 
       {searchMarker && (
-        <Marker 
-          position={searchMarker} 
-          icon={searchResultIcon} 
-          zIndexOffset={1000}
-          eventHandlers={{
+        <Marker position={searchMarker} icon={searchResultIcon} zIndexOffset={1000} eventHandlers={{
             click: () => {
               if (onSelectEntity) {
-                const fakeEntity: NgsiEntity = {
-                  id: 'search:result',
-                  type: 'SearchResult',
-                  name: { value: 'Vị trí đã chọn' },
-                  location: {
-                    type: 'GeoProperty',
-                    value: { type: 'Point', coordinates: [searchMarker[1], searchMarker[0]] } 
-                  },
-                  address: {
-                    value: { streetAddress: `Tọa độ: ${searchMarker[0].toFixed(4)}, ${searchMarker[1].toFixed(4)}` },
-                    addressLocality: undefined,
-                    streetAddress: undefined
-                  }
-                };
-                onSelectEntity(fakeEntity);
+                onSelectEntity({
+                  id: 'search:result', type: 'SearchResult', name: { value: 'Vị trí tìm kiếm' },
+                  location: { type: 'GeoProperty', value: { type: 'Point', coordinates: [searchMarker[1], searchMarker[0]] } },
+                  address: { value: { streetAddress: `Tọa độ: ${searchMarker[0].toFixed(4)}, ${searchMarker[1].toFixed(4)}` } }
+                }); 
               }
             }
           }}
         >
-          <Popup className="custom-popup">
-            <div className="font-bold text-red-600 text-sm p-1 text-center">📍 Vị trí tìm kiếm</div>
-          </Popup>
+          <Popup className="custom-popup"><div className="font-bold text-red-600 text-sm p-1 text-center">📍 Vị trí tìm kiếm</div></Popup>
         </Marker>
       )}
 
-      <MarkerClusterGroup
-        chunkedLoading
-        spiderfyOnMaxZoom={false}
-        maxClusterRadius={40}
-        disableClusteringAtZoom={16}
-      >
-      {filteredEntities.map((entity) => {
-        // Xử lý sự khác biệt cấu trúc giữa API NGSI-LD và dữ liệu Admin đã map
-        let position: [number, number] | null = null;
-        
-        // Trường hợp 1: Dữ liệu từ Admin (đã xử lý thành mảng [lat, lon])
-        if (Array.isArray(entity.location) && entity.location.length === 2 && typeof entity.location[0] === 'number') {
-             position = entity.location as [number, number];
-        } 
-        // Trường hợp 2: Dữ liệu NGSI-LD chuẩn (GeoJSON [lon, lat])
-        else if (entity.location?.value?.type === 'Point') {
-            const coords = entity.location.value.coordinates;
-            position = [coords[1], coords[0]];
-        }
+      <MarkerClusterGroup chunkedLoading spiderfyOnMaxZoom={false} maxClusterRadius={40} disableClusteringAtZoom={16}>
+        {filteredEntities.map((entity) => {
+          let position: [number, number] | null = null;
+          if (Array.isArray(entity.location) && entity.location.length === 2 && typeof entity.location[0] === 'number') {
+             position = (entity.location as unknown) as [number, number];
+          } else if (entity.location?.value?.type === 'Point') {
+             const coords = entity.location.value.coordinates;
+             position = [coords[1], coords[0]];
+          }
+          if (!position) return null;
+          
+          let itemDomain = domain;
+          
+          if (entity.type === 'BusStop') itemDomain = 'bus';
+          else if (entity.type === 'Parking') itemDomain = 'parking';
+          else if (entity.type === 'AirQuality') itemDomain = 'air';
+          else if (entity.type === 'Weather') itemDomain = 'weather';
+          
+          // Tạo icon tương ứng
+          const itemIcon = createCustomIcon(itemDomain);
 
-        if (!position) return null;
-
-        const rawAddress = entity.address?.value?.streetAddress || entity.address?.value || entity.address || 'Đang cập nhật';
-        const displayName = getValue(entity.name) !== 'N/A' ? getValue(entity.name) : (entity.name || entity.id);
-
-        // Chọn icon: Nếu là External Mode (Admin), chọn theo Type của entity. Nếu không, dùng domain chung.
-        const iconDomain = isExternalMode ? getTypeDomain(entity.type) : domain;
-        const icon = createCustomIcon(iconDomain);
-
-        return (
-          <Marker 
-            key={entity.id} 
-            position={position} 
-            icon={icon}
-            eventHandlers={{
-              click: () => {
-                if (onSelectEntity) onSelectEntity(entity);
-              }
-            }}
-          >
-            <Popup className="custom-popup">
-               <div className="min-w-[200px] p-1 cursor-pointer" onClick={() => onSelectEntity && onSelectEntity(entity)}>
-                  <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
-                    <h3 className="font-semibold text-gray-900 text-sm line-clamp-1 hover:text-blue-600">
-                      {displayName}
-                    </h3>
-                  </div>
-
-                  <div className="text-xs text-gray-500 mb-2 flex items-start gap-1.5">
-                       <MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />
-                       <span className="italic leading-tight">
-                         {typeof rawAddress === 'string' ? rawAddress : formatAddress(rawAddress)}
-                       </span>
+          return (
+            <Marker key={entity.id} position={position} icon={itemIcon} eventHandlers={{
+                click: () => { if (onSelectEntity) onSelectEntity(entity); }
+            }}>
+              <Popup className="custom-popup">
+                 <div className="min-w-[220px] p-1 cursor-pointer" onClick={() => onSelectEntity && onSelectEntity(entity)}>
+                    {/* 1. Header Name */}
+                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
+                      <h3 className="font-bold text-gray-900 text-sm line-clamp-1 hover:text-blue-600">
+                        {getValue(entity.name) !== 'N/A' ? getValue(entity.name) : entity.id.split(':').pop()}
+                      </h3>
+                    </div>
+                    
+                    {/* 2. Address */}
+                    <div className="text-xs text-gray-500 mb-3 flex items-start gap-1.5">
+                        <MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />
+                        <span className="italic leading-tight line-clamp-2">{getSafeAddress(entity)}</span>
                     </div>
 
-                  <div className="text-sm space-y-1">
-                     {entity.type === 'Weather' && <p className="text-orange-600 font-bold">{getValue(entity.temperature)}°C</p>}
-                     {entity.type === 'Parking' && <p className="text-blue-600 font-bold">Trống: {getValue(entity.availableSpotNumber)}</p>}
-                  </div>
-               </div>
-            </Popup>
-          </Marker>
-        );
-      })}
+                    {/* 3. UI Style 'CitizenEnvironment' (Mini Cards) */}
+                    <div className="text-sm space-y-2">
+                        {/* STYLE CHO WEATHER */}
+                        {(domain === 'weather' || entity.type.includes('Weather')) && (
+                          <div className="grid grid-cols-2 gap-2">
+                             <div className="bg-[#ffedd4] p-2 rounded-lg flex items-center gap-2 border border-orange-100">
+                                <Thermometer size={16} className="text-[#f54900]" />
+                                <span className="text-[#f54900] font-bold text-sm">{getValue(entity.temperature)}°C</span>
+                             </div>
+                             <div className="bg-[#cefafe] p-2 rounded-lg flex items-center gap-2 border border-blue-100">
+                                <Droplets size={16} className="text-[#0092b8]" />
+                                <span className="text-[#0092b8] font-bold text-sm">{getValue(entity.humidity) !== 'N/A' ? getValue(entity.humidity) : getValue(entity.relativeHumidity)}%</span>
+                             </div>
+                          </div>
+                        )}
+
+                        {/* STYLE CHO AIR */}
+                        {(domain === 'air' || entity.type.includes('Air')) && (
+                          <div className="bg-[#dcfce7] p-2 rounded-lg flex items-center justify-between border border-green-100">
+                             <div className="flex items-center gap-2">
+                                <Wind size={16} className="text-[#166534]" />
+                                <span className="text-[#166534] font-bold text-sm">AQI</span>
+                             </div>
+                             <span className="text-[#166534] font-b old text-lg">{getValue(entity.airQualityIndex)}</span>
+                          </div>
+                        )}
+
+                        {/* STYLE CHO PARKING */}
+                        {(domain === 'parking' || entity.type.includes('Parking')) && (
+                          <div className="bg-[#dbeafe] p-2 rounded-lg flex items-center justify-between border border-blue-100">
+                             <div className="flex items-center gap-2">
+                                <Car size={16} className="text-[#1e40af]" />
+                                <span className="text-[#1e40af] font-medium text-xs">Chỗ trống</span>
+                             </div>
+                             <span className="text-[#1e40af] font-bold text-lg">{getValue(entity.availableSpotNumber)}</span>
+                          </div>
+                        )}
+
+                    </div>
+                 </div>
+              </Popup>
+            </Marker>
+          );
+        })}
       </MarkerClusterGroup>
     </MapContainer>
   );

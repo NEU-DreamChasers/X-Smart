@@ -61,6 +61,8 @@ export function AdminMapManagement() {
                     // Giữ lại các trường dữ liệu khác để hiển thị Popup
                     temperature: item.temperature, 
                     availableSpotNumber: item.availableSpotNumber,
+                    airQualityIndex: item.airQualityIndex,
+
                     address: item.address,
                 }));
             });
@@ -113,10 +115,10 @@ export function AdminMapManagement() {
               </div>
               
               <div className="relative rounded-[14px] overflow-hidden border border-black/5" style={{ height: '500px' }}>
-                {/* KEY CHANGE: Truyền entities trực tiếp vào RealMap.
-                   Không truyền searchTerm để tránh lỗi undefined.
-                */}
                 <RealMap 
+                    domain = ""
+                    searchTerm = ""
+                    
                     entities={visibleEntities} 
                     zoom={14}
                     center={[10.7750, 106.7000]} 
