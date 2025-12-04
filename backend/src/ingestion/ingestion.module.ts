@@ -13,6 +13,7 @@ import { OpenWeatherMapAdapter } from './strategies/openweathermap.adapter';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AirQualityAdapter } from './strategies/air-quality.adapter';
 import { OverpassAdapter } from './strategies/overpass.adapter';
+import { HistoryModule } from 'src/history/history.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { OverpassAdapter } from './strategies/overpass.adapter';
     ScheduleModule.forRoot(),
     ScorpioModule,
     SourcesModule,
+    HistoryModule,
     ConfigModule,
     ClientsModule.registerAsync([
       {

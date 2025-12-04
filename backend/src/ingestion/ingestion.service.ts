@@ -8,6 +8,8 @@ import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
 import { SourcesService } from '../sources/sources.service';
 import { ScorpioService } from '../scorpio/scorpio.service';
+import { HistoryService } from '../history/history.service';
+import { raw } from 'express';
 
 @Injectable()
 export class IngestionService {
@@ -21,6 +23,7 @@ export class IngestionService {
     private readonly sourcesService: SourcesService,
     private readonly configService: ConfigService,
     private readonly scorpioService: ScorpioService,
+    private readonly historyService: HistoryService,
   ) {
     const key = this.configService.get<string>('OPENWEATHER_API_KEY');
     this.overpassUrl = 'https://maps.mail.ru/osm/tools/overpass/api/interpreter';
@@ -32,9 +35,10 @@ export class IngestionService {
   }
 
   // LUỒNG 1: THU THẬP CẢM BIẾN (Weather/Air) - Chạy 5 phút/lần
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_30_SECONDS)
   async handleSensorIngestion() {
-    this.logger.log('📡 [Ingestion] Đang thu thập dữ liệu Môi trường...');
+    this.logger.debug('📡 [Ingestion] Đang thu thập dữ liệu Môi trường...');
+    
     const [sources] = await this.sourcesService.findAll();
 
     for (const source of sources) {
@@ -49,15 +53,34 @@ export class IngestionService {
         }
 
         const response = await firstValueFrom(this.httpService.get(apiUrl));
+        const rawData = response.data;
 
+        // --- GỬI KAFKA (Cho Scorpio cập nhật hiện tại) ---
         this.kafkaClient.emit('raw_data_topic', {
           sourceType: source.adapterType,
-          payload: response.data,
+          payload: rawData,
         });
 
-        await new Promise((r) => setTimeout(r, 2000));
+        // --- LƯU LỊCH SỬ ---
+        let entityId = '';
+
+        if (source.adapterType === 'openweathermap') {
+             const owmId = rawData.id || rawData.name; 
+             entityId = `urn:ngsi-ld:WeatherObserved:OpenWeatherMap:${owmId}`;
+        } else {
+             const lat = source.latitude; 
+             const lon = source.longitude;
+             entityId = `urn:ngsi-ld:AirQualityObserved:AirQuality:Lat${lat}_Lon${lon}`;
+        }
+
+        await this.historyService.saveHistoryFromRaw(entityId, source.adapterType, rawData);
+
+        await new Promise((r) => setTimeout(r, 3000));
+
       } catch (error) {
-        this.logger.error(`Lỗi nguồn ${source.name}: ${error.message}`);
+        const err = error as Error;
+        this.logger.error(`Lỗi nguồn ${source.name}: ${err.message}`);
+        await new Promise((r) => setTimeout(r, 5000));
       }
     }
   }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Database, Wifi, Activity, FileText, Loader2, AlertCircle, MapPin } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { api } from '../services/api.service';
+import { ApiService } from '@/services/api.service';
 
 const cardStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -22,13 +22,21 @@ export function AdminAnalytics() {
   const [aqiData, setAqiData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentStation, setCurrentStation] = useState({ name: 'Đang tìm...', id: '' });
+  const [currentAirStation, setCurrentAirStation] = useState({ name: '', id: '' });
 
+  // Helper: Chuyển đổi dữ liệu & Làm tròn số
   const transformChartData = (apiData: any) => {
     if (!apiData || !apiData.labels || !apiData.datasets?.[0]) return [];
-    return apiData.labels.map((label: string, index: number) => ({
-        time: label.includes(' ') ? label.split(' ')[1] : label, 
-        value: apiData.datasets[0].data[index]
-    }));
+    return apiData.labels.map((label: string, index: number) => {
+        const rawVal = apiData.datasets[0].data[index];
+        // Làm tròn 2 chữ số
+        const value = typeof rawVal === 'number' ? Number(rawVal.toFixed(2)) : rawVal;
+        
+        return {
+            time: label.split(' ')[1]?.slice(0, 5) || label, 
+            value: value
+        };
+    });
   };
 
   useEffect(() => {
@@ -36,90 +44,122 @@ export function AdminAnalytics() {
       try {
         setLoading(true);
 
-        // --- BƯỚC 1: GỌI TẤT CẢ CÁC API ENTITY ĐỂ CỘNG TỔNG ---
-        // Chúng ta gọi song song 4 domain: Weather, Air, Bus, Parking
-        const [
-            resWeather, 
-            resAir, 
-            resBus, 
-            resParking, 
-            resSources, 
-            resReports
-        ] = await Promise.all([
-           api.get('/weather/status').catch(() => ({ data: [] })),
-           api.get('/air/status').catch(() => ({ data: [] })),
-           api.get('/bus/status').catch(() => ({ data: [] })),
-           api.get('/parking/status').catch(() => ({ data: [] })),
-           api.get('/sources').catch(() => ({ data: [] })),
-           api.get('/reports/admin/stats').catch(() => ({ data: { totalReports: 0 } }))
+        // --- BƯỚC 1: THỐNG KÊ TỔNG QUAN (Giữ nguyên 4 Card) ---
+        const [resWeather, resAir, resBus, resParking, resSources, resReports] = await Promise.all([
+           ApiService.weather.getAll(1, 0).catch(() => ({ data: [], totalCount: 0 })),
+           ApiService.air.getAll(1, 0).catch(() => ({ data: [], totalCount: 0 })),
+           ApiService.bus.getAll(1, 0).catch(() => ({ data: [], totalCount: 0 })),
+           ApiService.parking.getAll(1, 0).catch(() => ({ data: [], totalCount: 0 })),
+           ApiService.sources.getAll(1, 0).catch(() => ({ data: [], totalCount: 0 })),
+           // Giả lập API reports nếu chưa có
+           Promise.resolve({ data: { totalReports: 0, byStatus: [] } }) 
         ]);
 
-        // Helper an toàn để lấy độ dài mảng
-        const getCount = (res: any) => Array.isArray(res.data) ? res.data.length : 0;
-
-        const countWeather = getCount(resWeather);
-        const countAir = getCount(resAir);
-        const countBus = getCount(resBus);
-        const countParking = getCount(resParking);
-
-        // Tổng IoT = Tổng tất cả các loại thiết bị
-        const totalEnt = countWeather + countAir + countBus + countParking;
-
-        // Xử lý Report Stats
-        const reportStatsData = resReports.data;
-        const pendingItem = Array.isArray(reportStatsData.byStatus) 
-            ? reportStatsData.byStatus.find((item: any) => item.status === 'PENDING') 
-            : null;
+        const totalEnt = (resWeather.totalCount || 0) + (resAir.totalCount || 0) + (resBus.totalCount || 0) + (resParking.totalCount || 0);
 
         setStats({
-            totalEntities: totalEnt, // Số liệu chính xác
-            activeSensors: getCount(resSources),
-            totalReports: reportStatsData.totalReports || 0,
-            pendingReports: pendingItem ? Number(pendingItem.count) : 0,
+            totalEntities: totalEnt,
+            activeSensors: resSources.totalCount || 0,
+            totalReports: 0, // Bạn có thể update từ resReports nếu có
+            pendingReports: 0,
             apiHealth: 'Stable'
         });
 
-        // --- BƯỚC 2: XỬ LÝ BIỂU ĐỒ (Logic tìm trạm Weather để vẽ) ---
-        let targetLocation = '1566083'; 
-        let stationName = 'Mặc định';
-        const weatherList = Array.isArray(resWeather.data) ? resWeather.data : [];
+        // --- BƯỚC 2: CHUẨN BỊ DỮ LIỆU BIỂU ĐỒ ---
+        
+        // 1. Lấy danh sách trạm Thời tiết
+        const weatherRes = await ApiService.weather.getAll(20, 0);
+        const weatherList = weatherRes.data || [];
+        
+        // 2. Lấy danh sách trạm Không khí (Lấy nhiều để dễ tìm cặp)
+        const airRes = await ApiService.air.getAll(100, 0);
+        const airList = airRes.data || [];
 
+        let targetLocation = '';
+        let targetAirId = '';
+
+        // --- LOGIC CHỌN TRẠM THỜI TIẾT ---
         if (weatherList.length > 0) {
             const firstStation = weatherList[0];
-            if (firstStation.id && typeof firstStation.id === 'string') {
-                targetLocation = firstStation.id.split(':').pop(); 
-                stationName = firstStation.address?.addressLocality || firstStation.id;
+            targetLocation = firstStation.id;
+            
+            const shortId = firstStation.id.split(':').pop() || '';
+            const name = firstStation.name?.value || firstStation.name || shortId;
+            setCurrentStation({ name, id: shortId });
+
+            // --- LOGIC CHỌN TRẠM KHÔNG KHÍ ---
+            const wLoc = firstStation.location?.value?.coordinates || firstStation.location;
+            
+            console.log('🔍 Weather location:', wLoc);
+            console.log('🔍 Số trạm Air có sẵn:', airList.length);
+            
+            if (wLoc && Array.isArray(wLoc)) { 
+                const wLon = wLoc[0];
+                const wLat = wLoc[1];
+                
+                // Cách 1: Tìm trạm trùng tọa độ
+                const foundAir = airList.find((a: any) => {
+                    const aLoc = a.location?.value?.coordinates || a.location;
+                    if (!aLoc || !Array.isArray(aLoc)) return false;
+                    return Math.abs(aLoc[0] - wLon) < 0.0001 && Math.abs(aLoc[1] - wLat) < 0.0001;
+                });
+
+                if (foundAir) {
+                    targetAirId = foundAir.id;
+                    setCurrentAirStation({ name: 'Khớp vị trí', id: targetAirId });
+                    console.log('✅ Tìm thấy trạm Air khớp tọa độ:', targetAirId);
+                } else {
+                    console.log('⚠️ Không tìm thấy trạm Air khớp tọa độ');
+                }
             }
         }
-
-        setCurrentStation({ name: stationName, id: targetLocation });
-        await delay(500);
-
-        // Gọi API History
-        try {
-            const res = await api.get(`/history/chart/temperature/${targetLocation}?hours=24`);
-            setTempData(transformChartData(res.data));
-        } catch (e) { setTempData([]); }
-
-        try {
-            const res = await api.get(`/history/chart/precipitation/${targetLocation}?hours=24`);
-            setPrecipData(transformChartData(res.data));
-        } catch (e) { setPrecipData([]); }
-
-        // Tìm ID cho Air Quality
-        let targetAirLocation = targetLocation;
-        const airList = Array.isArray(resAir.data) ? resAir.data : [];
-        if (airList.length > 0) {
-             targetAirLocation = airList[0].id.split(':').pop();
+        
+        // Fallback: Luôn dùng trạm Air đầu tiên nếu chưa có targetAirId
+        if (!targetAirId && airList.length > 0) {
+            targetAirId = airList[0].id;
+            const airName = airList[0].name?.value || airList[0].name || targetAirId.split(':').pop() || targetAirId;
+            setCurrentAirStation({ name: airName, id: targetAirId });
+            console.warn("⚠️ Dùng trạm Air mặc định:", targetAirId);
         }
 
-        try {
-            const res = await api.get(`/history/chart/aqi/${targetAirLocation}?hours=24`);
-            setAqiData(transformChartData(res.data));
-        } catch (e) { setAqiData([]); }
+        await delay(500);
+        
+        // --- BƯỚC 3: GỌI API HISTORY ---
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+        
+        if (targetLocation) {
+             // Nhiệt độ
+             try {
+                 const res = await fetch(`${baseUrl}/history/chart?entityId=${encodeURIComponent(targetLocation)}&attr=temperature&hours=24`);
+                 setTempData(transformChartData(await res.json()));
+             } catch (e) {}
+
+             // Lượng mưa
+             try {
+                 const res = await fetch(`${baseUrl}/history/chart?entityId=${encodeURIComponent(targetLocation)}&attr=precipitation&hours=24`);
+                 setPrecipData(transformChartData(await res.json()));
+             } catch (e) {}
+        }
+
+        // AQI (Chắc chắn sẽ chạy nếu có trạm Air bất kỳ)
+        if (targetAirId) {
+             try {
+                 console.log('🔍 Đang tải dữ liệu AQI cho:', targetAirId);
+                 const res = await fetch(`${baseUrl}/history/chart?entityId=${encodeURIComponent(targetAirId)}&attr=pm25&hours=24`);
+                 const json = await res.json();
+                 console.log('📊 Dữ liệu AQI nhận được:', json);
+                 const transformed = transformChartData(json);
+                 console.log('📈 Dữ liệu AQI sau transform:', transformed);
+                 setAqiData(transformed);
+             } catch (e) { 
+                 console.error("❌ Lỗi tải AQI:", e); 
+             }
+        } else {
+            console.warn('⚠️ Không có targetAirId để tải dữ liệu AQI');
+        }
 
       } catch (error) {
-        console.error("Lỗi khởi tạo Dashboard:", error);
+        console.error("Lỗi khởi tạo Admin Dashboard:", error);
         setStats(prev => ({ ...prev, apiHealth: 'Error' }));
       } finally {
         setLoading(false);
@@ -139,21 +179,20 @@ export function AdminAnalytics() {
   return (
     <div className="space-y-6">
       
-      {/* Cards Thống kê */}
+      {/* --- PHẦN 1: CÁC CARD THỐNG KÊ (ĐÃ KHÔI PHỤC) --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* CARD 1: TỔNG ENTITY IOT */}
+        {/* Card 1: IoT */}
         <div className="bg-white rounded-[14px] p-5 shadow-sm" style={cardStyle}>
             <div className="flex items-center justify-between mb-3">
                 <div className="p-2.5 rounded-[10px] bg-blue-50 border border-blue-100"><Database className="w-5 h-5 text-blue-600" /></div>
                 <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">IOT</span>
             </div>
             <p className="text-sm text-gray-500">Tổng Entity IoT</p>
-            {/* Hiển thị con số đã tính toán */}
             <p className="text-2xl font-bold text-neutral-950 mt-1">{loading ? '...' : stats.totalEntities}</p>
         </div>
 
-        {/* CARD 2: NGUỒN DỮ LIỆU */}
+        {/* Card 2: Nguồn */}
         <div className="bg-white rounded-[14px] p-5 shadow-sm" style={cardStyle}>
             <div className="flex items-center justify-between mb-3">
                 <div className="p-2.5 rounded-[10px] bg-green-50 border border-green-100"><Wifi className="w-5 h-5 text-green-600" /></div>
@@ -162,7 +201,7 @@ export function AdminAnalytics() {
             <p className="text-2xl font-bold text-neutral-950 mt-1">{loading ? '...' : stats.activeSensors}</p>
         </div>
 
-        {/* CARD 3: PHẢN ÁNH */}
+        {/* Card 3: Phản ánh */}
         <div className="bg-white rounded-[14px] p-5 shadow-sm" style={cardStyle}>
             <div className="flex items-center justify-between mb-3">
                 <div className="p-2.5 rounded-[10px] bg-orange-50 border border-orange-100"><FileText className="w-5 h-5 text-orange-600" /></div>
@@ -172,7 +211,7 @@ export function AdminAnalytics() {
             <p className="text-2xl font-bold text-neutral-950 mt-1">{loading ? '...' : stats.totalReports}</p>
         </div>
 
-        {/* CARD 4: TRẠNG THÁI HỆ THỐNG */}
+        {/* Card 4: Hệ thống */}
         <div className="bg-white rounded-[14px] p-5 shadow-sm" style={cardStyle}>
             <div className="flex items-center justify-between mb-3">
                 <div className="p-2.5 rounded-[10px] bg-purple-50 border border-purple-100"><Activity className="w-5 h-5 text-purple-600" /></div>
@@ -183,19 +222,30 @@ export function AdminAnalytics() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 text-xs text-gray-500 px-1">
-         <MapPin className="w-3 h-3" />
-         <span>Đang hiển thị dữ liệu từ: <b>{currentStation.name}</b> (ID: {currentStation.id})</span>
+      {/* Thông tin trạm đang hiển thị */}
+      <div className="flex items-center gap-4 text-xs text-gray-500 px-1">
+         <div className="flex items-center gap-1">
+            <MapPin className="w-3 h-3 text-orange-500" />
+            <span>Trạm Thời tiết: <b>{currentStation.name}</b></span>
+         </div>
+         {currentAirStation.id && (
+            <div className="flex items-center gap-1">
+                <Wifi className="w-3 h-3 text-green-500" />
+                <span>Trạm Không khí: <b>{currentAirStation.id.split(':').pop()}</b></span>
+            </div>
+         )}
       </div>
 
-      {/* Biểu đồ (Giữ nguyên) */}
+      {/* --- PHẦN 2: BIỂU ĐỒ --- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* 1. Nhiệt độ */}
         <div className="bg-white rounded-[14px] p-6 shadow-sm" style={cardStyle}>
-          <div className="mb-6"><h3 className="text-lg font-medium text-neutral-950">Biểu đồ Nhiệt độ</h3><p className="text-sm text-gray-500">Quan trắc 24 giờ qua</p></div>
-          <div className="h-[250px]">
+          <div className="mb-6"><h3 className="text-lg font-medium text-neutral-950">Biểu đồ Nhiệt độ</h3><p className="text-sm text-gray-500">Trung bình mỗi giờ (24h qua)</p></div>
+          <div style={{ width: '100%', height: '250px' }}>
             {loading ? <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500"/></div> : 
              tempData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="99%" height="100%">
                     <LineChart data={tempData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
                         <XAxis dataKey="time" tick={{fontSize: 12}} stroke="#888" />
@@ -208,12 +258,13 @@ export function AdminAnalytics() {
           </div>
         </div>
 
+        {/* 2. Lượng mưa */}
         <div className="bg-white rounded-[14px] p-6 shadow-sm" style={cardStyle}>
-          <div className="mb-6"><h3 className="text-lg font-medium text-neutral-950">Lượng mưa</h3><p className="text-sm text-gray-500">Dữ liệu 24 giờ qua</p></div>
-          <div className="h-[250px]">
+          <div className="mb-6"><h3 className="text-lg font-medium text-neutral-950">Lượng mưa</h3><p className="text-sm text-gray-500">Tổng theo giờ (24h qua)</p></div>
+          <div style={{ width: '100%', height: '250px' }}>
             {loading ? <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500"/></div> : 
              precipData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="99%" height="100%">
                     <BarChart data={precipData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
                         <XAxis dataKey="time" tick={{fontSize: 12}} stroke="#888" />
@@ -222,23 +273,24 @@ export function AdminAnalytics() {
                         <Bar dataKey="value" fill="#3b82f6" name="Lượng mưa" radius={[4,4,0,0]} barSize={20} />
                     </BarChart>
                 </ResponsiveContainer>
-            ) : <EmptyChart text="Không có mưa trong 24h qua" />}
+            ) : <EmptyChart text="Không có mưa" />}
           </div>
         </div>
       </div>
       
+      {/* 3. AQI (Đảm bảo hiển thị nhờ Fallback ID) */}
       <div className="bg-white rounded-[14px] p-6 shadow-sm" style={cardStyle}>
-          <div className="mb-6"><h3 className="text-lg font-medium text-neutral-950">Chất lượng không khí (AQI)</h3><p className="text-sm text-gray-500">Dữ liệu 24 giờ qua</p></div>
-          <div className="h-[250px]">
+          <div className="mb-6"><h3 className="text-lg font-medium text-neutral-950">Chất lượng không khí (AQI)</h3><p className="text-sm text-gray-500">Bụi mịn PM2.5 (24h qua)</p></div>
+          <div style={{ width: '100%', height: '250px' }}>
             {loading ? <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500"/></div> : 
              aqiData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="99%" height="100%">
                     <LineChart data={aqiData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
                         <XAxis dataKey="time" tick={{fontSize: 12}} stroke="#888" />
-                        <YAxis unit="" stroke="#888" />
+                        <YAxis stroke="#888" />
                         <Tooltip />
-                        <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} dot={false} name="AQI"/>
+                        <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} dot={false} name="PM2.5"/>
                     </LineChart>
                 </ResponsiveContainer>
             ) : <EmptyChart text="Chưa có dữ liệu AQI" />}

@@ -8,7 +8,7 @@ import {
   Map, Activity, X, Loader2, Navigation, Clock, Compass, CornerUpRight,
   Car,
   Wind,
-  CloudSun, Droplets, Thermometer, Gauge, CloudFog, AlertTriangle, Biohazard
+  CloudSun, Droplets, Thermometer, Gauge, CloudFog, AlertTriangle, Biohazard, Sun, CloudRain
 } from 'lucide-react';
 
 // Import Interface để type checking (nếu cần)
@@ -28,6 +28,22 @@ const RealMap = dynamic(() => import('./maps/RealMap'), {
 
 
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
+
+// Helper: Lấy giá trị an toàn từ NGSI-LD Object
+  const getVal = (prop: any) => {
+    if (prop?.value !== undefined) return prop.value;
+    return prop ?? 0;
+  };
+
+  // Helper: Dịch tên thời tiết
+  const translateWeather = (typeObj: any) => {
+    const type = typeObj?.value || typeObj || '';
+    const map: Record<string, string> = {
+        'Clear': 'Quang đãng', 'Clouds': 'Có mây', 'Rain': 'Mưa',
+        'Drizzle': 'Mưa phùn', 'Thunderstorm': 'Dông bão', 'Mist': 'Sương mù', 'clear sky': 'Quang đãng'
+    };
+    return map[type] || type || 'Bình thường';
+  };
 
 // Hook Debounce: Giúp search mượt hơn, không gọi API liên tục
 function useDebounce<T>(value: T, delay: number): T {

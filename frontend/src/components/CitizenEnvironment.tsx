@@ -27,63 +27,94 @@ export function CitizenEnvironment() {
   const [manualCity, setManualCity] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
+  // Hàm helper để chuyển đổi dữ liệu Chart.js từ Backend sang Recharts (Frontend)
+  const transformChartData = (apiData: any, labelKey: string = 'time') => {
+     if (!apiData || !apiData.labels || !apiData.datasets) return [];
+     
+     const labels = apiData.labels;
+     const values = apiData.datasets[0].data; 
+     
+     return labels.map((label: string, index: number) => ({
+         [labelKey]: label,
+         value: values[index] || 0
+     }));
+  };
+
   // --- HÀM TẢI DỮ LIỆU CHÍNH ---
   const loadData = async (cityFilter?: string) => {
     setLoading(true);
     try {
-      // 1. Lấy dữ liệu thời tiết hiện tại (Status)
-      const weatherRes = await ApiService.weather.getAll();
-      const weatherList = weatherRes.data;
+      // 1. Gọi song song cả Weather và Air
+      const [weatherRes, airRes] = await Promise.all([
+          ApiService.weather.getAll(100, 0),
+          ApiService.air.getAll(100, 0)
+      ]);
 
+      const weatherList = Array.isArray(weatherRes) ? weatherRes : (weatherRes.data || []);
+      const airList = Array.isArray(airRes) ? airRes : (airRes.data || []);
+
+      // 2. Tìm trạm thời tiết phù hợp
       let selectedWeather = null;
-
-      // Tìm trạm thời tiết phù hợp
       if (cityFilter) {
         selectedWeather = weatherList.find((w: any) => 
-          w.address?.addressLocality?.toLowerCase().includes(cityFilter.toLowerCase())
+            (w.name?.value || w.name || '').toLowerCase().includes(cityFilter.toLowerCase()) ||
+            (w.address?.value?.addressLocality || w.address?.addressLocality || '').toLowerCase().includes(cityFilter.toLowerCase())
         );
       } else {
-        // Mặc định lấy trạm đầu tiên nếu không tìm kiếm
         selectedWeather = weatherList.length > 0 ? weatherList[0] : null;
       }
 
       setWeather(selectedWeather);
 
-      // 2. Nếu có trạm thời tiết, lấy tên địa điểm để load biểu đồ lịch sử
+      // 3. Load biểu đồ lịch sử
       if (selectedWeather) {
-         // Ưu tiên lấy addressLocality, nếu không có thì lấy ID hoặc tên mặc định
-         const locationKey = selectedWeather.address?.addressLocality || 'Hanoi'; 
+         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
          
-         // Gọi song song các API lịch sử
+         // --- TÌM TRẠM KHÔNG KHÍ TƯƠNG ỨNG ---
+         // Logic: Tìm trạm Air có tọa độ trùng với trạm Weather
+         let selectedAirId = '';
+         
+         // Lấy tọa độ Weather
+         const wLoc = selectedWeather.location?.value?.coordinates || selectedWeather.location; // [lon, lat] hoặc {coordinates: ...}
+         const wLon = Array.isArray(wLoc) ? wLoc[0] : wLoc?.coordinates?.[0];
+         const wLat = Array.isArray(wLoc) ? wLoc[1] : wLoc?.coordinates?.[1];
+
+         if (wLon && wLat) {
+             const foundAir = airList.find((a: any) => {
+                 const aLoc = a.location?.value?.coordinates || a.location;
+                 const aLon = Array.isArray(aLoc) ? aLoc[0] : aLoc?.coordinates?.[0];
+                 const aLat = Array.isArray(aLoc) ? aLoc[1] : aLoc?.coordinates?.[1];
+                 
+                 // So sánh tọa độ (làm tròn nhẹ để tránh sai số float)
+                 return Math.abs(aLon - wLon) < 0.0001 && Math.abs(aLat - wLat) < 0.0001;
+             });
+             if (foundAir) selectedAirId = foundAir.id;
+         }
+
+         // Nếu không tìm thấy theo tọa độ, fallback về cách cũ (replace string) để cầu may
+         if (!selectedAirId) {
+             selectedAirId = selectedWeather.id.replace('Weather', 'AirQuality');
+         }
+
+         // --- GỌI API LỊCH SỬ ---
          const [aqiData, rainData] = await Promise.all([
-             ApiService.history.getAqiChart(locationKey),
-             ApiService.history.getRainChart(locationKey)
+            // Dùng ID thật vừa tìm được
+            fetch(`${baseUrl}/history/chart?entityId=${encodeURIComponent(selectedAirId)}&attr=pm25`).then(r => r.json()),
+            
+            // ID Weather thì có sẵn rồi
+            fetch(`${baseUrl}/history/chart?entityId=${encodeURIComponent(selectedWeather.id)}&attr=precipitation`).then(r => r.json())
          ]);
 
-         // Format dữ liệu AQI cho Chart (Mapping lại nếu cần thiết)
-         // Giả sử API trả về: [{ timestamp: '...', value: 50 }]
-         const formattedAqi = Array.isArray(aqiData) ? aqiData.map((item: any) => ({
-             time: new Date(item.timestamp || item.dateObserved).getHours() + 'h',
-             value: item.value || item.aqi || 0
-         })) : [];
-
-         // Format dữ liệu Mưa
-         const formattedRain = Array.isArray(rainData) ? rainData.map((item: any) => ({
-             name: new Date(item.timestamp || item.dateObserved).getHours() + 'h',
-             value: item.value || item.precipitation || 0
-         })) : [];
-
-         setAirQualityChart(formattedAqi);
-         setRainChart(formattedRain);
+         setAirQualityChart(transformChartData(aqiData, 'time'));
+         setRainChart(transformChartData(rainData, 'name'));
 
       } else {
-          // Reset nếu không tìm thấy trạm
-          setAirQualityChart([]);
-          setRainChart([]);
+         setAirQualityChart([]);
+         setRainChart([]);
       }
 
     } catch (error) {
-      console.error("Lỗi tải dữ liệu môi trường:", error);
+      console.error("Lỗi tải dữ liệu:", error);
       setWeather(null);
     } finally {
       setLoading(false);
@@ -93,6 +124,7 @@ export function CitizenEnvironment() {
   const handleManualSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualCity.trim()) return;
+    
     setLocationMode('manual');
     loadData(manualCity);
     setIsEditing(false);
