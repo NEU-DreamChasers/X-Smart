@@ -134,9 +134,6 @@ export const getReports = async (): Promise<NgsiReport[]> => {
 export const getAdminReports = async (): Promise<NgsiReport[]> => {
   try {
     const response = await api.get('/reports/admin/all');
-    
-    // --- SỬA LOGIC Ở ĐÂY ---
-    // Backend trả về { data: [], meta: {} }, cần lấy thuộc tính .data
     let rawList = [];
     
     if (Array.isArray(response.data)) {
