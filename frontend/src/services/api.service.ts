@@ -109,26 +109,39 @@ export const ApiService = {
 
   // --- 4. HISTORY & CHARTS (MỚI) ---
   history: {
-    // Lấy dữ liệu biểu đồ nhiệt độ
     getTemperatureChart: async (location: string) => {
-        try {
-            const res = await api.get(`/history/chart/temperature/${location}`);
-            return res.data; // Mong đợi mảng: [{ time: '...', value: ... }]
-        } catch (e) { return []; }
+        try { const res = await api.get(`/history/chart/temperature/${location}`); return res.data; } catch (e) { return []; }
     },
-    // Lấy dữ liệu biểu đồ AQI
     getAqiChart: async (location: string) => {
-        try {
-            const res = await api.get(`/history/chart/aqi/${location}`);
-            return res.data;
-        } catch (e) { return []; }
+        try { const res = await api.get(`/history/chart/aqi/${location}`); return res.data; } catch (e) { return []; }
     },
-    // Lấy dữ liệu biểu đồ mưa
     getRainChart: async (location: string) => {
+        try { const res = await api.get(`/history/chart/precipitation/${location}`); return res.data; } catch (e) { return []; }
+    }
+  },
+
+  // --- 5. REPORTS ---
+  reports: {
+    // Đổi tên hàm thành getMyReports để khớp với CitizenNotifications.tsx
+    getMyReports: async () => {
         try {
-            const res = await api.get(`/history/chart/precipitation/${location}`);
-            return res.data;
-        } catch (e) { return []; }
+            // Endpoint này khớp với Backend ReportsController @Get('my-reports')
+            const res = await api.get('/reports/my-reports');
+            return { 
+                data: Array.isArray(res.data) ? res.data : [], 
+                totalCount: Array.isArray(res.data) ? res.data.length : 0 
+            };
+        } catch (error) {
+            console.warn('Lỗi lấy báo cáo:', error);
+            return { data: [], totalCount: 0 };
+        }
+    },
+    // Hàm tạo báo cáo
+    create: async (formData: FormData) => {
+        const res = await api.post('/reports', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return res.data;
     }
   }
 };

@@ -1,175 +1,254 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Badge } from './ui/badge';
-import { Bell, Info, CheckCircle2, Clock } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { 
+  Bell, AlertTriangle, CheckCircle2, Info, X, Loader2, 
+  CloudRain, ThermometerSun, Wind 
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { ApiService } from "@/services/api.service";
 
-interface CitizenNotificationsProps { isGuest?: boolean; }
+// Định nghĩa kiểu dữ liệu
+type NotificationType = "info" | "warning" | "success" | "danger";
 
-interface Notification {
+interface NotificationItem {
   id: string;
   title: string;
   message: string;
+  type: NotificationType;
+  timestamp: Date;
   isRead: boolean;
-  createdAt: string;
-  reportId?: string;
+  source?: string; // Nguồn: Weather, Air, Report
 }
 
-const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+export function CitizenNotifications() {
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export function CitizenNotifications({ isGuest = false }: CitizenNotificationsProps) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const unreadCount = notifications.filter(n => !n.isRead).length;
-
-  // --- 1. HÀM LẤY DỮ LIỆU (FETCH) ---
-  const fetchNotifications = async () => {
-    if (isGuest) return;
-    
-    const token = localStorage.getItem('access_token');
-    if (!token) return;
+  // --- LOGIC TỔNG HỢP DỮ LIỆU ---
+  const fetchAndGenerateNotifications = async () => {
+    // Không set loading = true ở đây để tránh nhấp nháy giao diện khi polling lại
+    const newNotifications: NotificationItem[] = [];
 
     try {
-      const res = await fetch(`${API_URL}/notifications`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data);
+      // 1. Kiểm tra Môi trường (Air)
+      const airData = await ApiService.air.getAll(1);
+      if (airData.data.length > 0) {
+        const currentAir = airData.data[0];
+        const aqi = currentAir.airQualityIndex || currentAir.aqi;
+        
+        if (aqi && aqi > 150) {
+            newNotifications.push({
+                id: `air-danger-${new Date().getHours()}`, // ID theo giờ để không spam
+                title: "Nguy hại sức khỏe",
+                message: `AQI mức ĐỎ (${aqi}). Không nên ra ngoài trời lúc này.`,
+                type: "danger",
+                timestamp: new Date(),
+                isRead: false,
+                source: "Môi trường"
+            });
+        } else if (aqi && aqi > 100) {
+             newNotifications.push({
+                id: `air-warning-${new Date().getHours()}`,
+                title: "Không khí kém",
+                message: `Chất lượng không khí mức Vàng (${aqi}). Đeo khẩu trang khi ra đường.`,
+                type: "warning",
+                timestamp: new Date(),
+                isRead: false,
+                source: "Môi trường"
+            });
+        }
       }
+
+      // 2. Kiểm tra Thời tiết (Weather) - Bổ sung cảnh báo Mưa/Nhiệt độ
+      const weatherData = await ApiService.weather.getAll(1);
+      if (weatherData.data.length > 0) {
+        const w = weatherData.data[0];
+        
+        // Cảnh báo Nóng
+        if (w.temperature > 37) {
+            newNotifications.push({
+                id: `weather-hot-${new Date().getHours()}`,
+                title: "Cảnh báo Nắng nóng",
+                message: `Nhiệt độ ${w.temperature}°C. Nguy cơ sốc nhiệt cao.`,
+                type: "danger",
+                timestamp: new Date(),
+                isRead: false,
+                source: "Thời tiết"
+            });
+        }
+        
+        // Cảnh báo Lạnh
+        if (w.temperature < 12) {
+            newNotifications.push({
+                id: `weather-cold-${new Date().getHours()}`,
+                title: "Cảnh báo Rét đậm",
+                message: `Nhiệt độ xuống thấp ${w.temperature}°C. Giữ ấm cơ thể.`,
+                type: "warning",
+                timestamp: new Date(),
+                isRead: false,
+                source: "Thời tiết"
+            });
+        }
+
+        // Cảnh báo Mưa / Ngập (Giả định logic)
+        // Lưu ý: check biến 'rain' hoặc 'precipitation' tùy vào dữ liệu thực tế API trả về
+        if (w.rain && w.rain > 50) { 
+             newNotifications.push({
+                id: `weather-rain-${new Date().getHours()}`,
+                title: "Cảnh báo Mưa lớn",
+                message: `Lượng mưa đạt ${w.rain}mm. Cảnh báo ngập lụt cục bộ.`,
+                type: "danger",
+                timestamp: new Date(),
+                isRead: false,
+                source: "Thời tiết"
+            });
+        }
+      }
+
+      // 3. Kiểm tra trạng thái Báo cáo (Reports)
+      // CHỈ GỌI KHI CÓ TOKEN
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      if (token) {
+          try {
+              const reportsData = await ApiService.reports.getMyReports();
+              if (reportsData && reportsData.data) {
+                  reportsData.data.forEach((report: any) => {
+                      // Chỉ báo khi đã xử lý xong hoặc được duyệt
+                      if (['RESOLVED', 'APPROVED', 'REJECTED'].includes(report.status)) {
+                          const statusText = report.status === 'APPROVED' ? 'Đã duyệt' : (report.status === 'RESOLVED' ? 'Đã xử lý xong' : 'Bị từ chối');
+                          const notiType = report.status === 'REJECTED' ? 'danger' : 'success';
+                          
+                          newNotifications.push({
+                              id: `report-${report.id}-${report.status}`,
+                              title: `Phản ánh: ${statusText}`,
+                              message: `Báo cáo "${report.title}" của bạn đã cập nhật trạng thái.`,
+                              type: notiType,
+                              timestamp: new Date(report.updatedAt || new Date()),
+                              isRead: false,
+                              source: "Phản ánh"
+                          });
+                      }
+                  });
+              }
+          } catch (err) {
+              // Fail silently (không log lỗi 401 ra console để tránh rác log)
+          }
+      }
+
     } catch (error) {
-      console.error("Lỗi tải thông báo:", error);
-    }
-  };
+      console.error("Lỗi cập nhật thông báo:", error);
+    } finally {
+      // Merge logic: Giữ lại các thông báo cũ, chỉ thêm mới nếu chưa có ID
+      setNotifications(prev => {
+        // Tạo Map từ mảng cũ để dễ kiểm tra
+        const existingMap = new Map(prev.map(item => [item.id, item]));
+        
+        newNotifications.forEach(newItem => {
+            // Nếu thông báo chưa tồn tại thì thêm vào
+            if (!existingMap.has(newItem.id)) {
+                existingMap.set(newItem.id, newItem);
+            }
+        });
 
-  // --- 2. HÀM ĐÁNH DẤU ĐÃ ĐỌC ---
-  const handleMarkRead = async (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      await fetch(`${API_URL}/notifications/${id}/read`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` }
+        // Chuyển lại thành mảng và sắp xếp thời gian giảm dần
+        return Array.from(existingMap.values()).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       });
+      setLoading(false);
     }
   };
 
-  // --- 3. POLLING (Tự động cập nhật mỗi 15s) ---
   useEffect(() => {
-    fetchNotifications();
-    
-    const interval = setInterval(() => {
-      fetchNotifications();
-    }, 30000);
-
+    fetchAndGenerateNotifications();
+    const interval = setInterval(fetchAndGenerateNotifications, 60000); // 1 phút check 1 lần
     return () => clearInterval(interval);
-  }, [isGuest]);
+  }, []);
+
+  // --- HELPER GIAO DIỆN ---
+  const markAsRead = (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+  };
+
+  const getIcon = (type: NotificationType) => {
+    switch (type) {
+      case "danger": return <AlertTriangle className="h-5 w-5 text-red-600" />;
+      case "warning": return <AlertTriangle className="h-5 w-5 text-yellow-600" />;
+      case "success": return <CheckCircle2 className="h-5 w-5 text-green-600" />;
+      default: return <Info className="h-5 w-5 text-blue-600" />;
+    }
+  };
+
+  const getStyles = (type: NotificationType, isRead: boolean) => {
+    const base = "border-l-4 p-4 mb-3 rounded shadow-sm transition-all hover:shadow-md cursor-pointer relative";
+    const readStyle = isRead ? "opacity-60 bg-gray-50 grayscale-[0.5]" : "bg-white";
+    
+    switch (type) {
+      case "danger": return cn(base, readStyle, "border-l-red-500 border-t border-r border-b border-gray-100");
+      case "warning": return cn(base, readStyle, "border-l-yellow-500 border-t border-r border-b border-gray-100");
+      case "success": return cn(base, readStyle, "border-l-green-500 border-t border-r border-b border-gray-100");
+      default: return cn(base, readStyle, "border-l-blue-500 border-t border-r border-b border-gray-100");
+    }
+  };
 
   return (
-    <div className="space-y-6 h-full flex flex-col">
+    <Card className="h-full w-full flex flex-col border-none shadow-none bg-transparent">
+      <CardHeader className="px-0 pt-0 pb-4">
+        <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Thông báo & Cảnh báo
+            </CardTitle>
+            {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        </div>
+      </CardHeader>
       
-      {/* Cảnh báo dành cho khách vãng lai */}
-      {isGuest && (
-        <div className="bg-blue-50 rounded-[14px] p-4 shadow-sm border border-blue-100">
-          <div className="flex gap-3">
-            <div className="p-2 bg-white rounded-full shrink-0 shadow-sm text-xl">👋</div>
-            <div>
-              <p className="text-sm font-bold text-blue-900">Chào mừng bạn!</p>
-              <p className="text-xs text-blue-700 mt-1">
-                Hãy <span className="font-bold underline cursor-pointer">đăng nhập</span> để gửi phản ánh và nhận thông báo khi cơ quan chức năng xử lý.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white rounded-[14px] p-6 shadow-sm flex-1 flex flex-col overflow-hidden" style={borderStyle}>
-        <div className="flex items-center justify-between mb-4 shrink-0">
-          <div>
-            <h3 className="text-gray-900 font-bold text-lg flex items-center gap-2">
-              <Bell className="w-5 h-5 text-blue-600" /> Thông báo của bạn
-            </h3>
-            <p className="text-xs text-gray-500 mt-0.5">Cập nhật từ hệ thống quản trị</p>
-          </div>
-          
-          {/* Badge đếm số chưa đọc */}
-          {unreadCount > 0 ? (
-            <Badge variant="secondary" className="rounded-full bg-red-50 text-red-600 border-red-100 px-3 py-1 animate-pulse">
-              {unreadCount} mới
-            </Badge>
-          ) : (
-             <Badge variant="secondary" className="rounded-full bg-gray-100 text-gray-500 px-3 py-1">
-              0 mới
-            </Badge>
-          )}
-        </div>
-        
-        {/* Nội dung danh sách (Có cuộn dọc) */}
-        <div className="space-y-3 overflow-y-auto flex-1 pr-1 custom-scrollbar">
-          {notifications.length === 0 ? (
-            // --- TRẠNG THÁI RỖNG ---
-            <div className="text-center py-12 text-gray-500 flex flex-col items-center justify-center h-full bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-3 shadow-sm">
-                <Info className="w-6 h-6 text-gray-300"/>
-              </div>
-              <p className="font-medium text-gray-600">Chưa có thông báo nào</p>
-              <p className="text-xs text-gray-400 mt-1 max-w-[200px]">
-                Khi Admin duyệt báo cáo của bạn, thông báo sẽ xuất hiện tại đây.
-              </p>
-            </div>
-          ) : (
-            // --- DANH SÁCH THÔNG BÁO ---
-            notifications.map((n) => (
-              <div 
-                key={n.id} 
-                onClick={() => !n.isRead && handleMarkRead(n.id)}
-                className={`relative p-4 rounded-xl border transition-all duration-200 cursor-pointer group
-                  ${!n.isRead 
-                    ? 'bg-blue-50/60 border-blue-100 shadow-sm hover:bg-blue-100/50'
-                    : 'bg-white border-gray-100 hover:bg-gray-50'
-                  }`}
-              >
-                {/* Chấm đỏ báo hiệu chưa đọc */}
-                {!n.isRead && (
-                  <span className="absolute top-4 right-4 w-2 h-2 bg-blue-600 rounded-full shadow-sm ring-4 ring-blue-50"></span>
-                )}
-
-                <div className="flex gap-3">
-                  {/* Icon trạng thái: Chuông hoặc Check */}
-                  <div className={`mt-1 p-2 rounded-full shrink-0 h-fit ${
-                    n.title.includes('duyệt') || n.title.includes('tiếp nhận') 
-                      ? 'bg-green-100 text-green-600' 
-                      : n.title.includes('từ chối') 
-                        ? 'bg-red-100 text-red-600'
-                        : 'bg-gray-100 text-gray-500'
-                  }`}>
-                     {n.isRead ? <CheckCircle2 className="w-4 h-4"/> : <Bell className="w-4 h-4"/>}
-                  </div>
-                  
-                  <div className="flex-1 pr-6">
-                    <h4 className={`text-sm mb-1 ${!n.isRead ? 'font-bold text-blue-900' : 'font-medium text-gray-700'}`}>
-                      {n.title}
-                    </h4>
-                    <p className={`text-xs leading-relaxed ${!n.isRead ? 'text-gray-800' : 'text-gray-500'}`}>
-                      {n.message}
-                    </p>
-                    
-                    {/* Thời gian */}
-                    <div className="flex items-center gap-1 mt-2.5 text-[10px] text-gray-400 font-medium">
-                      <Clock className="w-3 h-3" />
-                      {n.createdAt ? new Date(n.createdAt).toLocaleString('vi-VN') : 'Vừa xong'}
-                    </div>
-                  </div>
+      <CardContent className="p-0 flex-1 min-h-0">
+        <ScrollArea className="h-[calc(100vh-200px)] pr-4"> {/* Chiều cao động */}
+            {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border-2 border-dashed rounded-lg">
+                    <CheckCircle2 className="h-10 w-10 mb-2 opacity-20" />
+                    <p>Hiện tại không có cảnh báo nào</p>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
+            ) : (
+                notifications.map((n) => (
+                    <div 
+                        key={n.id} 
+                        className={getStyles(n.type, n.isRead)}
+                        onClick={() => markAsRead(n.id)}
+                    >
+                        <div className="flex gap-3">
+                            <div className="mt-1">{getIcon(n.type)}</div>
+                            <div className="flex-1">
+                                <div className="flex justify-between items-start mb-1">
+                                    <span className="font-semibold text-sm text-gray-900">{n.title}</span>
+                                    <span className="text-[10px] text-gray-500 whitespace-nowrap bg-gray-100 px-2 py-0.5 rounded-full">
+                                        {n.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                    </span>
+                                </div>
+                                <p className="text-sm text-gray-600 leading-relaxed">{n.message}</p>
+                                <div className="mt-2 flex gap-2">
+                                    {n.source && (
+                                        <Badge variant="outline" className="text-[10px] font-normal text-gray-500">
+                                            {n.source}
+                                        </Badge>
+                                    )}
+                                    {!n.isRead && (
+                                        <Badge className="text-[10px] bg-blue-100 text-blue-700 hover:bg-blue-200 border-none shadow-none">
+                                            Mới
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))
+            )}
+        </ScrollArea>
+      </CardContent>
+    </Card>
   );
 }
