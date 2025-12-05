@@ -24,9 +24,17 @@ if %ERRORLEVEL% NEQ 0 (
 )
 popd
 
-echo Ensure .env exists (copy from .env.example if present)...
+echo Ensure .env files exist (copy from .env.example if present)...
 if not exist .env (
   if exist .env.example copy .env.example .env
+)
+
+if not exist backend\.env (
+  if exist backend\.env.example copy backend\.env.example backend\.env
+)
+
+if not exist frontend\.env (
+  if exist frontend\.env.example copy frontend\.env.example frontend\.env
 )
 
 echo Starting docker-compose (build) ...

@@ -26,12 +26,12 @@ interface TabsProps {
   className?: string;
 }
 
-function Tabs({
-  defaultValue,
-  value: controlledValue,
-  onValueChange,
-  children,
-  className
+function Tabs({ 
+  defaultValue, 
+  value: controlledValue, 
+  onValueChange, 
+  children, 
+  className 
 }: TabsProps) {
   const [internalValue, setInternalValue] = React.useState(defaultValue || "");
 
