@@ -14,7 +14,6 @@ interface Sensor {
   status?: string;
 }
 
-// Strict border style match
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 const PAGE_SIZE = 10;
 
@@ -28,12 +27,10 @@ export default function SensorManagement() {
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Form State
   const [formData, setFormData] = useState({
     name: '',
     adapterType: 'openweathermap',

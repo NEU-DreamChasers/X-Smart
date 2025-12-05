@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { User, LogOut, Map, Leaf, Bell, Building2, MessageSquarePlus, LogIn } from 'lucide-react';
-import type { User as UserType } from '../app/page';
+import type { User as UserType } from '../../app/page';
 import { CitizenMapView } from './CitizenMapView';
 import { CitizenEnvironment } from './CitizenEnvironment';
-import { CitizenNotifications } from './CitizenNotifications';
-import CitizenReportForm from '@/components/CitizenReportForm';
-import CitizenReportHistory from '@/components/CitizenReportHistory';
+import { CitizenNotifications } from '@/components/citizen/CitizenNotifications';
+import CitizenReportForm from '@/components/citizen/CitizenReportForm';
+import CitizenReportHistory from '@/components/citizen/CitizenReportHistory';
 
 interface CitizenDashboardProps {
   user: UserType | null;
@@ -17,7 +17,6 @@ interface CitizenDashboardProps {
   onLogin?: () => void; 
 }
 
-// COPY STYLE TỪ CITIZEN ENVIRONMENT
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
 export function CitizenDashboard({ user: propUser, onLogout, onLogin }: CitizenDashboardProps) {
@@ -149,8 +148,6 @@ export function CitizenDashboard({ user: propUser, onLogout, onLogin }: CitizenD
           <TabsContent value="report" className="w-full pb-10 animate-in fade-in-50 duration-500">
              <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
                
-               {/* CỘT TRÁI: FORM */}
-               {/* Áp dụng style: bg-white rounded-[14px] shadow-sm + borderStyle */}
                <div 
                   className="lg:col-span-2 bg-white rounded-[14px] shadow-sm overflow-hidden"
                   style={borderStyle}
@@ -171,11 +168,10 @@ export function CitizenDashboard({ user: propUser, onLogout, onLogin }: CitizenD
                   </div>
                </div>
 
-               {/* CỘT PHẢI: HISTORY HOẶC LOGIN PROMPT */}
+               
                <div className="lg:col-span-1 h-full">
                  {!isGuest ? (
-                   // CitizenReportHistory đã có style riêng trong file của nó (cần đảm bảo file đó cũng dùng style này nếu muốn đồng bộ)
-                   // Nhưng ở đây ta bọc ngoài để chắc chắn
+                   
                    <div className="h-full">
                       <CitizenReportHistory refreshTrigger={refreshHistoryTrigger} />
                    </div>

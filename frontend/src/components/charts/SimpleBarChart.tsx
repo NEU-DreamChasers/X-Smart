@@ -29,21 +29,16 @@ export function SimpleBarChart({ data, xAxisKey, bars, height = 250 }: SimpleBar
   const chartHeight = height;
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
-
-  // Get all numeric values to determine max
   const allValues = bars.flatMap(bar => 
     data.map(d => Number(d[bar.dataKey]) || 0)
   );
   const maxValue = Math.max(...allValues, 1);
-
-  // Calculate grid lines
   const gridLineCount = 5;
   const gridValues = Array.from({ length: gridLineCount }, (_, i) => {
     const value = (maxValue / (gridLineCount - 1)) * i;
     return Math.round(value);
   });
 
-  // Bar width calculation
   const barGroupWidth = innerWidth / data.length;
   const barWidth = barGroupWidth / (bars.length + 1);
 

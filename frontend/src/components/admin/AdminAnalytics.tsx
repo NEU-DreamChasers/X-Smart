@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Database, Wifi, Activity, FileText, Loader2, AlertCircle, MapPin } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { api } from '../services/api.service';
+import { api } from '../../services/api.service';
 
 const cardStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -35,9 +35,6 @@ export function AdminAnalytics() {
     const initDashboard = async () => {
       try {
         setLoading(true);
-
-        // --- BƯỚC 1: GỌI TẤT CẢ CÁC API ENTITY ĐỂ CỘNG TỔNG ---
-        // Chúng ta gọi song song 4 domain: Weather, Air, Bus, Parking
         const [
             resWeather, 
             resAir, 
@@ -48,38 +45,32 @@ export function AdminAnalytics() {
         ] = await Promise.all([
            api.get('/weather/status').catch(() => ({ data: [] })),
            api.get('/air/status').catch(() => ({ data: [] })),
-           api.get('/bus/status').catch(() => ({ data: [] })),     // Thêm Bus
-           api.get('/parking/status').catch(() => ({ data: [] })), // Thêm Parking
+           api.get('/bus/status').catch(() => ({ data: [] })),
+           api.get('/parking/status').catch(() => ({ data: [] })),
            api.get('/sources').catch(() => ({ data: [] })),
            api.get('/reports/admin/stats').catch(() => ({ data: { totalReports: 0 } }))
         ]);
 
-        // Helper an toàn để lấy độ dài mảng
         const getCount = (res: any) => Array.isArray(res.data) ? res.data.length : 0;
 
         const countWeather = getCount(resWeather);
         const countAir = getCount(resAir);
         const countBus = getCount(resBus);
         const countParking = getCount(resParking);
-
-        // Tổng IoT = Tổng tất cả các loại thiết bị
         const totalEnt = countWeather + countAir + countBus + countParking;
-
-        // Xử lý Report Stats
         const reportStatsData = resReports.data;
         const pendingItem = Array.isArray(reportStatsData.byStatus) 
             ? reportStatsData.byStatus.find((item: any) => item.status === 'PENDING') 
             : null;
 
         setStats({
-            totalEntities: totalEnt, // Số liệu chính xác
+            totalEntities: totalEnt, 
             activeSensors: getCount(resSources),
             totalReports: reportStatsData.totalReports || 0,
             pendingReports: pendingItem ? Number(pendingItem.count) : 0,
             apiHealth: 'Stable'
         });
 
-        // --- BƯỚC 2: XỬ LÝ BIỂU ĐỒ (Logic tìm trạm Weather để vẽ) ---
         let targetLocation = '1566083'; 
         let stationName = 'Mặc định';
         const weatherList = Array.isArray(resWeather.data) ? resWeather.data : [];
@@ -95,7 +86,6 @@ export function AdminAnalytics() {
         setCurrentStation({ name: stationName, id: targetLocation });
         await delay(500);
 
-        // Gọi API History
         try {
             const res = await api.get(`/history/chart/temperature/${targetLocation}?hours=24`);
             setTempData(transformChartData(res.data));
@@ -106,7 +96,6 @@ export function AdminAnalytics() {
             setPrecipData(transformChartData(res.data));
         } catch (e) { setPrecipData([]); }
 
-        // Tìm ID cho Air Quality
         let targetAirLocation = targetLocation;
         const airList = Array.isArray(resAir.data) ? resAir.data : [];
         if (airList.length > 0) {
@@ -141,7 +130,6 @@ export function AdminAnalytics() {
       
       {/* Cards Thống kê */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        
         {/* CARD 1: TỔNG ENTITY IOT */}
         <div className="bg-white rounded-[14px] p-5 shadow-sm" style={cardStyle}>
             <div className="flex items-center justify-between mb-3">
@@ -149,7 +137,6 @@ export function AdminAnalytics() {
                 <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">IOT</span>
             </div>
             <p className="text-sm text-gray-500">Tổng Entity IoT</p>
-            {/* Hiển thị con số đã tính toán */}
             <p className="text-2xl font-bold text-neutral-950 mt-1">{loading ? '...' : stats.totalEntities}</p>
         </div>
 

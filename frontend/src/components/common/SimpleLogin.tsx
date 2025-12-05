@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Building2, User, Shield, Loader2, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 
-// Lấy URL API từ biến môi trường hoặc dùng mặc định
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export function SimpleLogin() {
@@ -14,39 +13,29 @@ export function SimpleLogin() {
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'citizen' | 'admin'>('citizen');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(''); // State để lưu thông báo lỗi
-
-  // Xử lý Login Google cho người dân
+  const [error, setError] = useState('');
   const handleCitizenLogin = () => {
     setIsLoading(true);
-    // Chuyển hướng trình duyệt sang Backend để bắt đầu quy trình Google OAuth
-    // Backend sẽ tự động redirect sang Google, sau đó trả về Frontend kèm Token
     window.location.href = `${API_URL}/auth/google`;
   };
 
-  // Xử lý Login Admin (Username/Password)
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError(''); // Reset lỗi cũ
+    setError(''); 
 
     try {
-      // Gọi API Login của NestJS
-      // Lưu ý: LocalStrategy mặc định của Passport thường mong đợi field là "username" và "password"
+
       const response = await axios.post(`${API_URL}/auth/login`, {
-        username: email, // Mapping email input vào username
+        username: email, 
         password: password
       });
 
-      // Giả sử Backend trả về: { access_token: "...", user: { ... } }
       const { access_token, user } = response.data;
 
-      // Lưu Token vào LocalStorage để dùng cho các request sau này
       if (access_token) {
         localStorage.setItem('accessToken', access_token);
         localStorage.setItem('user', JSON.stringify(user));
-        
-        // Chuyển hướng vào trang Admin
         router.push('/admin');
       } else {
         setError('Không nhận được token xác thực.');
@@ -54,7 +43,6 @@ export function SimpleLogin() {
 
     } catch (err: any) {
       console.error('Login error:', err);
-      // Xử lý hiển thị lỗi từ Backend (nếu có message) hoặc lỗi chung
       if (err.response && err.response.status === 401) {
         setError('Sai tên đăng nhập hoặc mật khẩu.');
       } else {
@@ -114,7 +102,6 @@ export function SimpleLogin() {
         {/* Login Card */}
         <div className="bg-white rounded-2xl shadow-sm p-8">
           
-          {/* Hiển thị lỗi nếu có */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700">
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -123,7 +110,6 @@ export function SimpleLogin() {
           )}
 
           {activeTab === 'citizen' ? (
-            // Form Người dân: Chỉ có nút Google
             <div className="text-center py-6">
                 <h2 className="text-xl text-gray-900 mb-6">Đăng nhập Người dân</h2>
                 <button

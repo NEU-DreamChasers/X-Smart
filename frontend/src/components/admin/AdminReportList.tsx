@@ -15,7 +15,6 @@ import {
   ImageIcon, Calendar, Eye, FileText, Filter
 } from 'lucide-react';
 
-// COPY STYLE TỪ ADMIN ANALYTICS
 const cardStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
 export default function AdminReportList() {
@@ -33,7 +32,6 @@ export default function AdminReportList() {
         setReports([]);
         return;
       }
-      // Sắp xếp: Mới nhất lên đầu
       const sorted = data.sort((a, b) => {
         const valA = a.dateObserved?.value;
         const valB = b.dateObserved?.value;
@@ -51,7 +49,6 @@ export default function AdminReportList() {
     fetchData();
   }, [fetchData]);
 
-  // --- Helpers ---
   const safeId = (id: any): string => (id === null || id === undefined) ? '' : String(id);
   const safeString = (val: any): string => (val === null || val === undefined) ? '' : (typeof val === 'object' ? JSON.stringify(val) : String(val));
 
@@ -125,7 +122,6 @@ export default function AdminReportList() {
   return (
     <div className="space-y-6">
       
-      {/* --- HEADER CARD: Giống AdminAnalytics --- */}
       <div className="bg-white p-6 rounded-[14px] shadow-sm flex flex-col md:flex-row items-center justify-between gap-6" style={cardStyle}>
         
         {/* Title */}
@@ -257,7 +253,6 @@ export default function AdminReportList() {
         )}
       </div>
 
-      {/* --- Detail Modal --- */}
       {selectedReport && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-white w-full max-w-2xl rounded-[20px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
@@ -276,7 +271,6 @@ export default function AdminReportList() {
                         <h4 className="font-bold text-sm mb-2 text-gray-900">Nội dung báo cáo</h4>
                         <p className="text-sm text-gray-700 leading-relaxed">{parseDescription(selectedReport.description?.value).desc || 'Không có nội dung'}</p>
                     </div>
-                    {/* Hình ảnh */}
                     {safeString(selectedReport.media?.value) && (
                         <div className="rounded-[14px] overflow-hidden border border-gray-100 shadow-sm">
                             <img src={safeString(selectedReport.media?.value)} className="w-full h-auto object-contain bg-gray-50" />

@@ -2,13 +2,12 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { Badge } from './ui/badge'; // Đảm bảo bạn có component này
-import { Button } from './ui/button'; // Đảm bảo bạn có component này
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'; // Đảm bảo bạn có component này
+import { Badge } from '../ui/badge'; 
+import { Button } from '../ui/button'; 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'; 
 import { Layers, Loader2 } from 'lucide-react';
 
-// Import RealMap với chế độ no-ssr để tránh lỗi Leaflet trên server
-const RealMap = dynamic(() => import('./maps/RealMap'), { 
+const RealMap = dynamic(() => import('../maps/RealMap'), { 
   ssr: false,
   loading: () => (
     <div className="h-full w-full bg-gray-100 animate-pulse flex items-center justify-center text-gray-400 rounded-[14px]">
@@ -19,14 +18,10 @@ const RealMap = dynamic(() => import('./maps/RealMap'), {
 });
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
-// Cấu hình layers + mapping API domain
 const mapLayersInitial = [
   { name: 'Bến xe buýt', type: 'BusStop', visible: true, color: '#3b82f6', apiDomain: 'bus' },
   { name: 'Cảm biến không khí', type: 'AirQuality', visible: true, color: '#10b981', apiDomain: 'air' },
   { name: 'Bãi đỗ xe', type: 'Parking', visible: true, color: '#f59e0b', apiDomain: 'parking' },
-  // Bạn có thể mở comment dòng dưới nếu muốn thêm Weather
-  // { name: 'Thời tiết', type: 'Weather', visible: false, color: '#ef4444', apiDomain: 'weather' },
 ];
 
 const cardStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
@@ -36,29 +31,23 @@ export function AdminMapManagement() {
   const [selectedLayerType, setSelectedLayerType] = useState<string | null>(null);
   const [entities, setEntities] = useState<any[]>([]);
 
-  // 1. Fetch dữ liệu từ API khi component mount
   useEffect(() => {
     const fetchEntities = async () => {
         try {
             const promises = mapLayers.map(async (layer) => {
-                // Gọi API /api/:domain/status
                 const res = await fetch(`${API_URL}/${layer.apiDomain}/status`);
                 if (!res.ok) return [];
                 const data = await res.json();
                 
-                // Map dữ liệu NGSI-LD sang format chuẩn cho RealMap
-                // Lưu ý: RealMap mới mong đợi location là mảng [Lat, Lon] nếu là dữ liệu Admin
                 return data.map((item: any) => ({
                     id: item.id,
-                    type: layer.type, // Gán type để RealMap chọn icon đúng
+                    type: layer.type, 
                     
-                    // Xử lý tọa độ: NGSI-LD GeoJSON là [Lon, Lat], Leaflet cần [Lat, Lon]
                     location: item.location?.value?.coordinates 
                         ? [item.location.value.coordinates[1], item.location.value.coordinates[0]]
-                        : [10.7750, 106.7000], // Fallback nếu lỗi
+                        : [10.7750, 106.7000], 
                         
                     name: item.name?.value || item.id,
-                    // Giữ lại các trường dữ liệu khác để hiển thị Popup
                     temperature: item.temperature, 
                     availableSpotNumber: item.availableSpotNumber,
                     address: item.address,
@@ -66,22 +55,19 @@ export function AdminMapManagement() {
             });
 
             const results = await Promise.all(promises);
-            // Gộp tất cả kết quả lại thành 1 mảng duy nhất
             setEntities(results.flat());
         } catch (e) {
             console.error("Lỗi tải map entities:", e);
         }
     };
     fetchEntities();
-  }, []); // Chỉ chạy 1 lần khi mount. Nếu muốn auto-refresh, cần thêm setInterval.
+  }, []);
 
-  // 2. Lọc entities theo layer đang bật
   const visibleEntities = useMemo(() => {
     const activeTypes = mapLayers.filter(l => l.visible).map(l => l.type);
     return entities.filter(e => activeTypes.includes(e.type));
   }, [mapLayers, entities]);
 
-  // 3. Hàm bật/tắt layer
   const toggleLayer = (type: string) => {
     setMapLayers(prev => prev.map(layer => 
         layer.type === type ? { ...layer, visible: !layer.visible } : layer
@@ -113,9 +99,7 @@ export function AdminMapManagement() {
               </div>
               
               <div className="relative rounded-[14px] overflow-hidden border border-black/5" style={{ height: '500px' }}>
-                {/* KEY CHANGE: Truyền entities trực tiếp vào RealMap.
-                   Không truyền searchTerm để tránh lỗi undefined.
-                */}
+                
                 <RealMap 
                     entities={visibleEntities} 
                     zoom={14}

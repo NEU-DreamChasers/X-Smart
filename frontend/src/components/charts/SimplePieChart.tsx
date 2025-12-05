@@ -34,12 +34,10 @@ export function SimplePieChart({
   const centerX = chartSize / 2;
   const centerY = chartSize / 2;
   const radius = Math.min(chartSize / 2.5, 100);
-
-  // Calculate total
   const total = data.reduce((sum, item) => sum + item.value, 0);
   
-  // Calculate angles
-  let currentAngle = -90; // Start from top
+
+  let currentAngle = -90; 
   const slices = data.map((item, index) => {
     const percentage = item.value / total;
     const angle = percentage * 360;
@@ -56,7 +54,6 @@ export function SimplePieChart({
     };
   });
 
-  // Convert polar to cartesian
   const polarToCartesian = (angle: number, r: number) => {
     const radian = (angle * Math.PI) / 180;
     return {
@@ -65,17 +62,16 @@ export function SimplePieChart({
     };
   };
 
-  // Create path for slice
   const createSlicePath = (startAngle: number, endAngle: number, outerR: number, innerR: number) => {
     const start = polarToCartesian(startAngle, outerR);
     const end = polarToCartesian(endAngle, outerR);
     const largeArc = endAngle - startAngle > 180 ? 1 : 0;
 
     if (innerR === 0) {
-      // Regular pie
+
       return `M ${centerX} ${centerY} L ${start.x} ${start.y} A ${outerR} ${outerR} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
     } else {
-      // Donut
+
       const innerStart = polarToCartesian(startAngle, innerR);
       const innerEnd = polarToCartesian(endAngle, innerR);
       return `M ${start.x} ${start.y} A ${outerR} ${outerR} 0 ${largeArc} 1 ${end.x} ${end.y} L ${innerEnd.x} ${innerEnd.y} A ${innerR} ${innerR} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y} Z`;

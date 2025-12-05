@@ -2,86 +2,76 @@
 
 import React, { useEffect, useState } from 'react';
 import { Wind, Thermometer, Droplets, Sun, CloudRain, Loader2, MapPin, Search, RotateCcw } from 'lucide-react';
-// Đảm bảo bạn có SimpleLineChart và SimpleBarChart (hoặc dùng Recharts trực tiếp như trước)
-import { SimpleLineChart } from './SimpleLineChart';
-import { SimpleBarChart } from './SimpleBarChart'; // Giả sử bạn có component này hoặc dùng Recharts
-import { ApiService } from '../services/api.service';
+import { SimpleLineChart } from '../charts/SimpleLineChart';
+import { SimpleBarChart } from '../charts/SimpleBarChart'; 
+import { ApiService } from '../../services/api.service';
 
-// Define the exact border style
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
-// Cấu hình biểu đồ không khí
 const airChartConfig = [
-  { dataKey: 'pm25', stroke: '#3b82f6', name: 'PM 2.5' },
-  { dataKey: 'pm10', stroke: '#10b981', name: 'PM 10' },
+  { dataKey: 'value', stroke: '#3b82f6', name: 'AQI' }, 
 ];
 
-// Cấu hình biểu đồ lượng mưa (Mới)
 const rainChartConfig = [
-  { dataKey: 'precipitation', fill: '#3b82f6', name: 'Lượng mưa (mm)' }
+  { dataKey: 'value', fill: '#3b82f6', name: 'Lượng mưa (mm)' } 
 ];
 
 export function CitizenEnvironment() {
   const [weather, setWeather] = useState<any>(null);
-  const [airQuality, setAirQuality] = useState<any[]>([]);
-  const [rainData, setRainData] = useState<any[]>([]); // State mới cho mưa
+  const [airQualityChart, setAirQualityChart] = useState<any[]>([]);
+  const [rainChart, setRainChart] = useState<any[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [locationMode, setLocationMode] = useState<'gps' | 'manual'>('gps');
   const [manualCity, setManualCity] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
-  // FETCH DATA
   const loadData = async (cityFilter?: string) => {
     setLoading(true);
     try {
-      const weatherList = await ApiService.weather.getAll();
-      const airList = await ApiService.air.getAll();
+      const weatherRes = await ApiService.weather.getAll();
+      const weatherList = weatherRes.data;
 
       let selectedWeather = null;
+
       if (cityFilter) {
         selectedWeather = weatherList.find((w: any) => 
           w.address?.addressLocality?.toLowerCase().includes(cityFilter.toLowerCase())
         );
       } else {
-        // Just take the first available sensor if no specific location filter
         selectedWeather = weatherList.length > 0 ? weatherList[0] : null;
       }
 
       setWeather(selectedWeather);
 
-      // 1. Xử lý dữ liệu Không khí (Air Quality) cho Chart
-      if (airList.length > 0) {
-        const airChartData = airList.slice(0, 8).map((aq: any) => ({
-          time: aq.dateObserved ? new Date(aq.dateObserved).getHours() + ':00' : 'Hiện tại',
-          pm25: aq.pm25 ?? 0,
-          pm10: aq.pm10 ?? 0
-        }));
-        setAirQuality(airChartData);
-      } else {
-        setAirQuality([]);
-      }
+      if (selectedWeather) {
+         const locationKey = selectedWeather.address?.addressLocality || 'Hanoi'; 
+         
+         const [aqiData, rainData] = await Promise.all([
+             ApiService.history.getAqiChart(locationKey),
+             ApiService.history.getRainChart(locationKey)
+         ]);
 
-      // 2. Xử lý dữ liệu Lượng mưa (Precipitation) cho Chart (Lấy từ weatherList hoặc API lịch sử nếu có)
-      // Giả sử weatherList có trường precipitation hoặc ta dùng weatherList history
-      if (weatherList.length > 0) {
-         // Demo: Map dữ liệu weatherList thành lịch sử mưa (Nếu API trả về list history)
-         // Nếu weatherList chỉ là current status của nhiều trạm, ta có thể hiển thị so sánh các trạm
-         // Hoặc nếu bạn có API history riêng cho mưa, hãy gọi ở đây.
-         // Tạm thời map từ weatherList (giả lập diễn biến theo trạm hoặc thời gian)
-         const rainChartData = weatherList.slice(0, 8).map((w: any) => ({
-            name: w.dateObserved ? new Date(w.dateObserved).getHours() + ':00' : 'Trạm ' + w.id.slice(-4), // Trục X
-            precipitation: w.precipitation ?? 0 
-         }));
-         setRainData(rainChartData);
+         const formattedAqi = Array.isArray(aqiData) ? aqiData.map((item: any) => ({
+             time: new Date(item.timestamp || item.dateObserved).getHours() + 'h',
+             value: item.value || item.aqi || 0
+         })) : [];
+         const formattedRain = Array.isArray(rainData) ? rainData.map((item: any) => ({
+             name: new Date(item.timestamp || item.dateObserved).getHours() + 'h',
+             value: item.value || item.precipitation || 0
+         })) : [];
+
+         setAirQualityChart(formattedAqi);
+         setRainChart(formattedRain);
+
       } else {
-          setRainData([]);
+          setAirQualityChart([]);
+          setRainChart([]);
       }
 
     } catch (error) {
       console.error("Lỗi tải dữ liệu môi trường:", error);
       setWeather(null);
-      setAirQuality([]);
-      setRainData([]);
     } finally {
       setLoading(false);
     }
@@ -99,7 +89,6 @@ export function CitizenEnvironment() {
     loadData();
   }, []);
 
-  // Helper: Dịch trạng thái thời tiết
   const translateWeather = (type: string) => {
       const map: Record<string, string> = {
           'Clear': 'Quang đãng',
@@ -109,14 +98,14 @@ export function CitizenEnvironment() {
           'Thunderstorm': 'Dông bão',
           'Mist': 'Sương mù'
       };
-      return map[type] || type || 'Không rõ';
+      return map[type] || type || 'Bình thường';
   };
 
   const displayConditions = weather ? [
     { 
       name: 'Thời tiết', 
       value: translateWeather(weather.weatherType), 
-      status: `Hôm nay: ${new Date().toLocaleDateString('vi-VN')}`, 
+      status: `Cập nhật: ${new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}`, 
       icon: Sun, color: '#f59e0b', bgColor: '#fef3c7' 
     },
     { 
@@ -128,11 +117,11 @@ export function CitizenEnvironment() {
     { 
       name: 'Độ ẩm', 
       value: `${weather.relativeHumidity ?? 0}%`, 
-      status: (weather.relativeHumidity > 70) ? 'Cao' : 'Bình thường', 
+      status: (weather.relativeHumidity > 80) ? 'Ẩm ướt' : 'Thoải mái', 
       icon: Droplets, color: '#0092b8', bgColor: '#cefafe' 
     },
     { 
-      name: 'Lượng mưa', // Thay Gió bằng Mưa cho thẻ chính (hoặc giữ Gió thêm Mưa)
+      name: 'Lượng mưa', 
       value: `${weather.precipitation ?? 0} mm`, 
       status: (weather.precipitation > 0) ? 'Đang mưa' : 'Không mưa', 
       icon: CloudRain, color: '#3b82f6', bgColor: '#eff6ff' 
@@ -141,13 +130,13 @@ export function CitizenEnvironment() {
 
   return (
     <div className="space-y-6">
-      {/* Top Bar: Tìm kiếm & Vị trí */}
+      {/* 1. Header & Search */}
       <div className="flex justify-between items-center px-1 h-10">
         {isEditing ? (
           <form onSubmit={handleManualSearch} className="flex items-center gap-2 w-full max-w-md animate-in fade-in">
             <input 
               type="text" 
-              placeholder="Nhập tên khu vực (VD: Quận 1)..." 
+              placeholder="Nhập tên khu vực (VD: Hanoi)..." 
               className="px-3 py-1.5 rounded-[14px] text-sm outline-none focus:ring-2 ring-blue-500 w-full bg-white"
               style={borderStyle}
               value={manualCity}
@@ -167,7 +156,7 @@ export function CitizenEnvironment() {
             >
               <MapPin className={`w-4 h-4 ${locationMode === 'gps' ? 'text-blue-600' : 'text-orange-600'}`} />
               <span className="font-medium">
-                {loading ? 'Đang tải...' : (weather?.address?.addressLocality || 'Chưa xác định')}
+                {loading ? 'Đang tải...' : (weather?.address?.addressLocality || 'Chưa xác định vị trí')}
               </span>
             </div>
             <button onClick={() => setIsEditing(true)} className="text-xs text-blue-600 hover:underline font-medium">
@@ -175,28 +164,23 @@ export function CitizenEnvironment() {
             </button>
             {locationMode === 'manual' && (
                <button onClick={() => { setLocationMode('gps'); loadData(); }} className="text-xs text-gray-500 hover:text-gray-900 flex items-center gap-1">
-                 <RotateCcw className="w-3 h-3" /> Đặt lại
+                 <RotateCcw className="w-3 h-3" /> GPS
                </button>
             )}
           </div>
         )}
       </div>
 
-      {/* Grid Cards: Chỉ số hiện tại */}
+      {/* 2. Grid Cards (Chỉ số hiện tại) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading ? (
-           <div 
-             className="col-span-full flex justify-center p-12 bg-white rounded-[14px] shadow-sm"
-             style={borderStyle}
-           >
-             <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                <p className="text-sm text-gray-500">Đang cập nhật dữ liệu...</p>
-             </div>
+           <div className="col-span-full flex justify-center p-12 bg-white rounded-[14px]" style={borderStyle}>
+             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
            </div>
         ) : !weather ? (
-            <div className="col-span-full p-8 text-center text-gray-500 bg-white rounded-[14px]" style={borderStyle}>
-                Không tìm thấy dữ liệu thời tiết cho khu vực này.
+            <div className="col-span-full p-12 text-center bg-white rounded-[14px]" style={borderStyle}>
+                <p className="text-gray-500 mb-2">Không tìm thấy dữ liệu quan trắc cho khu vực này.</p>
+                <button onClick={() => loadData()} className="text-blue-600 text-sm hover:underline">Thử tải lại</button>
             </div>
         ) : (
           displayConditions.map((condition, index) => {
@@ -223,44 +207,42 @@ export function CitizenEnvironment() {
         )}
       </div>
 
-      {/* Charts Section */}
+      {/* 3. Charts Section (Biểu đồ lịch sử) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Biểu đồ Không khí */}
+        {/* Biểu đồ Không khí (AQI) */}
         <div className="bg-white rounded-[14px] p-6 shadow-sm" style={borderStyle}>
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">Chất lượng không khí</h3>
-            <p className="text-sm text-gray-500">Chỉ số bụi mịn PM2.5 & PM10</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Chất lượng không khí (24h qua)</h3>
+            <p className="text-sm text-gray-500">Chỉ số AQI theo thời gian</p>
           </div>
           <div className="w-full">
-            {airQuality.length > 0 ? (
-              <SimpleLineChart data={airQuality} xAxisKey="time" lines={airChartConfig} height={250} />
+            {airQualityChart.length > 0 ? (
+              <SimpleLineChart data={airQualityChart} xAxisKey="time" lines={airChartConfig} height={250} />
             ) : (
-              <div className="h-[250px] flex items-center justify-center text-gray-400">
-                 {loading ? 'Đang tải biểu đồ...' : 'Chưa có dữ liệu không khí.'}
+              <div className="h-[250px] flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                 {loading ? 'Đang tải...' : 'Chưa có dữ liệu lịch sử AQI'}
               </div>
             )}
           </div>
         </div>
 
-        {/* Biểu đồ Lượng mưa (Mới) */}
+        {/* Biểu đồ Lượng mưa */}
         <div className="bg-white rounded-[14px] p-6 shadow-sm" style={borderStyle}>
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">Lượng mưa</h3>
-            <p className="text-sm text-gray-500">Diễn biến lượng mưa (mm)</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Lượng mưa (24h qua)</h3>
+            <p className="text-sm text-gray-500">Tổng lượng mưa (mm)</p>
           </div>
           <div className="w-full">
-            {rainData.length > 0 ? (
-               // Sử dụng SimpleBarChart hoặc nếu chưa có thì dùng Recharts trực tiếp như ví dụ trước
-               <SimpleBarChart data={rainData} xAxisKey="name" bars={rainChartConfig} height={250} />
+            {rainChart.length > 0 ? (
+               <SimpleBarChart data={rainChart} xAxisKey="name" bars={rainChartConfig} height={250} />
             ) : (
-              <div className="h-[250px] flex items-center justify-center text-gray-400">
-                 {loading ? 'Đang tải biểu đồ...' : 'Chưa có dữ liệu mưa.'}
+              <div className="h-[250px] flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                 {loading ? 'Đang tải...' : 'Chưa có dữ liệu lịch sử mưa'}
               </div>
             )}
           </div>
         </div>
-
       </div>
     </div>
   );

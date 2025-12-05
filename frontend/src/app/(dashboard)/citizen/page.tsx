@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 // Đảm bảo đường dẫn import component đúng với dự án của bạn
-import { CitizenDashboard } from '@/components/CitizenDashboard'; 
+import { CitizenDashboard } from '@/components/citizen/CitizenDashboard'; 
 
 export default function CitizenPage() {
   const router = useRouter();

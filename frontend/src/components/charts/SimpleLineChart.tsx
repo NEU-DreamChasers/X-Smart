@@ -30,23 +30,18 @@ export function SimpleLineChart({ data, xAxisKey, lines, height = 250 }: SimpleL
   const chartHeight = height;
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
-
-  // Get all numeric values to determine min/max
   const allValues = lines.flatMap(line => 
     data.map(d => Number(d[line.dataKey]) || 0)
   );
   const minValue = Math.min(...allValues);
   const maxValue = Math.max(...allValues);
   const valueRange = maxValue - minValue || 1;
-
-  // Calculate grid lines
   const gridLineCount = 5;
   const gridValues = Array.from({ length: gridLineCount }, (_, i) => {
     const value = minValue + (valueRange / (gridLineCount - 1)) * i;
     return Math.round(value);
   });
 
-  // Scale functions
   const xScale = (index: number) => {
     return padding.left + (index / (data.length - 1 || 1)) * innerWidth;
   };
@@ -56,7 +51,6 @@ export function SimpleLineChart({ data, xAxisKey, lines, height = 250 }: SimpleL
     return padding.top + innerHeight - normalized * innerHeight;
   };
 
-  // Generate path for each line
   const generatePath = (line: LineConfig) => {
     const points = data.map((d, i) => {
       const x = xScale(i);
