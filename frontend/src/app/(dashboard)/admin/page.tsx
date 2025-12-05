@@ -8,7 +8,7 @@ LICENSE file in the root directory of this source tree.
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { AdminDashboard } from '@/components/AdminDashboard';
+import { AdminDashboard } from '@/components/admin/AdminDashboard';
 
 export default function AdminPage() {
   const router = useRouter();

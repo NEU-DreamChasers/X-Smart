@@ -9,8 +9,8 @@ LICENSE file in the root directory of this source tree.
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CitizenDashboard } from '../components/CitizenDashboard';
-import { AdminDashboard } from '../components/AdminDashboard';
+import { CitizenDashboard } from '../components/citizen/CitizenDashboard';
+import { AdminDashboard } from '../components/admin/AdminDashboard';
 
 export type UserRole = 'citizen' | 'admin' | 'guest' | null;
 

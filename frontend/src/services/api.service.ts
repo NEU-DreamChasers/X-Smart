@@ -14,7 +14,6 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// 1. Interceptor: Tự động gắn Token
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
@@ -28,7 +27,6 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 2. Interceptor: Xử lý lỗi
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -37,7 +35,6 @@ api.interceptors.response.use(
   }
 );
 
-// --- HELPER: Parse NGSI-LD ---
 const parseNgsi = (item: any) => {
   if (!item) return null;
   const result: any = { id: item.id, type: item.type };
@@ -76,7 +73,6 @@ const createNgsiGetAll = (domain: string) =>
   };
 
 export const ApiService = {
-  // --- 1. Map ---
   map: {
     searchNearby: async (lat: number, lon: number, radius: number = 5000) => {
        try {
@@ -88,7 +84,6 @@ export const ApiService = {
     }
   },
 
-  // --- 2. Sources ---
   sources: {
     getAll: async (limit?: number, offset?: number) => {
       const res = await api.get('/sources', { params: { limit, offset } });
@@ -100,7 +95,6 @@ export const ApiService = {
     delete: (id: string) => api.delete(`/sources/${id}`).then(res => res.data),
   },
 
-  // --- 3. Current Status (NGSI-LD) ---
   weather: {
     getAll: createNgsiGetAll('weather'),
   },
@@ -114,7 +108,6 @@ export const ApiService = {
     getAll: createNgsiGetAll('parking'),
   },
 
-  // --- 4. HISTORY & CHARTS (MỚI) ---
   history: {
     getTemperatureChart: async (location: string) => {
         try { const res = await api.get(`/history/chart/temperature/${location}`); return res.data; } catch (e) { return []; }
@@ -127,12 +120,9 @@ export const ApiService = {
     }
   },
 
-  // --- 5. REPORTS ---
   reports: {
-    // Đổi tên hàm thành getMyReports để khớp với CitizenNotifications.tsx
     getMyReports: async () => {
         try {
-            // Endpoint này khớp với Backend ReportsController @Get('my-reports')
             const res = await api.get('/reports/my-reports');
             return { 
                 data: Array.isArray(res.data) ? res.data : [], 
@@ -143,7 +133,6 @@ export const ApiService = {
             return { data: [], totalCount: 0 };
         }
     },
-    // Hàm tạo báo cáo
     create: async (formData: FormData) => {
         const res = await api.post('/reports', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },

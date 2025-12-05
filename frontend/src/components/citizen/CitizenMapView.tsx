@@ -9,50 +9,27 @@ LICENSE file in the root directory of this source tree.
 
 import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Badge } from './ui/badge';
+import { Badge } from '../ui/badge';
 import { 
-  Bus, Hospital, School, MapPin, Search, Filter, 
-  Map, Activity, X, Loader2, Navigation, Clock, Compass, CornerUpRight,
-  Car,
-  Wind,
-  CloudSun, Droplets, Thermometer, Gauge, CloudFog, AlertTriangle, Biohazard, Sun, CloudRain
+  Bus, MapPin, Search, 
+  Map, Activity, X, Loader2, Navigation, CornerUpRight, Compass,
+  Wind, CloudSun, Droplets, CloudFog, AlertTriangle, Car
 } from 'lucide-react';
-
-// Import Interface để type checking (nếu cần)
-import type { NgsiEntity } from './maps/RealMap';
+import type { NgsiEntity } from '../maps/RealMap';
 import { formatAddress } from '@/lib/utils';
 
-// Import Map động (No SSR)
-const RealMap = dynamic(() => import('./maps/RealMap'), { 
+const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
+
+const RealMap = dynamic(() => import('../maps/RealMap'), { 
   ssr: false,
   loading: () => (
-    <div className="h-full w-full bg-gray-50 animate-pulse flex flex-col items-center justify-center gap-3 text-gray-400 rounded-[14px]">
-       <Loader2 className="w-8 h-8 animate-spin text-gray-300" />
+    <div className="h-full w-full bg-white animate-pulse flex flex-col items-center justify-center gap-3 text-gray-400 rounded-[14px]" style={borderStyle}>
+       <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
        <span className="text-sm font-medium">Đang tải bản đồ thành phố...</span>
     </div>
   )
 });
 
-
-const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
-
-// Helper: Lấy giá trị an toàn từ NGSI-LD Object
-  const getVal = (prop: any) => {
-    if (prop?.value !== undefined) return prop.value;
-    return prop ?? 0;
-  };
-
-  // Helper: Dịch tên thời tiết
-  const translateWeather = (typeObj: any) => {
-    const type = typeObj?.value || typeObj || '';
-    const map: Record<string, string> = {
-        'Clear': 'Quang đãng', 'Clouds': 'Có mây', 'Rain': 'Mưa',
-        'Drizzle': 'Mưa phùn', 'Thunderstorm': 'Dông bão', 'Mist': 'Sương mù', 'clear sky': 'Quang đãng'
-    };
-    return map[type] || type || 'Bình thường';
-  };
-
-// Hook Debounce: Giúp search mượt hơn, không gọi API liên tục
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
   useEffect(() => {
@@ -62,12 +39,9 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-// --- HÀM HELPER: ƯU TIÊN HIỂN THỊ TÊN ĐỊA DANH ---
 const getDisplayName = (item: any) => {
-  // 1. Nếu có tên chính thức (name), dùng nó
   if (item.name) return item.name;
 
-  // 2. Nếu không, quét qua các trường địa danh phổ biến
   const candidates = [
     item.address?.amenity,   
     item.address?.building,  
@@ -80,44 +54,33 @@ const getDisplayName = (item: any) => {
     item.address?.hospital
   ];
 
-  // Lấy cái đầu tiên không null/undefined
   const landmarkName = candidates.find(c => c);
   if (landmarkName) return landmarkName;
 
-  // 3. Cuối cùng mới dùng số nhà + tên đường
   if (item.address?.road) {
     return `${item.address.house_number ? item.address.house_number + ' ' : ''}${item.address.road}`;
   }
 
-  // 4. Fallback cuối cùng
   return item.display_name.split(',')[0];
 };
 
 export function CitizenMapView() {
-  // State Search
   const [searchQuery, setSearchQuery] = useState(''); 
   const debouncedQuery = useDebounce(searchQuery, 500); 
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
-
-  // State Map Logic
   const [mapCenter, setMapCenter] = useState<[number, number]>([10.7721, 106.6983]); 
   const [searchMarker, setSearchMarker] = useState<[number, number] | null>(null);
-  
-  // State Filter & Realtime Data
   const [layerDomain, setLayerDomain] = useState<string>('weather');
   const [markerFilter, setMarkerFilter] = useState('');
   const [realEntityCount, setRealEntityCount] = useState(0);
   const [isMapLoading, setIsMapLoading] = useState(false);
-
-  // State Routing & Selection
   const [selectedRealEntity, setSelectedRealEntity] = useState<NgsiEntity | null>(null);
   const [routeCoords, setRouteCoords] = useState<{ start: [number, number], end: [number, number] } | null>(null);
   const [isRoutingLoading, setIsRoutingLoading] = useState(false);
 
-  // --- EFFECT: GỌI API NOMINATIM ---
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (!debouncedQuery.trim()) {
@@ -127,9 +90,7 @@ export function CitizenMapView() {
 
       setIsSearching(true);
       try {
-        // viewbox cho khu vực TP.HCM
         const viewbox = '106.3,11.2,107.0,10.3';
-        // addressdetails=1 để lấy chi tiết (amenity, road...) phục vụ getDisplayName
         const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(debouncedQuery)}&countrycodes=vn&viewbox=${viewbox}&bounded=1&limit=5&addressdetails=1`;
         
         const res = await fetch(url);
@@ -153,25 +114,21 @@ export function CitizenMapView() {
     
     setMapCenter([lat, lon]);      
     setSearchMarker([lat, lon]);   
-    
-    // Cập nhật text input bằng tên hiển thị đẹp
     setSearchQuery(getDisplayName(item));
     
     setShowSuggestions(false);
-    
-    // Tạo một entity giả lập để Sidebar hiển thị thông tin
+  
     const fakeEntity: any = {
       id: 'search:result',
       type: 'SearchResult',
       name: { value: getDisplayName(item) },
-      location: { value: { coordinates: [lon, lat] } }, // GeoJSON: [Lon, Lat]
+      location: { value: { coordinates: [lon, lat] } }, 
       address: { value: { streetAddress: item.display_name } }
     };
     setSelectedRealEntity(fakeEntity);
     setRouteCoords(null);
   };
 
-  // Ẩn danh sách khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
@@ -219,8 +176,11 @@ export function CitizenMapView() {
   return (
     <div className="space-y-6">
       
-      {/* --- THANH TÌM KIẾM THÔNG MINH --- */}
-      <div className="bg-white rounded-[14px] p-4 shadow-sm relative z-[1001]" style={borderStyle} ref={searchContainerRef}>
+      <div 
+        className="bg-white rounded-[14px] p-4 shadow-sm sticky top-0 z-[1001]" 
+        style={borderStyle} 
+        ref={searchContainerRef}
+      >
         <div className="flex gap-2">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -230,11 +190,12 @@ export function CitizenMapView() {
               value={searchQuery} 
               onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true); }}
               onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-              className="w-full pl-10 pr-10 py-2 rounded-[10px] border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-100 transition-all text-sm"
+              className="w-full pl-10 pr-10 py-3 rounded-[14px] border-none bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm shadow-inner"
+              style={{ border: '0.8px solid rgba(0,0,0,0.05)' }}
             />
             
             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-              {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : 
+              {isSearching ? <Loader2 className="w-4 h-4 animate-spin text-blue-600" /> : 
                 searchQuery && (
                   <button onClick={() => { setSearchQuery(''); setSearchMarker(null); setSuggestions([]); setSelectedRealEntity(null); }}>
                     <X className="w-4 h-4 hover:text-red-500 transition-colors" />
@@ -243,20 +204,23 @@ export function CitizenMapView() {
               }
             </div>
 
-            {/* --- DROPDOWN GỢI Ý --- */}
             {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[12px] shadow-lg border border-gray-100 overflow-hidden max-h-[300px] overflow-y-auto animate-in fade-in slide-in-from-top-2">
+              <div 
+                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[14px] shadow-lg overflow-hidden max-h-[300px] overflow-y-auto animate-in fade-in slide-in-from-top-2 z-[1002]"
+                style={borderStyle}
+              >
                 {suggestions.map((item, index) => (
                   <button
                     key={index}
                     onClick={() => handleSelectSuggestion(item)}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-start gap-3 border-b border-gray-50 last:border-0 transition-colors"
+                  
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-start gap-3 transition-colors group"
                   >
-                    <div className="p-2 bg-gray-100 rounded-full shrink-0">
-                      <MapPin className="w-4 h-4 text-gray-600" />
+                    <div className="p-2 bg-gray-100 rounded-[10px] shrink-0 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                      <MapPin className="w-4 h-4 text-gray-500 group-hover:text-blue-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-900 line-clamp-1">
+                      <p className="text-sm font-semibold text-gray-900 line-clamp-1">
                         {getDisplayName(item)}
                       </p>
                       <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
@@ -274,15 +238,17 @@ export function CitizenMapView() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* CỘT TRÁI: BẢN ĐỒ */}
-        <div className="lg:col-span-2 bg-white rounded-[14px] p-1 shadow-sm flex flex-col h-[650px]" style={borderStyle}>
-          
+        <div 
+            className="lg:col-span-2 bg-white rounded-[14px] p-1 shadow-sm flex flex-col h-[650px]" 
+            style={borderStyle}
+        >
           {/* Map Controls */}
           <div className="p-4 flex flex-col xl:flex-row gap-3 justify-between items-center">
             <div className="flex gap-3 w-full xl:w-auto">
               <select
                 value={layerDomain}
                 onChange={(e) => { setLayerDomain(e.target.value); setMarkerFilter(''); }}
-                className="pl-3 pr-8 py-2 bg-gray-50 rounded-[10px] text-sm font-medium border-transparent focus:ring-0 cursor-pointer outline-none"
+                className="pl-3 pr-8 py-2.5 bg-gray-50 rounded-[14px] text-sm font-medium border-transparent focus:ring-2 focus:ring-blue-500 cursor-pointer outline-none transition-all hover:bg-gray-100"
               >
                 <option value="weather">⛈️ Thời tiết</option>
                 <option value="air">🌫 Không khí</option>
@@ -294,10 +260,10 @@ export function CitizenMapView() {
                 placeholder={`Lọc trong lớp ${layerDomain}...`}
                 value={markerFilter}
                 onChange={(e) => setMarkerFilter(e.target.value)}
-                className="pl-3 pr-3 py-2 bg-white border border-gray-200 rounded-[10px] text-sm focus:outline-none w-full"
+                className="pl-3 pr-3 py-2.5 bg-white border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full transition-all"
               />
             </div>
-            <div className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-medium border ${isMapLoading ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+            <div className={`px-3 py-1.5 rounded-[10px] flex items-center gap-1.5 text-xs font-medium border ${isMapLoading ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
               {isMapLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
               {isMapLoading ? 'Đang tải...' : `${realEntityCount} điểm hoạt động`}
             </div>
@@ -318,7 +284,10 @@ export function CitizenMapView() {
 
         {/* CỘT PHẢI: SIDEBAR THÔNG MINH */}
         <div className="space-y-4 h-[650px] flex flex-col">
-          <div className="bg-white rounded-[14px] p-5 shadow-sm flex-1 flex flex-col overflow-hidden relative" style={borderStyle}>
+          <div 
+            className="bg-white rounded-[14px] p-5 shadow-sm flex-1 flex flex-col overflow-hidden relative" 
+            style={borderStyle}
+          >
             
             {/* TRẠNG THÁI 1: ĐÃ CHỌN ĐỊA ĐIỂM */}
             {selectedRealEntity ? (
@@ -327,7 +296,7 @@ export function CitizenMapView() {
                 <div className="mb-4 pb-4 border-b border-gray-100">
                   <button 
                     onClick={() => { setSelectedRealEntity(null); setRouteCoords(null); }}
-                    className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-900 mb-2 transition-colors"
+                    className="text-xs text-gray-500 flex items-center gap-1 hover:text-blue-600 mb-2 transition-colors font-medium px-2 py-1 hover:bg-blue-50 rounded-[10px] w-fit -ml-2"
                   >
                     <CornerUpRight className="w-3 h-3 rotate-180" /> Quay lại danh sách
                   </button>
@@ -339,19 +308,17 @@ export function CitizenMapView() {
                   <p className="text-sm text-gray-500 mt-2 flex items-start gap-2">
                     <MapPin className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" /> 
                     <span className="line-clamp-3 italic">
-                      {/* Hàm formatAddress đã có ở ngoài */}
                       {formatAddress(selectedRealEntity.address?.value?.streetAddress || selectedRealEntity.address?.value || selectedRealEntity.address)}
                     </span>
                   </p>
                 </div>
 
-                {/* PHÂN LOẠI GIAO DIỆN: THỜI TIẾT vs ĐỊA ĐIỂM KHÁC */}
+                {/* PHÂN LOẠI GIAO DIỆN */}
                 {(() => {
                   const isWeather = selectedRealEntity.type?.includes('Weather') || selectedRealEntity.temperature?.value !== undefined;
                   const isAir = selectedRealEntity.type?.includes('Air') || selectedRealEntity.airQualityIndex !== undefined;
 
                   if (isWeather) {
-                    // --- LOGIC MÀU THEO NHIỆT ĐỘ ---
                     const temp = selectedRealEntity.temperature?.value ?? 25;
                     const getTempColors = (temperature: number) => {
                       if (temperature >= 35) return { gradient: 'from-red-500 to-orange-600', shadow: 'shadow-red-200', text: 'text-red-100', icon: '🔥' };
@@ -363,11 +330,9 @@ export function CitizenMapView() {
                     };
                     const tempColors = getTempColors(temp);
                     
-                    // --- GIAO DIỆN THỜI TIẾT ---
                     return (
                       <div className="space-y-4">
-                        {/* 1. Thẻ Nhiệt độ chính */}
-                        <div className={`bg-gradient-to-br ${tempColors.gradient} rounded-2xl p-6 text-white shadow-lg ${tempColors.shadow} relative overflow-hidden`}>
+                        <div className={`bg-gradient-to-br ${tempColors.gradient} rounded-[14px] p-6 text-white shadow-lg ${tempColors.shadow} relative overflow-hidden`}>
                           <div className="absolute top-[-20px] right-[-20px] opacity-20">
                             <CloudSun size={120} />
                           </div>
@@ -388,9 +353,8 @@ export function CitizenMapView() {
                           </div>
                         </div>
 
-                        {/* 2. Lưới thông tin chi tiết */}
                         <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                          <div className="bg-blue-50 p-4 rounded-[14px] border border-blue-100">
                             <div className="flex items-center gap-2 text-blue-600 mb-1">
                               <Droplets className="w-5 h-5" />
                               <span className="text-sm font-bold">Độ ẩm</span>
@@ -400,7 +364,7 @@ export function CitizenMapView() {
                             </p>
                           </div>
 
-                          <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                          <div className="bg-emerald-50 p-4 rounded-[14px] border border-emerald-100">
                             <div className="flex items-center gap-2 text-emerald-600 mb-1">
                               <Wind className="w-5 h-5" />
                               <span className="text-sm font-bold">Gió</span>
@@ -411,7 +375,7 @@ export function CitizenMapView() {
                           </div>
                           
                           {selectedRealEntity.rain?.value !== undefined && (
-                             <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 col-span-2">
+                             <div className="bg-indigo-50 p-4 rounded-[14px] border border-indigo-100 col-span-2">
                                 <div className="flex items-center gap-2 text-indigo-600 mb-1">
                                   <CloudSun className="w-5 h-5" />
                                   <span className="text-sm font-bold">Lượng mưa (1h)</span>
@@ -428,8 +392,6 @@ export function CitizenMapView() {
                   
                   else if (isAir) {
                     const aqi = selectedRealEntity.airQualityIndex?.value ?? selectedRealEntity.airQualityIndex ?? 1;
-                    
-                    // Chọn màu và lời khuyên theo AQI (1-5)
                     const getAqiStatus = (val: number) => {
                       if (val === 1) return { color: 'from-emerald-400 to-green-600', text: 'Tốt', advice: 'Không khí trong lành, tuyệt vời cho hoạt động ngoài trời.', icon: '🌿' };
                       if (val === 2) return { color: 'from-yellow-400 to-orange-500', text: 'Trung bình', advice: 'Chất lượng chấp nhận được. Nhóm nhạy cảm nên hạn chế.', icon: '😐' };
@@ -437,12 +399,11 @@ export function CitizenMapView() {
                       if (val === 4) return { color: 'from-red-600 to-rose-700', text: 'Xấu', advice: 'Cảnh báo: Có hại cho sức khỏe. Nên đeo khẩu trang.', icon: '🤢' };
                       return { color: 'from-purple-600 to-indigo-800', text: 'Nguy hại', advice: 'Khẩn cấp: Tránh mọi hoạt động ngoài trời!', icon: '☠️' };
                     };
-                    
                     const status = getAqiStatus(aqi);
 
                     return (
                       <div className="space-y-4">
-                        <div className={`bg-gradient-to-br ${status.color} rounded-2xl p-6 text-white shadow-lg relative overflow-hidden`}>
+                        <div className={`bg-gradient-to-br ${status.color} rounded-[14px] p-6 text-white shadow-lg relative overflow-hidden`}>
                           <div className="absolute top-[-20px] right-[-20px] opacity-20">
                             <CloudFog size={120} />
                           </div>
@@ -467,28 +428,27 @@ export function CitizenMapView() {
                           </div>
                         </div>
 
-                        {/* 2. Chi tiết các chất ô nhiễm */}
                         <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mt-2">Thành phần ô nhiễm</h4>
                         <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                          <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
                             <p className="text-xs text-gray-500 mb-1">Bụi mịn PM2.5</p>
                             <p className="text-xl font-bold text-gray-800">
                               {selectedRealEntity.pm25?.value ?? selectedRealEntity.pm25 ?? '--'} <span className="text-xs font-normal">µg/m³</span>
                             </p>
                           </div>
-                          <div className="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                          <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
                             <p className="text-xs text-gray-500 mb-1">Bụi PM10</p>
                             <p className="text-xl font-bold text-gray-800">
                               {selectedRealEntity.pm10?.value ?? selectedRealEntity.pm10 ?? '--'} <span className="text-xs font-normal">µg/m³</span>
                             </p>
                           </div>
-                          <div className="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                          <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
                             <p className="text-xs text-gray-500 mb-1">Khí CO</p>
                             <p className="text-xl font-bold text-gray-800">
                               {selectedRealEntity.co?.value ?? selectedRealEntity.co ?? '--'} <span className="text-xs font-normal">µg/m³</span>
                             </p>
                           </div>
-                          <div className="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                          <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
                             <p className="text-xs text-gray-500 mb-1">Khí NO2</p>
                             <p className="text-xl font-bold text-gray-800">
                               {selectedRealEntity.no2?.value ?? selectedRealEntity.no2 ?? '--'} <span className="text-xs font-normal">µg/m³</span>
@@ -499,13 +459,12 @@ export function CitizenMapView() {
                     );
                   }
 
-                  // --- GIAO DIỆN ĐỊA ĐIỂM KHÁC (Parking, Bus...) ---
                   else {
                     return (
                       <>
-                        <div className="bg-blue-50 rounded-[12px] p-4 mb-4 border border-blue-100">
+                        <div className="bg-blue-50 rounded-[14px] p-4 mb-4 border border-blue-100">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-full">
+                            <div className="p-2 bg-blue-100 rounded-[10px]">
                               <Navigation className="w-5 h-5 text-blue-600" />
                             </div>
                             <div>
@@ -522,7 +481,7 @@ export function CitizenMapView() {
                             <button 
                               onClick={startNavigation}
                               disabled={isRoutingLoading}
-                              className="w-full py-3 bg-gray-900 text-white rounded-[12px] font-medium flex items-center justify-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-lg shadow-gray-200 disabled:opacity-70"
+                              className="w-full py-3 bg-blue-600 text-white rounded-[14px] font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100 disabled:opacity-70 disabled:bg-gray-400"
                             >
                               {isRoutingLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Compass className="w-5 h-5" />}
                               Bắt đầu chỉ đường
@@ -530,7 +489,7 @@ export function CitizenMapView() {
                           ) : (
                             <button 
                               onClick={() => setRouteCoords(null)}
-                              className="w-full py-3 bg-white border border-gray-200 text-gray-700 rounded-[12px] font-medium hover:bg-gray-50 transition-all active:scale-95"
+                              className="w-full py-3 bg-white border border-gray-200 text-gray-700 rounded-[14px] font-medium hover:bg-gray-50 transition-all active:scale-95"
                             >
                               Hủy dẫn đường
                             </button>
@@ -542,23 +501,25 @@ export function CitizenMapView() {
                 })()}
               </div>
             ) : (
-              // TRẠNG THÁI 2: CHƯA CHỌN GÌ (LIST DEMO)
               <div className="flex flex-col h-full space-y-4 animate-in fade-in duration-500">
   
-                {/* 1. CARD THỐNG KÊ REAL-TIME */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+                {/* 1. CARD TRẠNG THÁI HỆ THỐNG - SỬA LẠI STYLE: borderStyle mỏng */}
+                <div 
+                    className="rounded-[14px] p-4 bg-white shadow-sm"
+                    style={borderStyle}
+                >
                   <h3 className="text-blue-900 font-bold flex items-center gap-2 mb-3">
                     <Activity className="w-5 h-5 text-blue-600" /> 
                     Trạng thái hệ thống
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-white p-3 rounded-lg shadow-sm border border-blue-50">
+                    <div className="bg-white p-3 rounded-[14px] shadow-sm" style={borderStyle}>
                       <p className="text-xs text-gray-500 uppercase font-semibold">Điểm giám sát</p>
                       <p className="text-2xl font-bold text-blue-600 mt-1">
                         {realEntityCount > 0 ? realEntityCount : '--'}
                       </p>
                     </div>
-                    <div className="bg-white p-3 rounded-lg shadow-sm border border-blue-50">
+                    <div className="bg-white p-3 rounded-[14px] shadow-sm" style={borderStyle}>
                       <p className="text-xs text-gray-500 uppercase font-semibold">Cập nhật</p>
                       <p className="text-lg font-bold text-green-600 mt-1">Real-time</p>
                       <p className="text-[10px] text-gray-400">Mỗi 30 giây</p>
@@ -566,18 +527,21 @@ export function CitizenMapView() {
                   </div>
                 </div>
 
-                {/* 2. BẢNG CHÚ GIẢI */}
-                <div className="flex-1 bg-gray-50 rounded-xl p-4 border border-gray-100 overflow-y-auto">
+                {/* 2. CARD BẢNG CHÚ GIẢI - SỬA LẠI STYLE: borderStyle mỏng */}
+                <div 
+                  className="flex-1 bg-white rounded-[14px] p-4 overflow-y-auto shadow-sm" 
+                  style={borderStyle}
+                >
                   <h3 className="text-gray-900 font-bold flex items-center gap-2 mb-4">
                     <Map className="w-5 h-5 text-gray-600" /> 
                     Chú giải ký hiệu
                   </h3>
                   
                   <div className="space-y-3">
-                    {/* 1. Trạm Thời tiết */}
-                    <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200 transition-colors hover:bg-gray-50">
+                    {/* Items Legend - Sửa lại dùng borderStyle để tránh viền đen đậm */}
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-[14px] transition-colors hover:shadow-sm" style={borderStyle}>
                       <div className="w-9 h-9 rounded-full bg-[#f97316] border-2 border-white shadow-md flex items-center justify-center">
-                        <CloudSun size={20} className="text-white" />
+                        <CloudSun size={18} className="text-white" />
                       </div>
                       <div>
                         <p className="text-sm font-bold text-gray-800">Trạm Thời tiết</p>
@@ -585,10 +549,9 @@ export function CitizenMapView() {
                       </div>
                     </div>
 
-                    {/* 2. Quan trắc Không khí */}
-                    <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200 transition-colors hover:bg-gray-50">
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-[14px] transition-colors hover:shadow-sm" style={borderStyle}>
                       <div className="w-9 h-9 rounded-full bg-[#10b981] border-2 border-white shadow-md flex items-center justify-center">
-                        <Wind size={20} className="text-white" />
+                        <Wind size={18} className="text-white" />
                       </div>
                       <div>
                         <p className="text-sm font-bold text-gray-800">Quan trắc Không khí</p>
@@ -596,10 +559,9 @@ export function CitizenMapView() {
                       </div>
                     </div>
 
-                    {/* 3. Bãi đỗ xe thông minh */}
-                    <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200 transition-colors hover:bg-gray-50">
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-[14px] transition-colors hover:shadow-sm" style={borderStyle}>
                       <div className="w-9 h-9 rounded-full bg-[#2563eb] border-2 border-white shadow-md flex items-center justify-center">
-                        <Car size={20} className="text-white" />
+                        <Car size={18} className="text-white" />
                       </div>
                       <div>
                         <p className="text-sm font-bold text-gray-800">Bãi đỗ xe thông minh</p>
@@ -607,10 +569,9 @@ export function CitizenMapView() {
                       </div>
                     </div>
 
-                    {/* 4. Trạm xe Buýt */}
-                    <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200 transition-colors hover:bg-gray-50">
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-[14px] transition-colors hover:shadow-sm" style={borderStyle}>
                       <div className="w-9 h-9 rounded-full bg-[#4f46e5] border-2 border-white shadow-md flex items-center justify-center">
-                        <Bus size={20} className="text-white" />
+                        <Bus size={18} className="text-white" />
                       </div>
                       <div>
                         <p className="text-sm font-bold text-gray-800">Trạm xe Buýt</p>

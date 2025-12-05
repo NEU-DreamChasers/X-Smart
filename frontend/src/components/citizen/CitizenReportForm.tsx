@@ -8,7 +8,7 @@ LICENSE file in the root directory of this source tree.
 'use client';
 
 import React, { useState, ChangeEvent, FormEvent, useEffect } from 'react';
-import { createCitizenReport, ReportFormState } from '../services/report.service';
+import { createCitizenReport, ReportFormState } from '../../services/report.service';
 import { MapPin, Send, AlertTriangle, Loader2, X, ImagePlus, Phone, Type } from 'lucide-react';
 
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
@@ -84,22 +84,18 @@ export default function CitizenReportForm({ onSuccess }: Props) {
     setIsLoading(true);
     setStatusMsg(null);
 
-    // Validate Title
     if (!formData.title.trim()) {
       setStatusMsg({ type: 'error', text: 'Vui lòng nhập tiêu đề báo cáo.' });
       setIsLoading(false);
       return;
     }
 
-    // Validate Location
     if ((formData.lat === 0 && formData.lng === 0) && !formData.address.trim()) {
       setStatusMsg({ type: 'error', text: 'Vui lòng cung cấp vị trí (Nhập địa chỉ hoặc dùng GPS).' });
       setIsLoading(false);
       return;
     }
 
-    // --- SỬA LỖI VALIDATION ---
-    // Luôn bắt buộc nhập SĐT nếu trong form chưa có (bất kể đã đăng nhập hay chưa)
     if (!formData.phoneNumber?.trim()) {
       setStatusMsg({ type: 'error', text: 'Vui lòng nhập Số điện thoại xác minh.' });
       setIsLoading(false);
@@ -161,7 +157,7 @@ export default function CitizenReportForm({ onSuccess }: Props) {
               <select
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full pl-4 pr-10 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all text-sm text-gray-700 appearance-none cursor-pointer"
+                className="w-full pl-4 pr-10 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm text-gray-700 appearance-none cursor-pointer"
                 style={borderStyle}
               >
                 <option value="traffic">🚦 Giao thông</option>
@@ -181,7 +177,7 @@ export default function CitizenReportForm({ onSuccess }: Props) {
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="Ví dụ: Ùn tắc tại ngã tư..."
-                className="w-full pl-10 pr-4 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all text-sm placeholder:text-gray-400"
+                className="w-full pl-10 pr-4 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm placeholder:text-gray-400"
                 style={borderStyle}
               />
               <Type className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
@@ -196,7 +192,7 @@ export default function CitizenReportForm({ onSuccess }: Props) {
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Mô tả sự cố, tình trạng hiện tại..."
-              className="w-full px-4 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all text-sm placeholder:text-gray-400 resize-none"
+              className="w-full px-4 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm placeholder:text-gray-400 resize-none"
               style={borderStyle}
             />
           </div>
@@ -213,7 +209,7 @@ export default function CitizenReportForm({ onSuccess }: Props) {
                 value={formData.phoneNumber}
                 onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                 placeholder="Nhập SĐT để xác minh"
-                className="w-full pl-10 pr-4 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all text-sm placeholder:text-gray-400"
+                className="w-full pl-10 pr-4 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm placeholder:text-gray-400"
                 style={borderStyle}
               />
               <Phone className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
@@ -231,14 +227,14 @@ export default function CitizenReportForm({ onSuccess }: Props) {
                 placeholder="Nhập địa chỉ..."
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                className="flex-1 px-4 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all text-sm placeholder:text-gray-400"
+                className="flex-1 px-4 py-3 bg-white rounded-[14px] shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm placeholder:text-gray-400"
                 style={borderStyle}
               />
               <button
                 type="button"
                 onClick={handleGetLocation}
                 disabled={isLoading}
-                className="px-4 py-3 bg-white text-gray-700 rounded-[14px] shadow-sm hover:bg-gray-50 transition-all flex items-center gap-2 whitespace-nowrap active:scale-95"
+                className="px-4 py-3 bg-white text-gray-700 rounded-[14px] shadow-sm hover:bg-gray-50 hover:text-blue-600 transition-all flex items-center gap-2 whitespace-nowrap active:scale-95"
                 style={borderStyle}
               >
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
@@ -246,7 +242,7 @@ export default function CitizenReportForm({ onSuccess }: Props) {
               </button>
             </div>
             {formData.lat !== 0 && (
-              <div className="flex items-center gap-1.5 p-2 bg-blue-50/50 rounded-[10px] w-fit mt-2" style={{ border: '0.8px solid rgba(59, 130, 246, 0.2)' }}>
+              <div className="flex items-center gap-1.5 p-2 bg-blue-50 rounded-[10px] w-fit mt-2" style={{ border: '0.8px solid rgba(59, 130, 246, 0.2)' }}>
                 <MapPin className="w-3.5 h-3.5 text-blue-600" />
                 <span className="text-xs font-medium text-blue-700">
                   {formData.lat.toFixed(5)}, {formData.lng.toFixed(5)}
@@ -291,7 +287,7 @@ export default function CitizenReportForm({ onSuccess }: Props) {
         <button
           type="submit"
           disabled={isLoading}
-          className="px-6 py-3 bg-gray-900 text-white rounded-[14px] font-medium transition-all shadow-sm flex items-center gap-2 hover:bg-gray-800 disabled:opacity-70 disabled:cursor-not-allowed active:scale-[0.98]"
+          className="px-6 py-3 bg-blue-600 text-white rounded-[14px] font-medium transition-all shadow-sm flex items-center gap-2 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed active:scale-[0.98]"
         >
           {isLoading ? (
             <>

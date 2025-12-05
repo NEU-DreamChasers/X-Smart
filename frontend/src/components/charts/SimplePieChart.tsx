@@ -39,11 +39,20 @@ export function SimplePieChart({
   const center = size / 2;
   const outerRadius = Math.min(size / 2.2, 100); 
 
-  const slices = useMemo(() => {
-    if (!data || data.length === 0) return [];
+  const chartSize = height;
+  const centerX = chartSize / 2;
+  const centerY = chartSize / 2;
+  const radius = Math.min(chartSize / 2.5, 100);
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  
 
-    const total = data.reduce((sum, item) => sum + item.value, 0);
-    let currentAngle = -90;
+  let currentAngle = -90; 
+  const slices = data.map((item, index) => {
+    const percentage = item.value / total;
+    const angle = percentage * 360;
+    const startAngle = currentAngle;
+    const endAngle = currentAngle + angle;
+    currentAngle = endAngle;
 
     return data.map((item, index) => {
       const percentage = total === 0 ? 0 : item.value / total;
@@ -68,25 +77,35 @@ export function SimplePieChart({
   const getCoordinates = (angleInDegrees: number, radius: number) => {
     const angleInRadians = (angleInDegrees * Math.PI) / 180.0;
     return {
-      x: center + radius * Math.cos(angleInRadians),
-      y: center + radius * Math.sin(angleInRadians)
+      ...item,
+      startAngle,
+      endAngle,
+      percentage: percentage * 100,
+      color: colors[index % colors.length]
+    };
+  });
+
+  const polarToCartesian = (angle: number, r: number) => {
+    const radian = (angle * Math.PI) / 180;
+    return {
+      x: centerX + r * Math.cos(radian),
+      y: centerY + r * Math.sin(radian)
     };
   };
 
-  // Helper: Tạo đường dẫn SVG (Path)
-  const createPath = (startAngle: number, endAngle: number, outerR: number, innerR: number) => {
-    const start = getCoordinates(startAngle, outerR);
-    const end = getCoordinates(endAngle, outerR);
-    
-    const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+  const createSlicePath = (startAngle: number, endAngle: number, outerR: number, innerR: number) => {
+    const start = polarToCartesian(startAngle, outerR);
+    const end = polarToCartesian(endAngle, outerR);
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
 
     if (innerR === 0) {
-      return [
-        `M ${center} ${center}`,
-        `L ${start.x} ${start.y}`,
-        `A ${outerR} ${outerR} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`,
-        `Z`
-      ].join(" ");
+
+      return `M ${centerX} ${centerY} L ${start.x} ${start.y} A ${outerR} ${outerR} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
+    } else {
+
+      const innerStart = polarToCartesian(startAngle, innerR);
+      const innerEnd = polarToCartesian(endAngle, innerR);
+      return `M ${start.x} ${start.y} A ${outerR} ${outerR} 0 ${largeArc} 1 ${end.x} ${end.y} L ${innerEnd.x} ${innerEnd.y} A ${innerR} ${innerR} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y} Z`;
     }
 
     const startInner = getCoordinates(startAngle, innerR);

@@ -33,28 +33,19 @@ export function SimpleLineChart({ data, xAxisKey, lines, height = 250 }: SimpleL
   const chartWidth = 600;
   const padding = { top: 20, right: 30, bottom: 30, left: 40 };
   const innerWidth = chartWidth - padding.left - padding.right;
-  const innerHeight = height - padding.top - padding.bottom;
+  const innerHeight = chartHeight - padding.top - padding.bottom;
+  const allValues = lines.flatMap(line => 
+    data.map(d => Number(d[line.dataKey]) || 0)
+  );
+  const minValue = Math.min(...allValues);
+  const maxValue = Math.max(...allValues);
+  const valueRange = maxValue - minValue || 1;
+  const gridLineCount = 5;
+  const gridValues = Array.from({ length: gridLineCount }, (_, i) => {
+    const value = minValue + (valueRange / (gridLineCount - 1)) * i;
+    return Math.round(value);
+  });
 
-  const { min, max, valueRange } = useMemo(() => {
-    if (!data || data.length === 0) return { min: 0, max: 100, valueRange: 100 };
-    
-    const allValues = lines.flatMap(line => 
-      data.map(d => Number(d[line.dataKey]) || 0)
-    );
-    
-    const rawMin = Math.min(...allValues);
-    const rawMax = Math.max(...allValues);
-    
-    const buffer = (rawMax - rawMin) * 0.1 || 5;
-    
-    return {
-      min: rawMin - buffer,
-      max: rawMax + buffer,
-      valueRange: (rawMax + buffer) - (rawMin - buffer) || 1
-    };
-  }, [data, lines]);
-
-  // Helper scales
   const xScale = (index: number) => {
     return padding.left + (index / (data.length - 1 || 1)) * innerWidth;
   };
@@ -64,21 +55,14 @@ export function SimpleLineChart({ data, xAxisKey, lines, height = 250 }: SimpleL
     return padding.top + innerHeight - normalized * innerHeight;
   };
 
-  // 2. Tính toán đường dẫn (Path) và Grid
-  const gridValues = useMemo(() => {
-    const count = 5;
-    return Array.from({ length: count }, (_, i) => {
-      return min + (valueRange / (count - 1)) * i;
-    });
-  }, [min, valueRange]);
-
-  if (!data || data.length === 0) {
-    return (
-      <div className="flex items-center justify-center text-gray-400 text-sm" style={{ height }}>
-        Chưa có dữ liệu biểu đồ
-      </div>
-    );
-  }
+  const generatePath = (line: LineConfig) => {
+    const points = data.map((d, i) => {
+      const x = xScale(i);
+      const y = yScale(Number(d[line.dataKey]) || 0);
+      return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+    }).join(' ');
+    return points;
+  };
 
   return (
     <div className="w-full relative select-none" style={{ height }}>

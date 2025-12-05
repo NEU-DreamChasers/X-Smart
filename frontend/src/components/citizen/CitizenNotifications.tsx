@@ -5,21 +5,17 @@ Copyright (c) 2025 NEU-DreamChasers
 This source code is licensed under the MIT license found in the
 LICENSE file in the root directory of this source tree.
 */
-"use client";
+'use client';
 
 import React, { useState, useEffect } from "react";
-import { 
-  Bell, AlertTriangle, CheckCircle2, Info, X, Loader2, 
-  CloudRain, ThermometerSun, Wind 
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Bell, AlertTriangle, CheckCircle2, Info, Loader2, X} from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ApiService } from "@/services/api.service";
 
-// Định nghĩa kiểu dữ liệu
+const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
+
 type NotificationType = "info" | "warning" | "success" | "danger";
 
 interface NotificationItem {
@@ -29,20 +25,18 @@ interface NotificationItem {
   type: NotificationType;
   timestamp: Date;
   isRead: boolean;
-  source?: string; // Nguồn: Weather, Air, Report
+  source?: string; 
 }
 
 export function CitizenNotifications() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // --- LOGIC TỔNG HỢP DỮ LIỆU ---
   const fetchAndGenerateNotifications = async () => {
-    // Không set loading = true ở đây để tránh nhấp nháy giao diện khi polling lại
     const newNotifications: NotificationItem[] = [];
 
     try {
-      // 1. Kiểm tra Môi trường (Air)
+      // Logic: Air Quality
       const airData = await ApiService.air.getAll(1);
       if (airData.data.length > 0) {
         const currentAir = airData.data[0];
@@ -50,7 +44,7 @@ export function CitizenNotifications() {
         
         if (aqi && aqi > 150) {
             newNotifications.push({
-                id: `air-danger-${new Date().getHours()}`, // ID theo giờ để không spam
+                id: `air-danger-${new Date().getHours()}`,
                 title: "Nguy hại sức khỏe",
                 message: `AQI mức ĐỎ (${aqi}). Không nên ra ngoài trời lúc này.`,
                 type: "danger",
@@ -71,12 +65,10 @@ export function CitizenNotifications() {
         }
       }
 
-      // 2. Kiểm tra Thời tiết (Weather) - Bổ sung cảnh báo Mưa/Nhiệt độ
+      // Logic: Weather
       const weatherData = await ApiService.weather.getAll(1);
       if (weatherData.data.length > 0) {
         const w = weatherData.data[0];
-        
-        // Cảnh báo Nóng
         if (w.temperature > 37) {
             newNotifications.push({
                 id: `weather-hot-${new Date().getHours()}`,
@@ -89,7 +81,6 @@ export function CitizenNotifications() {
             });
         }
         
-        // Cảnh báo Lạnh
         if (w.temperature < 12) {
             newNotifications.push({
                 id: `weather-cold-${new Date().getHours()}`,
@@ -102,8 +93,6 @@ export function CitizenNotifications() {
             });
         }
 
-        // Cảnh báo Mưa / Ngập (Giả định logic)
-        // Lưu ý: check biến 'rain' hoặc 'precipitation' tùy vào dữ liệu thực tế API trả về
         if (w.rain && w.rain > 50) { 
              newNotifications.push({
                 id: `weather-rain-${new Date().getHours()}`,
@@ -117,15 +106,13 @@ export function CitizenNotifications() {
         }
       }
 
-      // 3. Kiểm tra trạng thái Báo cáo (Reports)
-      // CHỈ GỌI KHI CÓ TOKEN
+      // Logic: Reports
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       if (token) {
           try {
               const reportsData = await ApiService.reports.getMyReports();
               if (reportsData && reportsData.data) {
                   reportsData.data.forEach((report: any) => {
-                      // Chỉ báo khi đã xử lý xong hoặc được duyệt
                       if (['RESOLVED', 'APPROVED', 'REJECTED'].includes(report.status)) {
                           const statusText = report.status === 'APPROVED' ? 'Đã duyệt' : (report.status === 'RESOLVED' ? 'Đã xử lý xong' : 'Bị từ chối');
                           const notiType = report.status === 'REJECTED' ? 'danger' : 'success';
@@ -143,26 +130,22 @@ export function CitizenNotifications() {
                   });
               }
           } catch (err) {
-              // Fail silently (không log lỗi 401 ra console để tránh rác log)
+             // silent fail
           }
       }
 
     } catch (error) {
       console.error("Lỗi cập nhật thông báo:", error);
     } finally {
-      // Merge logic: Giữ lại các thông báo cũ, chỉ thêm mới nếu chưa có ID
       setNotifications(prev => {
-        // Tạo Map từ mảng cũ để dễ kiểm tra
         const existingMap = new Map(prev.map(item => [item.id, item]));
         
         newNotifications.forEach(newItem => {
-            // Nếu thông báo chưa tồn tại thì thêm vào
             if (!existingMap.has(newItem.id)) {
                 existingMap.set(newItem.id, newItem);
             }
         });
 
-        // Chuyển lại thành mảng và sắp xếp thời gian giảm dần
         return Array.from(existingMap.values()).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       });
       setLoading(false);
@@ -171,91 +154,115 @@ export function CitizenNotifications() {
 
   useEffect(() => {
     fetchAndGenerateNotifications();
-    const interval = setInterval(fetchAndGenerateNotifications, 60000); // 1 phút check 1 lần
+    const interval = setInterval(fetchAndGenerateNotifications, 60000); 
     return () => clearInterval(interval);
   }, []);
 
-  // --- HELPER GIAO DIỆN ---
   const markAsRead = (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
   };
 
-  const getIcon = (type: NotificationType) => {
+  const getTheme = (type: NotificationType) => {
     switch (type) {
-      case "danger": return <AlertTriangle className="h-5 w-5 text-red-600" />;
-      case "warning": return <AlertTriangle className="h-5 w-5 text-yellow-600" />;
-      case "success": return <CheckCircle2 className="h-5 w-5 text-green-600" />;
-      default: return <Info className="h-5 w-5 text-blue-600" />;
-    }
-  };
-
-  const getStyles = (type: NotificationType, isRead: boolean) => {
-    const base = "border-l-4 p-4 mb-3 rounded shadow-sm transition-all hover:shadow-md cursor-pointer relative";
-    const readStyle = isRead ? "opacity-60 bg-gray-50 grayscale-[0.5]" : "bg-white";
-    
-    switch (type) {
-      case "danger": return cn(base, readStyle, "border-l-red-500 border-t border-r border-b border-gray-100");
-      case "warning": return cn(base, readStyle, "border-l-yellow-500 border-t border-r border-b border-gray-100");
-      case "success": return cn(base, readStyle, "border-l-green-500 border-t border-r border-b border-gray-100");
-      default: return cn(base, readStyle, "border-l-blue-500 border-t border-r border-b border-gray-100");
+      case "danger": 
+        return { icon: AlertTriangle, color: '#ef4444', bgColor: '#fee2e2', borderClass: 'border-red-100' };
+      case "warning": 
+        return { icon: AlertTriangle, color: '#f59e0b', bgColor: '#fef3c7', borderClass: 'border-yellow-100' };
+      case "success": 
+        return { icon: CheckCircle2, color: '#10b981', bgColor: '#d1fae5', borderClass: 'border-green-100' };
+      default: 
+        return { icon: Info, color: '#3b82f6', bgColor: '#eff6ff', borderClass: 'border-blue-100' };
     }
   };
 
   return (
-    <Card className="h-full w-full flex flex-col border-none shadow-none bg-transparent">
-      <CardHeader className="px-0 pt-0 pb-4">
-        <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
-            <Bell className="h-5 w-5" />
-            Thông báo & Cảnh báo
-            </CardTitle>
-            {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+    <div 
+      className="h-full w-full bg-white rounded-[14px] p-6 shadow-sm flex flex-col"
+      style={borderStyle}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-50 rounded-[10px] text-blue-600">
+                <Bell className="w-5 h-5" />
+            </div>
+            <div>
+                <h3 className="text-lg font-semibold text-gray-900">Thông báo & Cảnh báo</h3>
+                <p className="text-sm text-gray-500">Cập nhật tin tức quan trọng</p>
+            </div>
         </div>
-      </CardHeader>
+        {loading && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
+      </div>
       
-      <CardContent className="p-0 flex-1 min-h-0">
-        <ScrollArea className="h-[calc(100vh-200px)] pr-4"> {/* Chiều cao động */}
+      <div className="flex-1 min-h-0 relative">
+        <ScrollArea className="h-[calc(100vh-220px)] pr-4"> 
             {notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border-2 border-dashed rounded-lg">
+                <div className="flex flex-col items-center justify-center h-60 text-gray-400 border border-dashed border-gray-200 rounded-[14px] bg-gray-50">
                     <CheckCircle2 className="h-10 w-10 mb-2 opacity-20" />
-                    <p>Hiện tại không có cảnh báo nào</p>
+                    <p className="text-sm">Hiện tại không có cảnh báo nào</p>
                 </div>
             ) : (
-                notifications.map((n) => (
-                    <div 
-                        key={n.id} 
-                        className={getStyles(n.type, n.isRead)}
-                        onClick={() => markAsRead(n.id)}
-                    >
-                        <div className="flex gap-3">
-                            <div className="mt-1">{getIcon(n.type)}</div>
-                            <div className="flex-1">
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className="font-semibold text-sm text-gray-900">{n.title}</span>
-                                    <span className="text-[10px] text-gray-500 whitespace-nowrap bg-gray-100 px-2 py-0.5 rounded-full">
-                                        {n.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                    </span>
-                                </div>
-                                <p className="text-sm text-gray-600 leading-relaxed">{n.message}</p>
-                                <div className="mt-2 flex gap-2">
-                                    {n.source && (
-                                        <Badge variant="outline" className="text-[10px] font-normal text-gray-500">
-                                            {n.source}
-                                        </Badge>
-                                    )}
-                                    {!n.isRead && (
-                                        <Badge className="text-[10px] bg-blue-100 text-blue-700 hover:bg-blue-200 border-none shadow-none">
-                                            Mới
-                                        </Badge>
-                                    )}
+                <div className="space-y-3">
+                    {notifications.map((n) => {
+                        const theme = getTheme(n.type);
+                        const Icon = theme.icon;
+                        const isReadStyle = n.isRead ? "opacity-60 grayscale-[0.5]" : "bg-white";
+
+                        return (
+                            <div 
+                                key={n.id} 
+                                onClick={() => markAsRead(n.id)}
+                                className={cn(
+                                    "relative group cursor-pointer transition-all hover:shadow-md p-4 rounded-[14px] border",
+                                    isReadStyle,
+                                    !n.isRead ? theme.borderClass : "border-gray-100" 
+                                )}
+                            >
+                                <div className="flex gap-4">
+                                    <div 
+                                        className="shrink-0 rounded-[10px] p-2 w-10 h-10 flex items-center justify-center" 
+                                        style={{ backgroundColor: theme.bgColor }}
+                                    >
+                                        <Icon className="w-5 h-5" style={{ color: theme.color }} />
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className={cn(
+                                                "font-semibold text-sm truncate pr-2",
+                                                n.isRead ? "text-gray-600" : "text-gray-900"
+                                            )}>
+                                                {n.title}
+                                            </span>
+                                            <span className="text-xs text-gray-400 whitespace-nowrap bg-gray-50 px-2 py-0.5 rounded-[8px]">
+                                                {n.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            </span>
+                                        </div>
+                                        
+                                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                                            {n.message}
+                                        </p>
+
+                                        <div className="mt-3 flex items-center gap-2">
+                                            {n.source && (
+                                                <Badge variant="outline" className="text-[10px] font-normal text-gray-500 border-gray-200 bg-gray-50 h-5 px-2">
+                                                    {n.source}
+                                                </Badge>
+                                            )}
+                                            {!n.isRead && (
+                                                <Badge className="text-[10px] h-5 px-2 bg-blue-100 text-blue-700 hover:bg-blue-200 border-none shadow-none">
+                                                    Mới
+                                                </Badge>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                ))
+                        );
+                    })}
+                </div>
             )}
         </ScrollArea>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
