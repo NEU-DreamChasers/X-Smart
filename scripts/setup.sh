@@ -24,6 +24,16 @@ if [ ! -f .env ] && [ -f .env.example ]; then
   cp .env.example .env
 fi
 
+if [ ! -f backend/.env ] && [ -f backend/.env.example ]; then
+  echo "Copying backend/.env.example -> backend/.env"
+  cp backend/.env.example backend/.env
+fi
+
+if [ ! -f frontend/.env ] && [ -f frontend/.env.example ]; then
+  echo "Copying frontend/.env.example -> frontend/.env"
+  cp frontend/.env.example frontend/.env
+fi
+
 echo "Starting docker-compose (build)" 
 if command -v docker-compose >/dev/null 2>&1; then
   docker-compose up -d --build
