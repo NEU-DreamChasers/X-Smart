@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -32,11 +39,16 @@ export function CitizenEnvironment() {
       const weatherRes = await ApiService.weather.getAll();
       const weatherList = weatherRes.data;
 
+      const weatherList = Array.isArray(weatherRes) ? weatherRes : (weatherRes.data || []);
+      const airList = Array.isArray(airRes) ? airRes : (airRes.data || []);
+
+      // 2. Tìm trạm thời tiết phù hợp
       let selectedWeather = null;
 
       if (cityFilter) {
         selectedWeather = weatherList.find((w: any) => 
-          w.address?.addressLocality?.toLowerCase().includes(cityFilter.toLowerCase())
+            (w.name?.value || w.name || '').toLowerCase().includes(cityFilter.toLowerCase()) ||
+            (w.address?.value?.addressLocality || w.address?.addressLocality || '').toLowerCase().includes(cityFilter.toLowerCase())
         );
       } else {
         selectedWeather = weatherList.length > 0 ? weatherList[0] : null;
@@ -70,7 +82,7 @@ export function CitizenEnvironment() {
       }
 
     } catch (error) {
-      console.error("Lỗi tải dữ liệu môi trường:", error);
+      console.error("Lỗi tải dữ liệu:", error);
       setWeather(null);
     } finally {
       setLoading(false);
@@ -80,6 +92,7 @@ export function CitizenEnvironment() {
   const handleManualSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualCity.trim()) return;
+    
     setLocationMode('manual');
     loadData(manualCity);
     setIsEditing(false);
@@ -101,6 +114,7 @@ export function CitizenEnvironment() {
       return map[type] || type || 'Bình thường';
   };
 
+  // Cấu hình các thẻ chỉ số (Cards)
   const displayConditions = weather ? [
     { 
       name: 'Thời tiết', 

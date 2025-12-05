@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -50,6 +57,8 @@ export function AdminMapManagement() {
                     name: item.name?.value || item.id,
                     temperature: item.temperature, 
                     availableSpotNumber: item.availableSpotNumber,
+                    airQualityIndex: item.airQualityIndex,
+
                     address: item.address,
                 }));
             });
@@ -101,6 +110,9 @@ export function AdminMapManagement() {
               <div className="relative rounded-[14px] overflow-hidden border border-black/5" style={{ height: '500px' }}>
                 
                 <RealMap 
+                    domain = ""
+                    searchTerm = ""
+                    
                     entities={visibleEntities} 
                     zoom={14}
                     center={[10.7750, 106.7000]} 

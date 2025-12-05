@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -8,6 +15,8 @@ import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
 import { SourcesService } from '../sources/sources.service';
 import { ScorpioService } from '../scorpio/scorpio.service';
+import { HistoryService } from '../history/history.service';
+import { raw } from 'express';
 
 @Injectable()
 export class IngestionService {
@@ -21,20 +30,22 @@ export class IngestionService {
     private readonly sourcesService: SourcesService,
     private readonly configService: ConfigService,
     private readonly scorpioService: ScorpioService,
+    private readonly historyService: HistoryService,
   ) {
     const key = this.configService.get<string>('OPENWEATHER_API_KEY');
     this.overpassUrl = 'https://maps.mail.ru/osm/tools/overpass/api/interpreter';
 
     if (!key || key.trim() === '') {
-      throw new Error('❌ LỖI CẤU HÌNH: Chưa tìm thấy OPENWEATHER_API_KEY!');
+      throw new Error(' LỖI CẤU HÌNH: Chưa tìm thấy OPENWEATHER_API_KEY!');
     }
     this.openWeatherApiKey = key || '';
   }
 
   // LUỒNG 1: THU THẬP CẢM BIẾN (Weather/Air) - Chạy 5 phút/lần
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_30_SECONDS)
   async handleSensorIngestion() {
     this.logger.debug('📡 [Ingestion] Đang thu thập dữ liệu Môi trường...');
+    
     const [sources] = await this.sourcesService.findAll();
 
     for (const source of sources) {
@@ -49,15 +60,34 @@ export class IngestionService {
         }
 
         const response = await firstValueFrom(this.httpService.get(apiUrl));
+        const rawData = response.data;
 
+        // --- GỬI KAFKA (Cho Scorpio cập nhật hiện tại) ---
         this.kafkaClient.emit('raw_data_topic', {
           sourceType: source.adapterType,
-          payload: response.data,
+          payload: rawData,
         });
 
-        await new Promise((r) => setTimeout(r, 2000));
+        // --- LƯU LỊCH SỬ ---
+        let entityId = '';
+
+        if (source.adapterType === 'openweathermap') {
+             const owmId = rawData.id || rawData.name; 
+             entityId = `urn:ngsi-ld:WeatherObserved:OpenWeatherMap:${owmId}`;
+        } else {
+             const lat = source.latitude; 
+             const lon = source.longitude;
+             entityId = `urn:ngsi-ld:AirQualityObserved:AirQuality:Lat${lat}_Lon${lon}`;
+        }
+
+        await this.historyService.saveHistoryFromRaw(entityId, source.adapterType, rawData);
+
+        await new Promise((r) => setTimeout(r, 3000));
+
       } catch (error) {
-        this.logger.error(`Lỗi nguồn ${source.name}: ${error.message}`);
+        const err = error as Error;
+        this.logger.error(`Lỗi nguồn ${source.name}: ${err.message}`);
+        await new Promise((r) => setTimeout(r, 5000));
       }
     }
   }
@@ -65,7 +95,7 @@ export class IngestionService {
   // LUỒNG 2: GIẢ LẬP BÃI ĐỖ XE - Chạy 1 phút/lần
   @Cron(CronExpression.EVERY_MINUTE)
   async handleParkingSimulation() {
-    this.logger.debug('🚗 [Simulation] Đang cập nhật trạng thái bãi đỗ xe...');
+    this.logger.log(' [Simulation] Đang cập nhật trạng thái bãi đỗ xe...');
 
     const result = await this.scorpioService.getEntitiesByType('OffStreetParking');
     const parkingLots = result.data;
@@ -93,7 +123,7 @@ export class IngestionService {
 
       await this.scorpioService.publishEntity(updatePayload as any);
     }
-    this.logger.log(`✅ Đã cập nhật trạng thái cho ${parkingLots.length} bãi xe.`);
+    this.logger.log(` Đã cập nhật trạng thái cho ${parkingLots.length} bãi xe.`);
   }
 
   // LUỒNG 3: IMPORT DỮ LIỆU TĨNH
@@ -119,7 +149,7 @@ export class IngestionService {
 
     const response = await firstValueFrom(this.httpService.get(apiUrl));
     const elements = response.data.elements || [];
-    this.logger.log(`📦 Tìm thấy ${elements.length} điểm. Đang đẩy vào Kafka...`);
+    this.logger.log(` Tìm thấy ${elements.length} điểm. Đang đẩy vào Kafka...`);
 
     for (const element of elements) {
       this.kafkaClient.emit('raw_data_topic', {
