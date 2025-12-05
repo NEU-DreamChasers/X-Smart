@@ -1,0 +1,11 @@
+{
+    "folder": "src",
+    "license": "../HEADER.txt",
+    "exact_paths_method": "EXCLUDE",
+    "exact_paths": [
+        "src/tests/"
+    ],
+    "file_type": {
+        ".ts": "//"
+    }
+}

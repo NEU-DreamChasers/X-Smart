@@ -1,0 +1,13 @@
+{
+    "folder": "src",
+    "license": "../HEADER.txt",
+    "exact_paths_method": "EXCLUDE",
+    "exact_paths": [
+        "src/tests/",
+        "src/components/ui/"
+    ],
+    "file_type": {
+        ".ts": "//",
+        ".tsx": "//"
+    }
+}
