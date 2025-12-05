@@ -7,7 +7,7 @@ LICENSE file in the root directory of this source tree.
 */
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 
 interface DataPoint {
   [key: string]: string | number;
@@ -28,10 +28,12 @@ interface SimpleBarChartProps {
 
 export function SimpleBarChart({ data, xAxisKey, bars, height = 250 }: SimpleBarChartProps) {
   const [hoveredBar, setHoveredBar] = useState<{ index: number; bar: string } | null>(null);
+  
+  if (!data || data.length === 0) return null;
 
-
+  const padding = { top: 20, right: 20, bottom: 40, left: 50 };
   const chartWidth = 600;
-  const padding = { top: 20, right: 30, bottom: 30, left: 40 };
+  const chartHeight = height;
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
   const allValues = bars.flatMap(bar => 
@@ -52,28 +54,14 @@ export function SimpleBarChart({ data, xAxisKey, bars, height = 250 }: SimpleBar
     return padding.top + innerHeight - normalized * innerHeight;
   };
 
-  // Grid Lines
-  const gridValues = useMemo(() => {
-    const count = 5;
-    return Array.from({ length: count }, (_, i) => (maxValue / (count - 1)) * i);
-  }, [maxValue]);
-
-  if (!data || data.length === 0) {
-    return (
-      <div className="flex items-center justify-center text-gray-400 text-sm" style={{ height }}>
-        Chưa có dữ liệu biểu đồ
-      </div>
-    );
-  }
-
   return (
-    <div className="w-full relative select-none" style={{ height }}>
+    <div className="w-full relative" style={{ height }}>
       <svg
-        viewBox={`0 0 ${chartWidth} ${height}`}
+        viewBox={`0 0 ${chartWidth} ${chartHeight}`}
         className="w-full h-full"
         style={{ overflow: 'visible' }}
       >
-        {/* Grid lines & Y-Axis Labels */}
+        {/* Grid lines */}
         {gridValues.map((value, i) => {
           const y = yScale(value);
           return (
@@ -83,19 +71,19 @@ export function SimpleBarChart({ data, xAxisKey, bars, height = 250 }: SimpleBar
                 y1={y}
                 x2={chartWidth - padding.right}
                 y2={y}
-                stroke="#e5e7eb"
-                strokeDasharray="4 4"
+                stroke="#cccccc"
+                strokeDasharray="3 3"
                 strokeWidth={1}
               />
               <text
                 x={padding.left - 10}
                 y={y}
-                fill="#9ca3af"
-                fontSize="10"
+                fill="#666666"
+                fontSize="12"
                 textAnchor="end"
                 dominantBaseline="middle"
               >
-                {Math.round(value)}
+                {value}
               </text>
             </g>
           );
@@ -103,17 +91,14 @@ export function SimpleBarChart({ data, xAxisKey, bars, height = 250 }: SimpleBar
 
         {/* X-axis labels */}
         {data.map((d, i) => {
-          const showLabel = data.length < 15 || i % Math.ceil(data.length / 8) === 0;
-          if (!showLabel) return null;
-
-          const x = xScale(i);
+          const x = padding.left + i * barGroupWidth + barGroupWidth / 2;
           return (
             <text
               key={i}
               x={x}
-              y={height - 5}
-              fill="#6b7280"
-              fontSize="10"
+              y={chartHeight - padding.bottom + 20}
+              fill="#666666"
+              fontSize="12"
               textAnchor="middle"
             >
               {String(d[xAxisKey])}
@@ -123,40 +108,35 @@ export function SimpleBarChart({ data, xAxisKey, bars, height = 250 }: SimpleBar
 
         {/* Bars */}
         {data.map((d, dataIndex) => {
-
-          const groupStartX = xScale(dataIndex) - (barGroupWidth / 2);
-
           return bars.map((bar, barIndex) => {
             const value = Number(d[bar.dataKey]) || 0;
-            
-            const x = groupStartX + (barIndex * barWidth);
+            const x = padding.left + dataIndex * barGroupWidth + barIndex * barWidth + barWidth / 2;
             const y = yScale(value);
-            const barH = (padding.top + innerHeight) - y;
-            
+            const barHeight = padding.top + innerHeight - y;
             const isHovered = hoveredBar?.index === dataIndex && hoveredBar?.bar === bar.dataKey;
 
             return (
-              <g key={`${dataIndex}-${barIndex}`} onMouseEnter={() => setHoveredBar({ index: dataIndex, bar: bar.dataKey })} onMouseLeave={() => setHoveredBar(null)}>
+              <g key={`${dataIndex}-${barIndex}`}>
                 <rect
                   x={x}
                   y={y}
-                  width={Math.max(1, barWidth - 2)} 
-                  height={Math.max(0, barH)} 
+                  width={barWidth * 0.8}
+                  height={barHeight}
                   fill={bar.fill}
                   opacity={isHovered ? 0.8 : 1}
-                  rx={2} 
-                  style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+                  style={{ cursor: 'pointer', transition: 'opacity 0.2s' }}
+                  onMouseEnter={() => setHoveredBar({ index: dataIndex, bar: bar.dataKey })}
+                  onMouseLeave={() => setHoveredBar(null)}
+                  rx={2}
                 />
-                
-                {/* Tooltip giá trị khi hover (Hiện ngay trên đầu cột) */}
                 {isHovered && (
                   <text
-                    x={x + barWidth / 2}
+                    x={x + (barWidth * 0.8) / 2}
                     y={y - 5}
-                    fill="#4b5563"
-                    fontSize="11"
-                    fontWeight="bold"
+                    fill="#666666"
+                    fontSize="12"
                     textAnchor="middle"
+                    fontWeight="bold"
                   >
                     {value}
                   </text>
@@ -168,14 +148,14 @@ export function SimpleBarChart({ data, xAxisKey, bars, height = 250 }: SimpleBar
       </svg>
 
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 mt-2">
+      <div className="flex items-center justify-center gap-4 mt-4">
         {bars.map((bar) => (
-          <div key={bar.dataKey} className="flex items-center gap-2 text-xs text-gray-500">
+          <div key={bar.dataKey} className="flex items-center gap-2 text-sm">
             <div
-              className="w-3 h-3 rounded-sm"
+              className="w-3 h-3 rounded"
               style={{ backgroundColor: bar.fill }}
             />
-            <span>{bar.name}</span>
+            <span className="text-gray-600">{bar.name}</span>
           </div>
         ))}
       </div>

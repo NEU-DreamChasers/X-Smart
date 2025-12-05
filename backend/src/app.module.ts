@@ -29,7 +29,7 @@ import { UploadModule } from './upload/upload.module';
     }),
     ThrottlerModule.forRoot([{
       ttl: 60000,
-      limit: 20,
+      limit: 100,
     }]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],

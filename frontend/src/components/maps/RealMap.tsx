@@ -20,18 +20,11 @@ if (typeof window !== 'undefined') {
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { 
-  CloudSun, Wind, Car, Bus, MapPin, Navigation, Store, 
-  Thermometer, Droplets
+  CloudSun, Wind, Car, Bus, MapPin, Navigation, Store
 } from 'lucide-react';
 import { formatAddress } from '@/lib/utils';
 
-// Fix lỗi SSR cho Routing Machine
-if (typeof window !== 'undefined') {
-  try {
-    require('leaflet-routing-machine');
-  } catch (e) { console.error(e); }
-}
-
+// --- Interfaces ---
 export interface NgsiEntity {
   id: string;
   type: string;
@@ -39,8 +32,12 @@ export interface NgsiEntity {
     type: 'GeoProperty';
     value: { type: 'Point'; coordinates: [number, number] };
   };
-  address?: any;
-  name?: { value: any } | any;
+  address?: {
+    addressLocality: any;
+    streetAddress: any; 
+    value: any 
+  };
+  name?: { value: any };
   [key: string]: any;
 }
 
@@ -56,64 +53,36 @@ interface RealMapProps {
   entities?: NgsiEntity[];
 }
 
-// --- 1. HÀM TẠO TÊN TIẾNG VIỆT THÔNG MINH (NÂNG CẤP) ---
-const getSmartName = (entity: NgsiEntity) => {
-  let rawName = entity.name?.value || entity.name || '';
-
-  const badKeywords = [
-    'urn:ngsi-ld',
-    'OpenWeatherMap',
-    'Lat', 'Lon',
-    'Public Parking',
-    'Unknown',
-    'N/A'
-  ];
-
-  const isBadName = badKeywords.some(kw => rawName.includes(kw));
-
-  let typeVN = 'Điểm giám sát';
-  if (entity.type?.includes('Weather')) typeVN = 'Trạm Thời tiết';
-  else if (entity.type?.includes('Air')) typeVN = 'Trạm Không khí';
-  else if (entity.type?.includes('Parking') || entity.type === 'OffStreetParking') typeVN = 'Bãi đỗ xe';
-  else if (entity.type?.includes('Bus') || entity.category?.value?.includes('bus')) typeVN = 'Trạm Xe buýt';
-
-  if (rawName.includes('Weather - ')) return rawName.replace('Weather - ', 'Thời tiết khu vực ');
-  if (rawName.includes('Air Monitor - ')) return rawName.replace('Air Monitor - ', 'Không khí khu vực ');
-  
-  if (isBadName) {
-     const addr = entity.address?.value || entity.address;
-     
-     if (addr?.streetAddress && addr.streetAddress !== 'Unknown Street') {
-        return `${typeVN} ${addr.streetAddress}`;
-     }
-     if (addr?.addressLocality) {
-        return `${typeVN} tại ${addr.addressLocality}`;
-     }
-     return `${typeVN} #${entity.id.split(':').pop()?.substring(0, 5)}`;
-  }
-
-  return rawName;
-};
-
-// --- Routing Component ---
+// --- Helper Functions ---
 function RoutingMachine({ routeCoords }: { routeCoords: { start: [number, number]; end: [number, number] } | null | undefined }) {
   const map = useMap();
+
   useEffect(() => {
     if (!routeCoords || !map) return;
     // @ts-ignore
     const routingControl = L.Routing.control({
-      waypoints: [ L.latLng(routeCoords.start[0], routeCoords.start[1]), L.latLng(routeCoords.end[0], routeCoords.end[1]) ],
-      routeWhileDragging: false, showAlternatives: false, fitSelectedRoutes: true,
+      waypoints: [
+        L.latLng(routeCoords.start[0], routeCoords.start[1]),
+        L.latLng(routeCoords.end[0], routeCoords.end[1])
+      ],
+      routeWhileDragging: false,
+      showAlternatives: false,
+      fitSelectedRoutes: true,
       lineOptions: { styles: [{ color: '#3b82f6', weight: 6, opacity: 0.8 }] },
-      createMarker: () => null, addWaypoints: false, draggableWaypoints: false, containerClassName: 'hidden', 
+      createMarker: () => null,
+      addWaypoints: false,
+      draggableWaypoints: false,
+      containerClassName: 'hidden', 
     }).addTo(map);
-    // @ts-ignore
-    return () => { try { if (map && routingControl) map.removeControl(routingControl); } catch(e){} };
+
+    return () => {
+      if (map && routingControl) map.removeControl(routingControl);
+    };
   }, [routeCoords, map]);
+
   return null;
 }
 
-// --- CONFIG MÀU SẮC ---
 const DOMAIN_CONFIG: Record<string, { color: string, icon: any }> = {
   weather: { color: '#f97316', icon: <CloudSun size={20} color="white" /> },
   air: { color: '#10b981', icon: <Wind size={20} color="white" /> },
@@ -214,9 +183,11 @@ const searchResultIcon = L.divIcon({
   className: '', iconSize: [48, 48], iconAnchor: [24, 48], popupAnchor: [0, -48]
 });
 
-function MapController({ center }: { center?: [number, number] }) {
+function MapController({ center, zoom }: { center?: [number, number], zoom?: number }) {
   const map = useMap();
-  useEffect(() => { if (center) map.flyTo(center, 16, { duration: 1.5 }); }, [center, map]);
+  useEffect(() => {
+    if (center) map.flyTo(center, zoom || 16, { duration: 1.5 });
+  }, [center, zoom, map]);
   return null;
 }
 
@@ -245,6 +216,7 @@ export default function RealMap({
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'; 
       const apiUrl = `${baseUrl}/${apiDomain}/status`;
+      
       const res = await fetch(apiUrl, { cache: 'no-store' });
       if (!res.ok) throw new Error(`API Error`);
       const data: NgsiEntity[] = await res.json();
@@ -256,7 +228,6 @@ export default function RealMap({
   };
 
   useEffect(() => {
-    if (propEntities) return;
     fetchEntities();
     if (!isExternalMode) {
         const interval = setInterval(fetchEntities, 30000);
@@ -275,43 +246,53 @@ export default function RealMap({
     }
     if (onDataLoaded) onDataLoaded(result.length, false);
     return result;
-  }, [entitiesToRender, searchTerm, onDataLoaded]);
+  }, [activeEntities, searchTerm, onDataLoaded]);
 
-  const getValue = (prop: any) => {
-    if (prop === undefined || prop === null) return 'N/A';
-    if (typeof prop === 'object' && prop.value !== undefined) return prop.value;
-    return prop;
-  };
-  
-  // Helper get Safe Address
-  const getSafeAddress = (entity: NgsiEntity) => {
-    const val = entity.address?.value?.streetAddress || entity.address?.value || entity.address;
-    return formatAddress(val);
-  };
+  const getValue = (prop: any) => (prop && prop.value !== undefined ? prop.value : 'N/A');
 
   return (
     <MapContainer 
-      center={center || [10.7769, 106.7009]} zoom={13} zoomControl={false} attributionControl={false}
+      center={center || [10.7769, 106.7009]} 
+      zoom={zoom} 
       style={{ height: '100%', width: '100%', borderRadius: '0 0 14px 14px' }}
+      zoomControl={false}
+      attributionControl={false}
     >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <MapController center={center} />
+      
+      <MapController center={center} zoom={zoom} />
       <RoutingMachine routeCoords={routeCoordinates} />
 
       {searchMarker && (
-        <Marker position={searchMarker} icon={searchResultIcon} zIndexOffset={1000} eventHandlers={{
+        <Marker 
+          position={searchMarker} 
+          icon={searchResultIcon} 
+          zIndexOffset={1000}
+          eventHandlers={{
             click: () => {
               if (onSelectEntity) {
-                onSelectEntity({
-                  id: 'search:result', type: 'SearchResult', name: { value: 'Vị trí tìm kiếm' },
-                  location: { type: 'GeoProperty', value: { type: 'Point', coordinates: [searchMarker[1], searchMarker[0]] } },
-                  address: { value: { streetAddress: `Tọa độ: ${searchMarker[0].toFixed(4)}, ${searchMarker[1].toFixed(4)}` } }
-                }); 
+                const fakeEntity: NgsiEntity = {
+                  id: 'search:result',
+                  type: 'SearchResult',
+                  name: { value: 'Vị trí đã chọn' },
+                  location: {
+                    type: 'GeoProperty',
+                    value: { type: 'Point', coordinates: [searchMarker[1], searchMarker[0]] } 
+                  },
+                  address: {
+                    value: { streetAddress: `Tọa độ: ${searchMarker[0].toFixed(4)}, ${searchMarker[1].toFixed(4)}` },
+                    addressLocality: undefined,
+                    streetAddress: undefined
+                  }
+                };
+                onSelectEntity(fakeEntity);
               }
             }
           }}
         >
-          <Popup className="custom-popup"><div className="font-bold text-red-600 text-sm p-1 text-center">📍 Vị trí tìm kiếm</div></Popup>
+          <Popup className="custom-popup">
+            <div className="font-bold text-red-600 text-sm p-1 text-center">📍 Vị trí tìm kiếm</div>
+          </Popup>
         </Marker>
       )}
 
@@ -368,50 +349,15 @@ export default function RealMap({
                        </span>
                     </div>
 
-                    {/* 3. UI Style 'CitizenEnvironment' (Mini Cards) */}
-                    <div className="text-sm space-y-2">
-                        {/* STYLE CHO WEATHER */}
-                        {(domain === 'weather' || entity.type.includes('Weather')) && (
-                          <div className="grid grid-cols-2 gap-2">
-                             <div className="bg-[#ffedd4] p-2 rounded-lg flex items-center gap-2 border border-orange-100">
-                                <Thermometer size={16} className="text-[#f54900]" />
-                                <span className="text-[#f54900] font-bold text-sm">{getValue(entity.temperature)}°C</span>
-                             </div>
-                             <div className="bg-[#cefafe] p-2 rounded-lg flex items-center gap-2 border border-blue-100">
-                                <Droplets size={16} className="text-[#0092b8]" />
-                                <span className="text-[#0092b8] font-bold text-sm">{getValue(entity.humidity) !== 'N/A' ? getValue(entity.humidity) : getValue(entity.relativeHumidity)}%</span>
-                             </div>
-                          </div>
-                        )}
-
-                        {/* STYLE CHO AIR */}
-                        {(domain === 'air' || entity.type.includes('Air')) && (
-                          <div className="bg-[#dcfce7] p-2 rounded-lg flex items-center justify-between border border-green-100">
-                             <div className="flex items-center gap-2">
-                                <Wind size={16} className="text-[#166534]" />
-                                <span className="text-[#166534] font-bold text-sm">AQI</span>
-                             </div>
-                             <span className="text-[#166534] font-b old text-lg">{getValue(entity.airQualityIndex)}</span>
-                          </div>
-                        )}
-
-                        {/* STYLE CHO PARKING */}
-                        {(domain === 'parking' || entity.type.includes('Parking')) && (
-                          <div className="bg-[#dbeafe] p-2 rounded-lg flex items-center justify-between border border-blue-100">
-                             <div className="flex items-center gap-2">
-                                <Car size={16} className="text-[#1e40af]" />
-                                <span className="text-[#1e40af] font-medium text-xs">Chỗ trống</span>
-                             </div>
-                             <span className="text-[#1e40af] font-bold text-lg">{getValue(entity.availableSpotNumber)}</span>
-                          </div>
-                        )}
-
-                    </div>
-                 </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+                  <div className="text-sm space-y-1">
+                     {entity.type === 'Weather' && <p className="text-orange-600 font-bold">{getValue(entity.temperature)}°C</p>}
+                     {entity.type === 'Parking' && <p className="text-blue-600 font-bold">Trống: {getValue(entity.availableSpotNumber)}</p>}
+                  </div>
+               </div>
+            </Popup>
+          </Marker>
+        );
+      })}
       </MarkerClusterGroup>
     </MapContainer>
   );
