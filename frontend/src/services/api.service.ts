@@ -97,6 +97,8 @@ export const ApiService = {
 
   weather: {
     getAll: createNgsiGetAll('weather'),
+    getForecast: (entityId: string) => 
+      api.get(`/weather/forecast`, { params: { entityId } }).then(res => res.data),
   },
   air: {
     getAll: createNgsiGetAll('air'),

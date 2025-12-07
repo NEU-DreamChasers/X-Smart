@@ -30,6 +30,7 @@ interface SimpleLineChartProps {
 export function SimpleLineChart({ data, xAxisKey, lines, height = 250 }: SimpleLineChartProps) {
   const [hoveredPoint, setHoveredPoint] = useState<{ index: number; line: string } | null>(null);
 
+  const chartHeight = height;
   const chartWidth = 600;
   const padding = { top: 20, right: 30, bottom: 30, left: 40 };
   const innerWidth = chartWidth - padding.left - padding.right;
@@ -39,7 +40,13 @@ export function SimpleLineChart({ data, xAxisKey, lines, height = 250 }: SimpleL
   );
   const minValue = Math.min(...allValues);
   const maxValue = Math.max(...allValues);
-  const valueRange = maxValue - minValue || 1;
+
+  // Tạo khoảng đệm (buffer) để biểu đồ không chạm nóc/đáy
+  const buffer = (maxValue - minValue) * 0.1 || 10;
+  const safeMin = minValue - buffer;
+  const safeMax = maxValue + buffer;
+  const valueRange = safeMax - safeMin || 1;
+
   const gridLineCount = 5;
   const gridValues = Array.from({ length: gridLineCount }, (_, i) => {
     const value = minValue + (valueRange / (gridLineCount - 1)) * i;
@@ -51,7 +58,7 @@ export function SimpleLineChart({ data, xAxisKey, lines, height = 250 }: SimpleL
   };
 
   const yScale = (value: number) => {
-    const normalized = (value - min) / valueRange;
+    const normalized = (value - safeMin) / valueRange;
     return padding.top + innerHeight - normalized * innerHeight;
   };
 
@@ -65,7 +72,12 @@ export function SimpleLineChart({ data, xAxisKey, lines, height = 250 }: SimpleL
   };
 
   return (
-    <div className="w-full relative select-none" style={{ height }}>
+    <div className="w-full relative select-none" style={{ height }} onMouseLeave={() => setHoveredPoint(null)}>
+      <rect 
+            x={0} y={0} width={chartWidth} height={chartHeight} 
+            fill="transparent" 
+            onMouseEnter={() => setHoveredPoint(null)} 
+        />
       <svg
         viewBox={`0 0 ${chartWidth} ${height}`}
         className="w-full h-full"
@@ -191,15 +203,20 @@ export function SimpleLineChart({ data, xAxisKey, lines, height = 250 }: SimpleL
           <div className="font-bold text-gray-700 mb-1 border-b border-gray-100 pb-1">
             {String(data[hoveredPoint.index][xAxisKey])}
           </div>
-          {lines.map((line) => (
+          {lines.map((line) => {
+            const rawValue = Number(data[hoveredPoint.index][line.dataKey]);
+            const displayValue = Number.isInteger(rawValue) ? rawValue : rawValue.toFixed(2);
+            
+            return (
             <div key={line.dataKey} className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: line.stroke }} />
               <span className="text-gray-500">{line.name}:</span>
               <span className="font-mono font-bold text-gray-900">
-                {String(data[hoveredPoint.index][line.dataKey])}
+                {displayValue}
               </span>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
