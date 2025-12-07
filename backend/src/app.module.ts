@@ -20,6 +20,8 @@ import { HistoryModule } from './history/history.module';
 import { ReportsModule } from './reports/reports.module';
 import { MinioClientModule } from './minio-client/minio-client.module';
 import { UploadModule } from './upload/upload.module';
+import { WeatherService } from './weather/weather.service';
+import { WeatherController } from './weather/weather.controller';
 
 @Module({
   imports: [
@@ -58,12 +60,13 @@ import { UploadModule } from './upload/upload.module';
     MinioClientModule,
     UploadModule,
   ],
-  controllers: [],
+  controllers: [WeatherController],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    WeatherService,
   ],
 })
 export class AppModule { }

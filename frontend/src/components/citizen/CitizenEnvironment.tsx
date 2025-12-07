@@ -8,7 +8,7 @@ LICENSE file in the root directory of this source tree.
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Wind, Thermometer, Droplets, Sun, CloudRain, Loader2, MapPin, Search, RotateCcw } from 'lucide-react';
+import { Wind, Thermometer, Droplets, Sun, CloudRain, Loader2, MapPin, Search, RotateCcw, ChevronRight, CalendarClock } from 'lucide-react';
 import { SimpleLineChart } from '../charts/SimpleLineChart';
 import { SimpleBarChart } from '../charts/SimpleBarChart'; 
 import { ApiService } from '../../services/api.service';
@@ -21,6 +21,7 @@ const rainChartConfig = [ { dataKey: 'value', fill: '#3b82f6', name: 'Lượng m
 export function CitizenEnvironment() {
   const [weather, setWeather] = useState<any>(null);
   const [airData, setAirData] = useState<any>(null);
+  const [forecast, setForecast] = useState<any[]>([]);
 
   const [airQualityChart, setAirQualityChart] = useState<any[]>([]);
   const [rainChart, setRainChart] = useState<any[]>([]);
@@ -85,6 +86,17 @@ export function CitizenEnvironment() {
       let selectedAir = null;
       
       if (selectedWeather) {
+
+          // --- GỌI API DỰ BÁO THỜI TIẾT ---
+          ApiService.weather.getForecast(selectedWeather.id)
+            .then((res: any) => {
+                setForecast(res.list || []);
+            })
+            .catch((err) => {
+                console.error("Lỗi lấy dự báo:", err);
+                setForecast([]);
+            });
+
          const wLoc = selectedWeather.location?.value?.coordinates || selectedWeather.location;
          
          if (wLoc && Array.isArray(wLoc)) {
@@ -315,6 +327,71 @@ export function CitizenEnvironment() {
           </div>
         </div>
       </div>
+
+      {/* DỰ BÁO THỜI TIẾT */}
+      {!loading && forecast.length > 0 && (
+        <div className="bg-white rounded-[14px] p-6 shadow-sm" style={borderStyle}>
+            <div className="flex items-center justify-between mb-5">
+                <div>
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <CalendarClock className="w-5 h-5 text-blue-600" />
+                        Dự báo sắp tới
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">Chi tiết mỗi 3 giờ trong 5 ngày tới</p>
+                </div>
+                <div className="text-xs text-blue-600 font-medium flex items-center bg-blue-50 px-3 py-1.5 rounded-full">
+                    Cuộn ngang <ChevronRight className="w-3 h-3 ml-1 animate-pulse" />
+                </div>
+            </div>
+            
+            <div className="relative -mx-2 px-2">
+                <div className="flex gap-5 overflow-x-auto pb-6 pt-2 scrollbar-thin scrollbar-thumb-gray-100 scrollbar-track-transparent snap-x">
+                    {forecast.map((item: any, idx: number) => {
+                        const date = new Date(item.dt * 1000);
+                        const day = date.getDate();
+                        const month = date.getMonth() + 1;
+                        const hour = date.getHours().toString().padStart(2, '0');
+                        const temp = Math.round(item.main.temp);
+                        const iconCode = item.weather?.[0]?.icon;
+                        const desc = item.weather?.[0]?.description;
+                        const isFirst = idx === 0;
+
+                        return (
+                            <div 
+                                key={idx} 
+                                // 👇 STYLE MỚI: Bỏ border đen, dùng Gradient & Shadow mềm
+                                className={`
+                                    min-w-[160px] p-6 rounded-[20px] 
+                                    flex flex-col items-center text-center shrink-0 
+                                    transition-all duration-300 snap-start
+                                    ${isFirst 
+                                        ? 'bg-gradient-to-br from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-200 scale-105' 
+                                        : 'bg-gradient-to-b from-blue-50/50 to-white text-slate-700 shadow-sm hover:shadow-md hover:-translate-y-1'
+                                    }
+                                `}
+                            >
+                                <div className="mb-3">
+                                    <p className={`text-lg font-bold ${isFirst ? 'text-white' : 'text-slate-800'}`}>{hour}:00</p>
+                                    <p className={`text-sm font-medium ${isFirst ? 'text-blue-100' : 'text-slate-400'}`}>{day}/{month}</p>
+                                </div>
+                                
+                                <img 
+                                    src={`https://openweathermap.org/img/wn/${iconCode}@2x.png`} 
+                                    alt={desc} 
+                                    className="w-20 h-20 -my-2 drop-shadow-sm filter"
+                                />
+                                <p className={`text-4xl font-extrabold mb-2 mt-1 ${isFirst ? 'text-white' : 'text-slate-800'}`}>{temp}°</p>
+                                <p className={`text-sm font-medium capitalize leading-tight h-10 flex items-center justify-center line-clamp-2 ${isFirst ? 'text-blue-50' : 'text-slate-500'}`}>
+                                    {desc}
+                                </p>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="absolute right-0 top-0 h-full w-20 bg-gradient-to-l from-white via-white/80 to-transparent pointer-events-none rounded-r-[14px]"></div>
+            </div>
+        </div>
+      )}
     </div>
   );
 }
