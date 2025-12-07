@@ -15,16 +15,13 @@ import { ApiService } from '../../services/api.service';
 
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
-const airChartConfig = [
-  { dataKey: 'value', stroke: '#3b82f6', name: 'AQI' }, 
-];
-
-const rainChartConfig = [
-  { dataKey: 'value', fill: '#3b82f6', name: 'Lượng mưa (mm)' } 
-];
+const airChartConfig = [ { dataKey: 'value', stroke: '#10b981', name: 'PM2.5 (µg/m³)' } ];
+const rainChartConfig = [ { dataKey: 'value', fill: '#3b82f6', name: 'Lượng mưa (mm)' } ];
 
 export function CitizenEnvironment() {
   const [weather, setWeather] = useState<any>(null);
+  const [airData, setAirData] = useState<any>(null);
+
   const [airQualityChart, setAirQualityChart] = useState<any[]>([]);
   const [rainChart, setRainChart] = useState<any[]>([]);
   
@@ -33,51 +30,120 @@ export function CitizenEnvironment() {
   const [manualCity, setManualCity] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
+  // Helper: Chuyển đổi dữ liệu từ API History sang format của Chart
+  const transformChartData = (apiData: any) => {
+    if (!apiData || !apiData.labels || !apiData.datasets?.[0]) return [];
+    
+    return apiData.labels.map((label: string, index: number) => {
+         let timeLabel = label;
+         const dateObj = new Date(label);
+
+        if (!isNaN(dateObj.getTime())) {
+            const h = dateObj.getHours().toString().padStart(2, '0');
+            const m = dateObj.getMinutes().toString().padStart(2, '0');
+            timeLabel = `${h}:${m}`;
+        } else if (label.includes(' ')) {
+             const parts = label.split(' ');
+             const timePart = parts.find(p => p.includes(':'));
+             if (timePart) timeLabel = timePart.slice(0, 5);
+        }
+
+        const rawVal = apiData.datasets[0].data[index];
+
+        const value = typeof rawVal === 'number' ? Number(rawVal.toFixed(2)) : rawVal;
+        
+        return { time: timeLabel, value };
+    });
+  };
+
   const loadData = async (cityFilter?: string) => {
     setLoading(true);
     try {
-      const weatherRes = await ApiService.weather.getAll();
-      const weatherList = weatherRes.data;
+      const [weatherRes, airRes] = await Promise.all([
+          ApiService.weather.getAll(100, 0),
+          ApiService.air.getAll(100, 0)
+      ]);
+
+      const weatherList = Array.isArray(weatherRes) ? weatherRes : (weatherRes.data || []);
+      const airList = Array.isArray(airRes) ? airRes : (airRes.data || []);
 
       let selectedWeather = null;
 
       if (cityFilter) {
-        selectedWeather = weatherList.find((w: any) => 
-          w.address?.addressLocality?.toLowerCase().includes(cityFilter.toLowerCase())
-        );
+        selectedWeather = weatherList.find((w: any) => {
+            const name = w.name?.value || w.name || '';
+            const addr = w.address?.value?.addressLocality || w.address?.addressLocality || '';
+            return name.toLowerCase().includes(cityFilter.toLowerCase()) || 
+                   addr.toLowerCase().includes(cityFilter.toLowerCase());
+        });
       } else {
         selectedWeather = weatherList.length > 0 ? weatherList[0] : null;
       }
 
       setWeather(selectedWeather);
 
+      let selectedAir = null;
+      
       if (selectedWeather) {
-         const locationKey = selectedWeather.address?.addressLocality || 'Hanoi'; 
+         const wLoc = selectedWeather.location?.value?.coordinates || selectedWeather.location;
          
-         const [aqiData, rainData] = await Promise.all([
-             ApiService.history.getAqiChart(locationKey),
-             ApiService.history.getRainChart(locationKey)
-         ]);
+         if (wLoc && Array.isArray(wLoc)) {
+             selectedAir = airList.find((a: any) => {
+                 const aLoc = a.location?.value?.coordinates || a.location;
+                 return aLoc && Math.abs(aLoc[0] - wLoc[0]) < 0.0001 && Math.abs(aLoc[1] - wLoc[1]) < 0.0001;
+             });
+         }
 
-         const formattedAqi = Array.isArray(aqiData) ? aqiData.map((item: any) => ({
-             time: new Date(item.timestamp || item.dateObserved).getHours() + 'h',
-             value: item.value || item.aqi || 0
-         })) : [];
-         const formattedRain = Array.isArray(rainData) ? rainData.map((item: any) => ({
-             name: new Date(item.timestamp || item.dateObserved).getHours() + 'h',
-             value: item.value || item.precipitation || 0
-         })) : [];
+         if (!selectedAir) {
+             const wName = selectedWeather.name?.value || selectedWeather.name || '';
+             const commonName = wName.replace('Weather', '').replace('Trạm Thời tiết', '').trim();
+             if (commonName) {
+                selectedAir = airList.find((a: any) => {
+                    const aName = a.name?.value || a.name || '';
+                    return aName.includes(commonName);
+                });
+             }
+         }
 
-         setAirQualityChart(formattedAqi);
-         setRainChart(formattedRain);
+         if (!selectedAir && airList.length > 0) {
+             selectedAir = airList[0];
+         }
+         
+         setAirData(selectedAir);
+
+      // --- GỌI API BIỂU ĐỒ ---
+         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+         const promises = [];
+
+         promises.push(
+            fetch(`${baseUrl}/history/chart?entityId=${encodeURIComponent(selectedWeather.id)}&attr=precipitation`)
+            .then(r => r.json())
+            .catch(() => ({ labels: [], datasets: [] }))
+         );
+
+         if (selectedAir) {
+             promises.push(
+                fetch(`${baseUrl}/history/chart?entityId=${encodeURIComponent(selectedAir.id)}&attr=pm25`)
+                .then(r => r.json())
+                .catch(() => ({ labels: [], datasets: [] }))
+             );
+         } else {
+             promises.push(Promise.resolve({ labels: [], datasets: [] }));
+         }
+
+         const [rainData, aqiData] = await Promise.all(promises);
+         
+         setRainChart(transformChartData(rainData));
+         setAirQualityChart(transformChartData(aqiData));
 
       } else {
-          setAirQualityChart([]);
-          setRainChart([]);
+         setAirData(null);
+         setRainChart([]);
+         setAirQualityChart([]);
       }
 
     } catch (error) {
-      console.error("Lỗi tải dữ liệu môi trường:", error);
+      console.error("Lỗi tải dữ liệu:", error);
       setWeather(null);
     } finally {
       setLoading(false);
@@ -95,6 +161,8 @@ export function CitizenEnvironment() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const getVal = (prop: any) => (prop?.value !== undefined ? prop.value : (prop ?? 0));
 
   const translateWeather = (type: string) => {
       const map: Record<string, string> = {
@@ -214,40 +282,36 @@ export function CitizenEnvironment() {
         )}
       </div>
 
-      {/* 3. Charts Section (Biểu đồ lịch sử) */}
+      {/* 3. Charts Section (Style Admin) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Biểu đồ Không khí (AQI) */}
+        {/* Biểu đồ AQI */}
         <div className="bg-white rounded-[14px] p-6 shadow-sm" style={borderStyle}>
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">Chất lượng không khí (24h qua)</h3>
-            <p className="text-sm text-gray-500">Chỉ số AQI theo thời gian</p>
+            <h3 className="text-lg font-medium text-neutral-950">Chất lượng không khí (24h qua)</h3>
+            <p className="text-sm text-gray-500">
+                Chỉ số PM2.5 (µg/m³)
+            </p>
           </div>
-          <div className="w-full">
-            {airQualityChart.length > 0 ? (
-              <SimpleLineChart data={airQualityChart} xAxisKey="time" lines={airChartConfig} height={250} />
-            ) : (
-              <div className="h-[250px] flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                 {loading ? 'Đang tải...' : 'Chưa có dữ liệu lịch sử AQI'}
-              </div>
-            )}
+          <div style={{ width: '100%', height: '250px' }}>
+            {loading ? <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500"/></div> : 
+             airQualityChart.length > 0 ? (
+                <SimpleLineChart data={airQualityChart} xAxisKey="time" lines={airChartConfig} height={250} />
+            ) : <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa có dữ liệu AQI</div>}
           </div>
         </div>
 
-        {/* Biểu đồ Lượng mưa */}
+        {/* Biểu đồ Mưa */}
         <div className="bg-white rounded-[14px] p-6 shadow-sm" style={borderStyle}>
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">Lượng mưa (24h qua)</h3>
+            <h3 className="text-lg font-medium text-neutral-950">Lượng mưa (24h qua)</h3>
             <p className="text-sm text-gray-500">Tổng lượng mưa (mm)</p>
           </div>
-          <div className="w-full">
-            {rainChart.length > 0 ? (
-               <SimpleBarChart data={rainChart} xAxisKey="name" bars={rainChartConfig} height={250} />
-            ) : (
-              <div className="h-[250px] flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                 {loading ? 'Đang tải...' : 'Chưa có dữ liệu lịch sử mưa'}
-              </div>
-            )}
+          <div style={{ width: '100%', height: '250px' }}>
+            {loading ? <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500"/></div> : 
+             rainChart.length > 0 ? (
+                <SimpleBarChart data={rainChart} xAxisKey="name" bars={rainChartConfig} height={250} />
+            ) : <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa có dữ liệu mưa</div>}
           </div>
         </div>
       </div>
