@@ -1,4 +1,11 @@
-"use client";
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
+'use client';
 
 import React, { useState, useEffect } from "react";
 import { Bell, AlertTriangle, CheckCircle2, Info, Loader2, X} from "lucide-react";

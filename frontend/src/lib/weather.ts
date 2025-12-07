@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 const API_KEY = 'e6a9ac520f15ef26ef5a4d86d1006ce9';
 
 export interface WeatherData {

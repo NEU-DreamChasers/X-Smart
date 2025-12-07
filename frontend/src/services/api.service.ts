@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -43,6 +50,7 @@ const parseNgsi = (item: any) => {
   return result;
 };
 
+// --- HELPER: Create GetAll ---
 const createNgsiGetAll = (domain: string) => 
   async (limit?: number, offset?: number): Promise<{ data: any[]; totalCount: number }> => {
     const url = `/${domain}/status`;
@@ -89,6 +97,8 @@ export const ApiService = {
 
   weather: {
     getAll: createNgsiGetAll('weather'),
+    getForecast: (entityId: string) => 
+      api.get(`/weather/forecast`, { params: { entityId } }).then(res => res.data),
   },
   air: {
     getAll: createNgsiGetAll('air'),

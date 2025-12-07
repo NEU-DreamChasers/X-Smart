@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 export interface NgsiProperty {
   type: 'Property';
   value: any;
@@ -19,7 +26,7 @@ export interface NgsiGeoProperty {
 
 export interface NgsiRelationship {
   type: 'Relationship';
-  object: string; // URN của đối tượng được liên kết
+  object: string;
 }
 
 //Cấu trúc tổng thể của một Entity hoàn chỉnh

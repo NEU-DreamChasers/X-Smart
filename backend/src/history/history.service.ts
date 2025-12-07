@@ -1,157 +1,119 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 import { Injectable, Logger } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
-import { firstValueFrom } from 'rxjs';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, MoreThan } from 'typeorm';
+import { SensorHistory } from './entities/sensor-history.entity';
 
 @Injectable()
 export class HistoryService {
   private readonly logger = new Logger(HistoryService.name);
-  private readonly quantumLeapUrl: string;
 
   constructor(
-    private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
-  ) {
-    this.quantumLeapUrl = this.configService.get<string>('QUANTUMLEAP_URL', 'http://quantumleap:8668');
-  }
+    @InjectRepository(SensorHistory)
+    private historyRepo: Repository<SensorHistory>,
+  ) {}
 
-  async getEntitiesByType(type: string, limit: number) {
+  // --- 1. HÀM GHI: Lưu dữ liệu từ Ingestion vào DB ---
+  async saveHistoryFromRaw(entityId: string, type: string, rawData: any) {
     try {
-      const url = `${this.quantumLeapUrl}/v2/entities?type=${type}&limit=${limit}`;
-      const response = await firstValueFrom(this.httpService.get(url));
-      return response.data;
+      const records: Partial<SensorHistory>[] = [];
+      
+      if (type.includes('openweathermap') && !type.includes('aqi')) {
+        if (rawData.main?.temp !== undefined) 
+            this.addRecord(records, entityId, 'temperature', rawData.main.temp);
+        if (rawData.main?.humidity !== undefined) 
+            this.addRecord(records, entityId, 'humidity', rawData.main.humidity);
+        if (rawData.rain?.['1h'] !== undefined)
+            this.addRecord(records, entityId, 'precipitation', rawData.rain['1h']);
+      }
+
+      if (type.includes('openweathermap_aqi')) {
+        const components = rawData.list?.[0]?.components;
+        const main = rawData.list?.[0]?.main;
+        
+        if (main?.aqi) this.addRecord(records, entityId, 'aqi', main.aqi);
+        if (components?.pm2_5) this.addRecord(records, entityId, 'pm25', components.pm2_5);
+        if (components?.co) this.addRecord(records, entityId, 'co', components.co);
+      }
+
+      if (type === 'OffStreetParking') {
+         // Với Parking, rawData chính là payload update của bạn
+         if (rawData.availableSpotNumber?.value !== undefined) {
+             this.addRecord(records, entityId, 'availableSpotNumber', rawData.availableSpotNumber.value);
+         }
+      }
+
+      if (records.length > 0) {
+        await this.historyRepo.save(records);
+      }
+
     } catch (error) {
-      this.logger.error(`Failed to get entities: ${error}`);
-      throw error;
+      this.logger.error(`Lỗi lưu lịch sử: ${(error as any).message}`);
     }
   }
 
-  async getAttributeHistory(
-    entityId: string,
-    attrName: string,
-    options: { lastN?: number; fromDate?: string; toDate?: string },
-  ) {
-    try {
-      let url = `${this.quantumLeapUrl}/v2/entities/${encodeURIComponent(entityId)}/attrs/${attrName}?`;
-
-      if (options.lastN) url += `lastN=${options.lastN}&`;
-      if (options.fromDate) url += `fromDate=${options.fromDate}&`;
-      if (options.toDate) url += `toDate=${options.toDate}&`;
-
-      const response = await firstValueFrom(this.httpService.get(url));
-      return response.data;
-    } catch (error) {
-      this.logger.error(`Failed to get attribute history: ${error}`);
-      throw error;
-    }
+  // Helper để push vào mảng gọn hơn
+  private addRecord(list: any[], entityId: string, name: string, value: any) {
+    list.push({ entityId, attributeName: name, value: Number(value) });
   }
 
-  async getWeatherHistory(entityId: string, lastN: number) {
-    try {
-      const url = `${this.quantumLeapUrl}/v2/entities/${encodeURIComponent(entityId)}?lastN=${lastN}`;
-      const response = await firstValueFrom(this.httpService.get(url));
-      return response.data;
-    } catch (error) {
-      this.logger.error(`Failed to get weather history: ${error}`);
-      throw error;
+
+  // --- 2. HÀM ĐỌC: Lấy dữ liệu vẽ biểu đồ ---
+  async getChartData(location: string, attrName: string, hours: number = 24) {
+    let entityId = location;
+    if (!location.startsWith('urn:ngsi-ld:')) {
+       entityId = location; 
     }
-  }
 
-  async getAirQualityHistory(entityId: string, lastN: number) {
-    try {
-      const url = `${this.quantumLeapUrl}/v2/entities/${encodeURIComponent(entityId)}?lastN=${lastN}`;
-      const response = await firstValueFrom(this.httpService.get(url));
-      return response.data;
-    } catch (error) {
-      this.logger.error(`Failed to get air quality history: ${error}`);
-      throw error;
-    }
-  }
+    const since = new Date();
+    since.setHours(since.getHours() - hours);
 
-  async getTemperatureChartData(location: string, hours: number) {
-    const entityId = `urn:ngsi-ld:WeatherObserved:OpenWeatherMap:${location}`;
-    const data = await this.getAttributeHistory(entityId, 'temperature', { lastN: hours });
-
-    // Transform to Chart.js format
-    const labels = data.index || [];
-    const values = data.values || [];
+    const data = await this.historyRepo
+      .createQueryBuilder('h')
+      .select("date_trunc('hour', h.observedAt)", 'time')
+      .addSelect('AVG(h.value)', 'value')                 
+      .where('h.entityId = :entityId', { entityId })
+      .andWhere('h.attributeName = :attrName', { attrName })
+      .andWhere('h.observedAt > :since', { since })
+      .groupBy('time')
+      .orderBy('time', 'ASC')
+      .getRawMany()
 
     return {
-      labels: labels.map((timestamp: string) =>
-        new Date(timestamp).toLocaleString('vi-VN', {
-          hour: '2-digit',
-          minute: '2-digit',
-          day: '2-digit',
-          month: '2-digit',
-        }),
-      ),
-      datasets: [
-        {
-          label: 'Nhiệt độ (°C)',
-          data: values,
-          borderColor: 'rgb(255, 99, 132)',
-          backgroundColor: 'rgba(255, 99, 132, 0.2)',
-        },
-      ],
+      labels: data.map((d) => {
+        const date = new Date(d.time);
+        return date.toLocaleString('vi-VN', { 
+          hour: '2-digit', 
+          minute: '2-digit', 
+          day: '2-digit', 
+          month: '2-digit' 
+        });
+      }),
+      datasets: [{
+        label: attrName.toUpperCase(),
+        data: data.map(d => d.value),
+        borderColor: 'rgb(53, 162, 235)',
+        backgroundColor: 'rgba(53, 162, 235, 0.5)',
+        tension: 0.3
+      }]
     };
   }
-
-  async getAQIChartData(location: string, hours: number) {
-    const entityId = `urn:ngsi-ld:AirQualityObserved:OpenWeatherMap:AirQuality:${location}`;
-    const pm25Data = await this.getAttributeHistory(entityId, 'pm25', { lastN: hours });
-
-    const labels = pm25Data.index || [];
-    const pm25Values = pm25Data.values || [];
-
-    return {
-      labels: labels.map((timestamp: string) =>
-        new Date(timestamp).toLocaleString('vi-VN', {
-          hour: '2-digit',
-          minute: '2-digit',
-          day: '2-digit',
-          month: '2-digit',
-        }),
-      ),
-      datasets: [
-        {
-          label: 'PM2.5 (µg/m³)',
-          data: pm25Values,
-          borderColor: 'rgb(54, 162, 235)',
-          backgroundColor: 'rgba(54, 162, 235, 0.2)',
-        },
-      ],
-    };
+  
+  async getTemperatureChartData(id: string, hours: number) {
+      return this.getChartData(id, 'temperature', hours);
   }
 
-  async getPrecipitationChartData(location: string, hours: number) {
-    const entityId = `urn:ngsi-ld:WeatherObserved:OpenWeatherMap:${location}`;
-    const data = await this.getAttributeHistory(entityId, 'precipitation', { lastN: hours });
+  async getAQIChartData(id: string, hours: number) {
+      return this.getChartData(id, 'pm25', hours);
+  }
 
-    const labels = data.index || [];
-    const values = data.values || [];
-
-    return {
-      labels: labels.map((timestamp: string) =>
-        new Date(timestamp).toLocaleString('vi-VN', {
-          hour: '2-digit',
-          minute: '2-digit',
-          day: '2-digit',
-          month: '2-digit',
-        }),
-      ),
-      datasets: [
-        {
-          label: 'Lượng mưa (mm)',
-          data: values,
-          backgroundColor: 'rgba(75, 192, 192, 0.6)',
-          borderColor: 'rgb(75, 192, 192)',
-          borderWidth: 1,
-        },
-      ],
-    };
+  async getPrecipitationChartData(id: string, hours: number) {
+      return this.getChartData(id, 'precipitation', hours);
   }
 }

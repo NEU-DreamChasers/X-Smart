@@ -149,3 +149,7 @@ backend/.env
 
 # Database data
 /db
+
+# MinIO Data
+minio_data/
+.minio.sys/

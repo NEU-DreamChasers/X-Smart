@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 'use client';
 
 import React, { useState, ChangeEvent, FormEvent, useEffect } from 'react';
@@ -191,10 +198,12 @@ export default function CitizenReportForm({ onSuccess }: Props) {
           </div>
 
           <div className="space-y-2">
+            {/* SỬA: Luôn hiện dấu sao bắt buộc */}
             <label className="text-sm font-medium text-gray-900">
               Số điện thoại liên hệ <span className="text-red-500">*</span>
             </label>
             <div className="relative">
+              {/* SỬA: Xóa thuộc tính disabled và cập nhật placeholder */}
               <input
                 type="tel"
                 value={formData.phoneNumber}
