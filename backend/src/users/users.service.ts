@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 // src/users/users.service.ts
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -49,10 +56,10 @@ export class UsersService implements OnModuleInit {
 
         const admin = this.usersRepository.create({
           username: 'admin',
-          email: 'admin@x-smart.system', // Thêm email giả để tránh null
+          email: 'admin@x-smart.system',
           passwordHash,
-          role: UserRole.ADMIN, // <--- 4. QUAN TRỌNG: Dùng Enum
-          provider: 'local',    // Đánh dấu là tài khoản nội bộ
+          role: UserRole.ADMIN,
+          provider: 'local',
         });
 
         await this.usersRepository.save(admin);
@@ -61,7 +68,7 @@ export class UsersService implements OnModuleInit {
         console.log('Tài khoản Admin đã tồn tại.');
       }
     } catch (error) {
-      console.error('❌ LỖI KHỞI TẠO ADMIN:', error);
+      console.error(' LỖI KHỞI TẠO ADMIN:', error);
     }
   }
 }

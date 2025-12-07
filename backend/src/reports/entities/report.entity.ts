@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { User } from 'src/users/user.entity'; // Kiểm tra đúng đường dẫn file User của bạn
 import type { Point } from 'geojson';
@@ -21,10 +28,10 @@ export class Report {
     description: string;
 
     @Column({ nullable: true })
-    address: string; // Địa chỉ text (VD: 123 Giải Phóng)
+    address: string;
 
     @Column({ nullable: true })
-    imageUrl: string; // Vẫn giữ cột này, nhưng tạm thời cho phép null
+    imageUrl: string;
 
     // --- VỊ TRÍ BẢN ĐỒ (PostGIS) ---
     @Index({ spatial: true })
@@ -44,6 +51,9 @@ export class Report {
     status: ReportStatus;
 
     // --- NGƯỜI GỬI ---
+    @Column({ nullable: true })
+    userId: number;
+
     @ManyToOne(() => User, (user) => user.reports, { nullable: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'userId' })
     user: User;

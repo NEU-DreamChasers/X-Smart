@@ -1,19 +1,22 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 import axios from 'axios';
-import { create } from 'domain';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
-// THÊM: export const api để report.service.ts có thể dùng chung
 export const api = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
-// 1. Interceptor: Tự động gắn Token vào Header
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('access_token');
-      // Backend của bạn dùng Bearer Token
+      const token = localStorage.getItem('accessToken');
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -23,20 +26,14 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 2. Interceptor: Xử lý lỗi chung
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('API Error Detail:', JSON.stringify(error.response?.data, null, 2));
-    const message = error.response?.data?.message;
-    if (Array.isArray(message)) {
-        console.error('Validation Error:', message[0]);
-    }
+    console.error('API Error:', error.response?.data?.message || error.message);
     return Promise.reject(error);
   }
 );
 
-// Helper: Chuyển đổi dữ liệu NGSI-LD sang Object phẳng cho UI
 const parseNgsi = (item: any) => {
   if (!item) return null;
   const result: any = { id: item.id, type: item.type };
@@ -52,86 +49,96 @@ const parseNgsi = (item: any) => {
   return result;
 };
 
+// --- HELPER: Create GetAll ---
 const createNgsiGetAll = (domain: string) => 
   async (limit?: number, offset?: number): Promise<{ data: any[]; totalCount: number }> => {
     const url = `/${domain}/status`;
     const params: any = {};
-
     if (limit !== undefined) {
-      params.limit = limit;
-      params.count = 'true';
+        params.limit = limit;
+        params.count = 'true';
     }
-    if (offset !== undefined) {
-      params.offset = offset;
-    }
+    if (offset !== undefined) params.offset = offset;
 
-    const res = await api.get(url, { params });
-    
-    const totalCount = parseInt(res.headers['ngsild-results-count'] || res.headers['x-total-count'] || '0', 10);
-    
-    return {
-        data: Array.isArray(res.data) ? res.data.map(parseNgsi) : [],
-        totalCount: totalCount,
-    };
+    try {
+      const res = await api.get(url, { params });
+      const totalCount = parseInt(res.headers['ngsild-results-count'] || res.headers['x-total-count'] || '0', 10);
+      const parsedData = Array.isArray(res.data) ? res.data.map(parseNgsi) : [];
+      return { data: parsedData, totalCount };
+    } catch (error) {
+      console.error(`Error fetching ${domain}:`, error);
+      return { data: [], totalCount: 0 };
+    }
   };
 
 export const ApiService = {
-  // --- QUẢN LÝ SOURCES (Cảm biến / Nguồn dữ liệu) ---
-  sources: {
-    getAll: async (limit?: number, offset?: number): Promise<{ data: any[]; totalCount: number }> => {
-      const params: any = {};
-      if (limit !== undefined) params.limit = limit;
-      if (offset !== undefined) params.offset = offset;
-      
-      const res = await api.get('/sources', { params });
-      
-      const totalCount = parseInt(res.headers['x-total-count'] || '0', 10);
-      
-      return {
-          data: res.data, 
-          totalCount: totalCount,
-      };
-    },
-    getOne: async (id: string) => {
-      const res = await api.get(`/sources/${id}`);
-      return res.data;
-    },
-    create: async (data: any) => {
-      const res = await api.post('/sources', data);
-      return res.data;
-    },
-    update: async (id: string, data: any) => {
-      const res = await api.patch(`/sources/${id}`, data);
-      return res.data;
-    },
-    delete: async (id: string) => {
-      const res = await api.delete(`/sources/${id}`);
-      return res.data;
-    },
+  map: {
+    searchNearby: async (lat: number, lon: number, radius: number = 5000) => {
+       try {
+         const res = await api.get('/map/search-nearby', { params: { lat, lon, radius } });
+         return res.data; 
+       } catch (error) {
+         return [];
+       }
+    }
   },
 
-  // --- DỮ LIỆU NGSI-LD ---
+  sources: {
+    getAll: async (limit?: number, offset?: number) => {
+      const res = await api.get('/sources', { params: { limit, offset } });
+      return { data: res.data, totalCount: parseInt(res.headers['x-total-count'] || '0', 10) };
+    },
+    getOne: (id: string) => api.get(`/sources/${id}`).then(res => res.data),
+    create: (data: any) => api.post('/sources', data).then(res => res.data),
+    update: (id: string, data: any) => api.patch(`/sources/${id}`, data).then(res => res.data),
+    delete: (id: string) => api.delete(`/sources/${id}`).then(res => res.data),
+  },
+
   weather: {
     getAll: createNgsiGetAll('weather'),
-    create: (id: string, data: any) =>
-      api.post(`/weather/status/${id}`, data, { params: { type: 'openweathermap' } }),
-    delete: (id: string) => api.delete(`/weather/status/${id}`),
+    getForecast: (entityId: string) => 
+      api.get(`/weather/forecast`, { params: { entityId } }).then(res => res.data),
   },
-
   air: {
     getAll: createNgsiGetAll('air'),
-    create: (id: string, data: any) =>
-      api.post(`/air/status/${id}`, data, { params: { type: 'openweathermap_aqi' } }),
-    delete: (id: string) => api.delete(`/air/status/${id}`),
   },
-
   bus: {
     getAll: createNgsiGetAll('bus'),
-    delete: (id: string) => api.delete(`/bus/status/${id}`),
   },
-
   parking: {
     getAll: createNgsiGetAll('parking'),
-    delete: (id: string) => api.delete(`/parking/status/${id}`),
   },
+
+  history: {
+    getTemperatureChart: async (location: string) => {
+        try { const res = await api.get(`/history/chart/temperature/${location}`); return res.data; } catch (e) { return []; }
+    },
+    getAqiChart: async (location: string) => {
+        try { const res = await api.get(`/history/chart/aqi/${location}`); return res.data; } catch (e) { return []; }
+    },
+    getRainChart: async (location: string) => {
+        try { const res = await api.get(`/history/chart/precipitation/${location}`); return res.data; } catch (e) { return []; }
+    }
+  },
+
+  reports: {
+    getMyReports: async () => {
+        try {
+            const res = await api.get('/reports/my-reports');
+            return { 
+                data: Array.isArray(res.data) ? res.data : [], 
+                totalCount: Array.isArray(res.data) ? res.data.length : 0 
+            };
+        } catch (error) {
+            console.warn('Lỗi lấy báo cáo:', error);
+            return { data: [], totalCount: 0 };
+        }
+    },
+    create: async (formData: FormData) => {
+        const res = await api.post('/reports', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return res.data;
+    }
+  }
 };

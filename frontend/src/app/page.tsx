@@ -1,9 +1,16 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CitizenDashboard } from '../components/CitizenDashboard';
-import { AdminDashboard } from '../components/AdminDashboard';
+import { CitizenDashboard } from '../components/citizen/CitizenDashboard';
+import { AdminDashboard } from '../components/admin/AdminDashboard';
 
 export type UserRole = 'citizen' | 'admin' | 'guest' | null;
 

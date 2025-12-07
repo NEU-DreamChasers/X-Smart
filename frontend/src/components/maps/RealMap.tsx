@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -7,7 +14,6 @@ import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 
-// Import Routing Machine an toàn cho SSR
 if (typeof window !== 'undefined') {
   require('leaflet-routing-machine');
 }
@@ -36,19 +42,14 @@ export interface NgsiEntity {
 }
 
 interface RealMapProps {
-  // domain và searchTerm thành optional để Admin không bắt buộc phải truyền
   domain?: string;
   searchTerm?: string;
   onDataLoaded?: (count: number, loading: boolean) => void;
   center?: [number, number];
-  zoom?: number; // Thêm prop zoom
+  zoom?: number;
   searchMarker?: [number, number] | null;
-  
-  // Props cho Routing
   routeCoordinates?: { start: [number, number]; end: [number, number] } | null;
   onSelectEntity?: (entity: NgsiEntity) => void; 
-  
-  // MỚI: Cho phép truyền dữ liệu trực tiếp (Dùng cho Admin)
   entities?: NgsiEntity[];
 }
 
@@ -58,7 +59,6 @@ function RoutingMachine({ routeCoords }: { routeCoords: { start: [number, number
 
   useEffect(() => {
     if (!routeCoords || !map) return;
-
     // @ts-ignore
     const routingControl = L.Routing.control({
       waypoints: [
@@ -86,14 +86,13 @@ function RoutingMachine({ routeCoords }: { routeCoords: { start: [number, number
 const DOMAIN_CONFIG: Record<string, { color: string, icon: any }> = {
   weather: { color: '#f97316', icon: <CloudSun size={20} color="white" /> },
   air: { color: '#10b981', icon: <Wind size={20} color="white" /> },
-  parking: { color: '#2563eb', icon: <Car size={20} color="white" /> },
+  parking: { color: '#2563eb', icon: <Car size={18} color="white" /> },
   bus: { color: '#4f46e5', icon: <Bus size={20} color="white" /> },
   poi: { color: '#7c3aed', icon: <Store size={20} color="white" /> },
   traffic: { color: '#dc2626', icon: <Navigation size={20} color="white" /> },
   default: { color: '#4b5563', icon: <MapPin size={20} color="white" /> },
 };
 
-// Map từ Entity Type (Admin) sang Domain Key (Config)
 const getTypeDomain = (type: string, defaultDomain: string = 'default') => {
   const t = type.toLowerCase();
   if (t.includes('bus')) return 'bus';
@@ -104,8 +103,57 @@ const getTypeDomain = (type: string, defaultDomain: string = 'default') => {
   return defaultDomain;
 };
 
-const createCustomIcon = (domain: string) => {
+const createCustomIcon = (domain: string, entity?: any) => {
   const config = DOMAIN_CONFIG[domain] || DOMAIN_CONFIG.default;
+
+  if (domain === 'parking' && entity) {
+    const available = entity.availableSpotNumber?.value ?? entity.availableSpotNumber ?? 0;
+    const bgColor = available === 0 ? '#ef4444' : (available < 10 ? '#f59e0b' : config.color); 
+
+    const iconHtml = renderToStaticMarkup(
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: bgColor,
+        padding: '4px 8px',
+        borderRadius: '20px', 
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)',
+        border: '2px solid white',
+        minWidth: '50px',
+        position: 'relative',
+        transform: 'translateY(-10px)' 
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {config.icon}
+          <span style={{ 
+            color: 'white', 
+            fontWeight: '800', 
+            fontSize: '14px',
+            lineHeight: '1',
+            paddingTop: '1px' 
+          }}>
+            {available}
+          </span>
+        </div>
+        
+        <div style={{
+          position: 'absolute',
+          bottom: '-5px',
+          left: '50%',
+          transform: 'translateX(-50%) rotate(45deg)',
+          width: '10px',
+          height: '10px',
+          backgroundColor: bgColor,
+          borderRight: '2px solid white',
+          borderBottom: '2px solid white',
+          zIndex: -1
+        }}></div>
+      </div>
+    );
+    return L.divIcon({ html: iconHtml, className: '', iconSize: [60, 40], iconAnchor: [30, 40], popupAnchor: [0, -45] });
+  }
+
   const iconHtml = renderToStaticMarkup(
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -145,24 +193,22 @@ function MapController({ center, zoom }: { center?: [number, number], zoom?: num
 
 export default function RealMap({ 
   domain = 'default', 
-  searchTerm = '', // Fix lỗi: Mặc định là rỗng để tránh undefined
+  searchTerm = '',
   onDataLoaded, 
   center, 
   zoom = 13,
   searchMarker, 
   routeCoordinates, 
   onSelectEntity,
-  entities: externalEntities // Nhận entities từ bên ngoài (Admin)
+  entities: externalEntities 
 }: RealMapProps) {
   
   const [internalEntities, setInternalEntities] = useState<NgsiEntity[]>([]);
 
-  // Quyết định dùng nguồn dữ liệu nào: Bên ngoài truyền vào (Admin) hay Tự fetch (Client)
   const isExternalMode = !!externalEntities;
   const activeEntities = isExternalMode ? externalEntities : internalEntities;
 
   const fetchEntities = async () => {
-    // Nếu có external entities hoặc không có domain cụ thể thì không tự fetch
     if (isExternalMode || !domain || domain === 'default') return;
 
     if (onDataLoaded) onDataLoaded(0, true);
@@ -183,7 +229,6 @@ export default function RealMap({
 
   useEffect(() => {
     fetchEntities();
-    // Chỉ auto-refresh nếu đang ở chế độ tự fetch
     if (!isExternalMode) {
         const interval = setInterval(fetchEntities, 30000);
         return () => clearInterval(interval);
@@ -192,11 +237,10 @@ export default function RealMap({
 
   const filteredEntities = useMemo(() => {
     let result = activeEntities || [];
-    // Fix lỗi: Kiểm tra searchTerm tồn tại trước khi trim
     if (searchTerm && searchTerm.trim()) {
       const lowerTerm = searchTerm.toLowerCase();
       result = result.filter(entity => {
-        const name = String(entity.name?.value || entity.name || '').toLowerCase(); // Handle structure differences
+        const name = String(entity.name?.value || entity.name || '').toLowerCase(); 
         return name.includes(lowerTerm);
       });
     }
@@ -259,14 +303,11 @@ export default function RealMap({
         disableClusteringAtZoom={16}
       >
       {filteredEntities.map((entity) => {
-        // Xử lý sự khác biệt cấu trúc giữa API NGSI-LD và dữ liệu Admin đã map
         let position: [number, number] | null = null;
         
-        // Trường hợp 1: Dữ liệu từ Admin (đã xử lý thành mảng [lat, lon])
         if (Array.isArray(entity.location) && entity.location.length === 2 && typeof entity.location[0] === 'number') {
              position = entity.location as [number, number];
         } 
-        // Trường hợp 2: Dữ liệu NGSI-LD chuẩn (GeoJSON [lon, lat])
         else if (entity.location?.value?.type === 'Point') {
             const coords = entity.location.value.coordinates;
             position = [coords[1], coords[0]];
@@ -277,9 +318,10 @@ export default function RealMap({
         const rawAddress = entity.address?.value?.streetAddress || entity.address?.value || entity.address || 'Đang cập nhật';
         const displayName = getValue(entity.name) !== 'N/A' ? getValue(entity.name) : (entity.name || entity.id);
 
-        // Chọn icon: Nếu là External Mode (Admin), chọn theo Type của entity. Nếu không, dùng domain chung.
         const iconDomain = isExternalMode ? getTypeDomain(entity.type) : domain;
-        const icon = createCustomIcon(iconDomain);
+        
+        // --- UPDATE: Truyền entity vào createCustomIcon ---
+        const icon = createCustomIcon(iconDomain, entity);
 
         return (
           <Marker 
