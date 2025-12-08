@@ -176,41 +176,60 @@ export function CitizenEnvironment() {
 
   const getVal = (prop: any) => (prop?.value !== undefined ? prop.value : (prop ?? 0));
 
+  // --- SỬA LỖI DỊCH THUẬT ---
   const translateWeather = (type: string) => {
+      if (!type) return 'Đang cập nhật';
+      
+      const lowerType = type.toLowerCase();
+      
+      // Map các trường hợp phổ biến từ API OpenWeatherMap
       const map: Record<string, string> = {
-          'Clear': 'Quang đãng',
-          'Clouds': 'Có mây',
-          'Rain': 'Mưa',
-          'Drizzle': 'Mưa phùn',
-          'Thunderstorm': 'Dông bão',
-          'Mist': 'Sương mù'
+          'clear': 'Quang đãng',
+          'clear sky': 'Trời quang',
+          'clouds': 'Có mây',
+          'few clouds': 'Ít mây',
+          'scattered clouds': 'Mây rải rác',
+          'broken clouds': 'Mây nhiều',
+          'overcast clouds': 'Trời âm u',
+          'rain': 'Mưa',
+          'light rain': 'Mưa nhỏ',
+          'moderate rain': 'Mưa vừa',
+          'heavy intensity rain': 'Mưa to',
+          'drizzle': 'Mưa phùn',
+          'thunderstorm': 'Dông bão',
+          'mist': 'Sương mù',
+          'haze': 'Sương mù nhẹ',
+          'fog': 'Sương dày'
       };
-      return map[type] || type || 'Bình thường';
+
+      // Trả về kết quả dịch hoặc trả về giá trị gốc nếu không tìm thấy (có viết hoa chữ cái đầu)
+      return map[lowerType] || (type.charAt(0).toUpperCase() + type.slice(1));
   };
 
   const displayConditions = weather ? [
     { 
       name: 'Thời tiết', 
-      value: translateWeather(weather.weatherType), 
+      // Gọi hàm translateWeather để dịch giá trị
+      value: translateWeather(weather.weatherType?.value || weather.weatherType), 
       status: `Cập nhật: ${new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}`, 
       icon: Sun, color: '#f59e0b', bgColor: '#fef3c7' 
     },
     { 
       name: 'Nhiệt độ', 
-      value: `${(weather.temperature ?? 0).toFixed(1)}°C`, 
+      value: `${(weather.temperature?.value ?? weather.temperature ?? 0).toFixed(1)}°C`, 
       status: 'Hiện tại', 
       icon: Thermometer, color: '#f54900', bgColor: '#ffedd4' 
     },
     { 
       name: 'Độ ẩm', 
-      value: `${weather.relativeHumidity ?? 0}%`, 
-      status: (weather.relativeHumidity > 80) ? 'Ẩm ướt' : 'Thoải mái', 
+      value: `${weather.relativeHumidity?.value ?? weather.relativeHumidity ?? 0}%`, 
+      status: ((weather.relativeHumidity?.value ?? weather.relativeHumidity ?? 0) > 80) ? 'Ẩm ướt' : 'Thoải mái', 
       icon: Droplets, color: '#0092b8', bgColor: '#cefafe' 
     },
     { 
       name: 'Lượng mưa', 
-      value: `${weather.precipitation ?? 0} mm`, 
-      status: (weather.precipitation > 0) ? 'Đang mưa' : 'Không mưa', 
+      value: `${weather.precipitation?.value ?? weather.precipitation ?? 0} mm`, 
+      status: ((weather.precipitation?.value ?? weather.precipitation ?? 0) > 0) ? 'Đang mưa' : 'Không mưa', 
       icon: CloudRain, color: '#3b82f6', bgColor: '#eff6ff' 
     },
   ] : [];
@@ -284,6 +303,9 @@ export function CitizenEnvironment() {
                   </div>
                 </div>
                 <p className="text-sm text-gray-500 mb-1">{condition.name}</p>
+                {/* Giữ nguyên style nhưng xóa class 'capitalize' nếu muốn hiển thị tiếng Việt chuẩn ngữ pháp.
+                   Nếu giữ 'capitalize' thì "Mưa nhỏ" sẽ thành "Mưa Nhỏ".
+                */}
                 <p className="text-2xl mb-2 font-semibold capitalize" style={{ color: condition.color }}>{condition.value}</p>
                 <div className="inline-block px-2 py-1 rounded-[8px] text-xs font-medium bg-gray-50 text-gray-800 border border-gray-100">
                   {condition.status}
@@ -380,8 +402,9 @@ export function CitizenEnvironment() {
                                     className="w-20 h-20 -my-2 drop-shadow-sm filter"
                                 />
                                 <p className={`text-4xl font-extrabold mb-2 mt-1 ${isFirst ? 'text-white' : 'text-slate-800'}`}>{temp}°</p>
+                                {/* Dịch mô tả dự báo thời tiết */}
                                 <p className={`text-sm font-medium capitalize leading-tight h-10 flex items-center justify-center line-clamp-2 ${isFirst ? 'text-blue-50' : 'text-slate-500'}`}>
-                                    {desc}
+                                    {translateWeather(desc)}
                                 </p>
                             </div>
                         );

@@ -29,20 +29,16 @@ interface SimpleBarChartProps {
 export function SimpleBarChart({ data, xAxisKey, bars, height = 250 }: SimpleBarChartProps) {
   const [hoveredBar, setHoveredBar] = useState<{ index: number; bar: string } | null>(null);
 
-
   const chartWidth = 600;
+  const chartHeight = height;
   const padding = { top: 20, right: 30, bottom: 30, left: 40 };
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
+  
   const allValues = bars.flatMap(bar => 
     data.map(d => Number(d[bar.dataKey]) || 0)
   );
   const maxValue = Math.max(...allValues, 1);
-  const gridLineCount = 5;
-  const gridValues = Array.from({ length: gridLineCount }, (_, i) => {
-    const value = (maxValue / (gridLineCount - 1)) * i;
-    return Math.round(value);
-  });
 
   const barGroupWidth = innerWidth / data.length;
   const barWidth = barGroupWidth / (bars.length + 1);
@@ -50,6 +46,10 @@ export function SimpleBarChart({ data, xAxisKey, bars, height = 250 }: SimpleBar
   const yScale = (value: number) => {
     const normalized = value / maxValue;
     return padding.top + innerHeight - normalized * innerHeight;
+  };
+
+  const xScale = (index: number) => {
+    return padding.left + (index + 0.5) * barGroupWidth;
   };
 
   // Grid Lines
