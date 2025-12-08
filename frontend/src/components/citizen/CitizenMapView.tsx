@@ -107,6 +107,12 @@ export function CitizenMapView() {
     fetchSuggestions();
   }, [debouncedQuery]);
 
+  const getVal = (prop: any) => {
+    if (prop === undefined || prop === null) return undefined;
+    if (typeof prop === 'object' && prop !== null && 'value' in prop) return prop.value;
+    return prop;
+  };
+
   // --- HANDLER: CHỌN GỢI Ý ---
   const handleSelectSuggestion = (item: any) => {
     const lat = parseFloat(item.lat);
@@ -315,11 +321,11 @@ export function CitizenMapView() {
 
                 {/* PHÂN LOẠI GIAO DIỆN */}
                 {(() => {
-                  const isWeather = selectedRealEntity.type?.includes('Weather') || selectedRealEntity.temperature?.value !== undefined;
-                  const isAir = selectedRealEntity.type?.includes('Air') || selectedRealEntity.airQualityIndex !== undefined;
+                  const isWeather = selectedRealEntity.type?.includes('Weather') || getVal(selectedRealEntity.temperature) !== undefined;
+                  const isAir = selectedRealEntity.type?.includes('Air') || getVal(selectedRealEntity.airQualityIndex) !== undefined;
 
                   if (isWeather) {
-                    const temp = selectedRealEntity.temperature?.value ?? 25;
+                    const temp = Number(getVal(selectedRealEntity.temperature) ?? 25);
                     const getTempColors = (temperature: number) => {
                       if (temperature >= 35) return { gradient: 'from-red-500 to-orange-600', shadow: 'shadow-red-200', text: 'text-red-100', icon: '🔥' };
                       if (temperature >= 30) return { gradient: 'from-orange-400 to-amber-500', shadow: 'shadow-orange-200', text: 'text-orange-100', icon: '☀️' };
@@ -342,7 +348,7 @@ export function CitizenMapView() {
                             </p>
                             <div className="flex items-end gap-2 mt-1">
                               <span className="text-6xl font-bold tracking-tighter">
-                                {selectedRealEntity.temperature?.value ?? '--'}
+                                {getVal(selectedRealEntity.temperature) ?? '--'}
                               </span>
                               <span className="text-3xl font-medium mb-2">°C</span>
                             </div>
@@ -360,7 +366,7 @@ export function CitizenMapView() {
                               <span className="text-sm font-bold">Độ ẩm</span>
                             </div>
                             <p className="text-2xl font-bold text-gray-800">
-                              {selectedRealEntity.humidity?.value ?? selectedRealEntity.relativeHumidity?.value ?? '--'}%
+                              {getVal(selectedRealEntity.humidity) ?? getVal(selectedRealEntity.relativeHumidity) ?? '--'}%
                             </p>
                           </div>
 
@@ -370,18 +376,18 @@ export function CitizenMapView() {
                               <span className="text-sm font-bold">Gió</span>
                             </div>
                             <p className="text-2xl font-bold text-gray-800">
-                              {selectedRealEntity.windSpeed?.value ?? '--'} <span className="text-sm font-normal text-gray-500">m/s</span>
+                              {getVal(selectedRealEntity.windSpeed) ?? '--'} <span className="text-sm font-normal text-gray-500">m/s</span>
                             </p>
                           </div>
                           
-                          {selectedRealEntity.rain?.value !== undefined && (
+                          {getVal(selectedRealEntity.rain) !== undefined && (
                              <div className="bg-indigo-50 p-4 rounded-[14px] border border-indigo-100 col-span-2">
                                 <div className="flex items-center gap-2 text-indigo-600 mb-1">
                                   <CloudSun className="w-5 h-5" />
                                   <span className="text-sm font-bold">Lượng mưa (1h)</span>
                                 </div>
                                 <p className="text-2xl font-bold text-gray-800">
-                                  {selectedRealEntity.rain.value} <span className="text-sm font-normal text-gray-500">mm</span>
+                                  {getVal(selectedRealEntity.rain)} <span className="text-sm font-normal text-gray-500">mm</span>
                                 </p>
                              </div>
                           )}
@@ -391,7 +397,7 @@ export function CitizenMapView() {
                   } 
                   
                   else if (isAir) {
-                    const aqi = selectedRealEntity.airQualityIndex?.value ?? selectedRealEntity.airQualityIndex ?? 1;
+                    const aqi = Number(getVal(selectedRealEntity.airQualityIndex) ?? 1);
                     const getAqiStatus = (val: number) => {
                       if (val === 1) return { color: 'from-emerald-400 to-green-600', text: 'Tốt', advice: 'Không khí trong lành, tuyệt vời cho hoạt động ngoài trời.', icon: '🌿' };
                       if (val === 2) return { color: 'from-yellow-400 to-orange-500', text: 'Trung bình', advice: 'Chất lượng chấp nhận được. Nhóm nhạy cảm nên hạn chế.', icon: '😐' };
@@ -433,25 +439,25 @@ export function CitizenMapView() {
                           <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
                             <p className="text-xs text-gray-500 mb-1">Bụi mịn PM2.5</p>
                             <p className="text-xl font-bold text-gray-800">
-                              {selectedRealEntity.pm25?.value ?? selectedRealEntity.pm25 ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                              {getVal(selectedRealEntity.pm25) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
                             </p>
                           </div>
                           <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
                             <p className="text-xs text-gray-500 mb-1">Bụi PM10</p>
                             <p className="text-xl font-bold text-gray-800">
-                              {selectedRealEntity.pm10?.value ?? selectedRealEntity.pm10 ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                              {getVal(selectedRealEntity.pm10) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
                             </p>
                           </div>
                           <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
                             <p className="text-xs text-gray-500 mb-1">Khí CO</p>
                             <p className="text-xl font-bold text-gray-800">
-                              {selectedRealEntity.co?.value ?? selectedRealEntity.co ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                              {getVal(selectedRealEntity.co) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
                             </p>
                           </div>
                           <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
                             <p className="text-xs text-gray-500 mb-1">Khí NO2</p>
                             <p className="text-xl font-bold text-gray-800">
-                              {selectedRealEntity.no2?.value ?? selectedRealEntity.no2 ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                              {getVal(selectedRealEntity.no2) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
                             </p>
                           </div>
                         </div>
