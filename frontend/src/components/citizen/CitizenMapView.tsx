@@ -791,99 +791,99 @@ export function CitizenMapView() {
                                         </div>
                                     )}
                                 </div>
-                             </div>
-                    );
-                  }
+                            </div>
+                            );
+                        }
 
-                  if (isAir) {
-                    const valAqi = getVal(selectedRealEntity.airQualityIndex);
-                    const aqi = Number(valAqi ?? 1);
+                        if (isAir) {
+                            const valAqi = getVal(selectedRealEntity.airQualityIndex);
+                            const aqi = Number(valAqi ?? 1);
 
-                    const getAqiStatus = (val: number) => {
-                      if (val === 1) return { color: 'from-emerald-400 to-green-600', text: 'Tốt', advice: 'Không khí trong lành, tuyệt vời cho hoạt động ngoài trời.', icon: '🌿' };
-                      if (val === 2) return { color: 'from-yellow-400 to-orange-500', text: 'Trung bình', advice: 'Chất lượng chấp nhận được. Nhóm nhạy cảm nên hạn chế.', icon: '😐' };
-                      if (val === 3) return { color: 'from-orange-500 to-red-500', text: 'Kém', advice: 'Người già và trẻ em nên hạn chế ra ngoài.', icon: '😷' };
-                      if (val === 4) return { color: 'from-red-600 to-rose-700', text: 'Xấu', advice: 'Cảnh báo: Có hại cho sức khỏe. Nên đeo khẩu trang.', icon: '🤢' };
-                      return { color: 'from-purple-600 to-indigo-800', text: 'Nguy hại', advice: 'Khẩn cấp: Tránh mọi hoạt động ngoài trời!', icon: '☠️' };
-                    };
-                    const status = getAqiStatus(aqi);
+                            const getAqiStatus = (val: number) => {
+                              if (val === 1) return { color: 'from-emerald-400 to-green-600', text: 'Tốt', advice: 'Không khí trong lành, tuyệt vời cho hoạt động ngoài trời.', icon: '🌿' };
+                              if (val === 2) return { color: 'from-yellow-400 to-orange-500', text: 'Trung bình', advice: 'Chất lượng chấp nhận được. Nhóm nhạy cảm nên hạn chế.', icon: '😐' };
+                              if (val === 3) return { color: 'from-orange-500 to-red-500', text: 'Kém', advice: 'Người già và trẻ em nên hạn chế ra ngoài.', icon: '😷' };
+                              if (val === 4) return { color: 'from-red-600 to-rose-700', text: 'Xấu', advice: 'Cảnh báo: Có hại cho sức khỏe. Nên đeo khẩu trang.', icon: '🤢' };
+                              return { color: 'from-purple-600 to-indigo-800', text: 'Nguy hại', advice: 'Khẩn cấp: Tránh mọi hoạt động ngoài trời!', icon: '☠️' };
+                            };
+                            const status = getAqiStatus(aqi);
 
-                    return (
-                      <div className="space-y-4">
-                        <div className={`bg-gradient-to-br ${status.color} rounded-[14px] p-6 text-white shadow-lg relative overflow-hidden`}>
-                          <div className="absolute top-[-20px] right-[-20px] opacity-20">
-                            <CloudFog size={120} />
-                          </div>
-                          <div className="relative z-10">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="text-white/80 text-sm font-bold uppercase tracking-wider">Chỉ số AQI</p>
-                                <div className="flex items-baseline gap-2">
-                                  <span className="text-6xl font-extrabold">{aqi}</span>
-                                  <span className="text-2xl font-medium">/ 5</span>
+                            return (
+                              <div className="space-y-4">
+                                <div className={`bg-gradient-to-br ${status.color} rounded-[14px] p-6 text-white shadow-lg relative overflow-hidden`}>
+                                  <div className="absolute top-[-20px] right-[-20px] opacity-20">
+                                    <CloudFog size={120} />
+                                  </div>
+                                  <div className="relative z-10">
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <p className="text-white/80 text-sm font-bold uppercase tracking-wider">Chỉ số AQI</p>
+                                        <div className="flex items-baseline gap-2">
+                                          <span className="text-6xl font-extrabold">{aqi}</span>
+                                          <span className="text-2xl font-medium">/ 5</span>
+                                        </div>
+                                      </div>
+                                      <span className="text-4xl">{status.icon}</span>
+                                    </div>
+                                    <div className="mt-2 pt-2 border-t border-white/20">
+                                      <p className="text-xl font-bold">{status.text}</p>
+                                      <p className="text-sm text-white/90 mt-1 flex gap-2">
+                                        <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                                        {status.advice}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Thành phần ô nhiễm</h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
+                                    <p className="text-xs text-gray-500 mb-1">Bụi mịn PM2.5</p>
+                                    <p className="text-xl font-bold text-gray-800">
+                                      {getVal(selectedRealEntity.pm25) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                                    </p>
+                                  </div>
+                                  <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
+                                    <p className="text-xs text-gray-500 mb-1">Bụi PM10</p>
+                                    <p className="text-xl font-bold text-gray-800">
+                                      {getVal(selectedRealEntity.pm10) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                                    </p>
+                                  </div>
+                                  <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
+                                    <p className="text-xs text-gray-500 mb-1">Khí CO</p>
+                                    <p className="text-xl font-bold text-gray-800">
+                                      {getVal(selectedRealEntity.co) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                                    </p>
+                                  </div>
+                                  <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
+                                    <p className="text-xs text-gray-500 mb-1">Khí NO2</p>
+                                    <p className="text-xl font-bold text-gray-800">
+                                      {getVal(selectedRealEntity.no2) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
-                              <span className="text-4xl">{status.icon}</span>
-                            </div>
-                            <div className="mt-2 pt-2 border-t border-white/20">
-                              <p className="text-xl font-bold">{status.text}</p>
-                              <p className="text-sm text-white/90 mt-1 flex gap-2">
-                                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                                {status.advice}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                            );
+                        }
 
-                        <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mt-2">Thành phần ô nhiễm</h4>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
-                            <p className="text-xs text-gray-500 mb-1">Bụi mịn PM2.5</p>
-                            <p className="text-xl font-bold text-gray-800">
-                              {getVal(selectedRealEntity.pm25) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
-                            </p>
-                          </div>
-                          <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
-                            <p className="text-xs text-gray-500 mb-1">Bụi PM10</p>
-                            <p className="text-xl font-bold text-gray-800">
-                              {getVal(selectedRealEntity.pm10) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
-                            </p>
-                          </div>
-                          <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
-                            <p className="text-xs text-gray-500 mb-1">Khí CO</p>
-                            <p className="text-xl font-bold text-gray-800">
-                              {getVal(selectedRealEntity.co) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
-                            </p>
-                          </div>
-                          <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
-                            <p className="text-xs text-gray-500 mb-1">Khí NO2</p>
-                            <p className="text-xl font-bold text-gray-800">
-                              {getVal(selectedRealEntity.no2) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <>
-                      <div className="bg-blue-50 rounded-[14px] p-4 mb-4 border border-blue-100">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-100 rounded-[10px]">
-                            <Navigation className="w-5 h-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900">Điều hướng thông minh</p>
-                            <p className="text-xs text-blue-600">
-                              {routeCoords ? 'Đang dẫn đường...' : 'Sẵn sàng tính toán lộ trình'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
+                        return (
+                          <>
+                            <div className="bg-blue-50 rounded-[14px] p-4 mb-4 border border-blue-100">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-100 rounded-[10px]">
+                                  <Navigation className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900">Điều hướng thông minh</p>
+                                  <p className="text-xs text-blue-600">
+                                    {routeCoords ? 'Đang dẫn đường...' : 'Sẵn sàng tính toán lộ trình'}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        );
+                        })()}
                         
                         {/* BUTTON MỞ MENU CHỈ ĐƯỜNG */}
                         <div className="mt-4 pt-4 border-t border-gray-100">
