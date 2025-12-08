@@ -9,7 +9,7 @@ LICENSE file in the root directory of this source tree.
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, User, Shield, Loader2, AlertCircle } from 'lucide-react';
+import { Building2, User, Shield, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -21,6 +21,7 @@ export function SimpleLogin() {
   const [activeTab, setActiveTab] = useState<'citizen' | 'admin'>('citizen');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
   const handleCitizenLogin = () => {
     setIsLoading(true);
     window.location.href = `${API_URL}/auth/google`;
@@ -63,6 +64,16 @@ export function SimpleLogin() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-xl">
+        
+        {/* Nút trở về trang chủ */}
+        <button 
+          onClick={() => router.push('/')}
+          className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors mb-8 font-medium"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span>Trở về trang chủ</span>
+        </button>
+
         {/* Logo and Title */}
         <div className="flex items-center gap-4 mb-12">
           <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
