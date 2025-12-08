@@ -267,9 +267,9 @@ const searchResultIcon = L.divIcon({
   className: '', iconSize: [48, 48], iconAnchor: [24, 48], popupAnchor: [0, -48]
 });
 
-function MapController({ center }: { center?: [number, number] }) {
+function MapController({ center, zoom }: { center?: [number, number]; zoom?: number }) {
   const map = useMap();
-  useEffect(() => { if (center) map.flyTo(center, 16, { duration: 1.5 }); }, [center, map]);
+  useEffect(() => { if (center) map.flyTo(center, zoom || 16, { duration: 1.5 }); }, [center, zoom, map]);
   return null;
 }
 
@@ -287,6 +287,13 @@ export default function RealMap({
 }: RealMapProps) {
   
   const [internalEntities, setInternalEntities] = useState<NgsiEntity[]>([]);
+
+  const getValue = (prop: any) => {
+    if (prop === undefined || prop === null) return 'N/A';
+    if (typeof prop === 'object' && prop.value !== undefined) return prop.value;
+    if (typeof prop === 'object' && Object.keys(prop).length === 0) return 'N/A';
+    return prop;
+  };
 
   const isExternalMode = !!externalEntities;
   const activeEntities = isExternalMode ? externalEntities : internalEntities;
@@ -343,7 +350,7 @@ export default function RealMap({
   };
 
   useEffect(() => {
-    if (propEntities) return;
+    if (isExternalMode) return;
     fetchEntities();
     if (!isExternalMode) {
         const interval = setInterval(fetchEntities, 30000);
@@ -370,23 +377,41 @@ export default function RealMap({
     return filteredEntities.map((entity) => {
       let position: [number, number] | null = null;
       
-      if (Array.isArray(entity.location) && entity.location.length === 2 && typeof entity.location[0] === 'number') {
-           position = entity.location as [number, number];
-      } 
-      else if (entity.location?.value?.type === 'Point') {
+      if (entity.location?.coordinates && Array.isArray(entity.location.coordinates)) {
+           const coords = entity.location.coordinates;
+           position = [coords[1], coords[0]];
+      }
+      else if (entity.location?.value?.coordinates && Array.isArray(entity.location.value.coordinates)) {
           const coords = entity.location.value.coordinates;
           position = [coords[1], coords[0]];
+      }
+      else if (Array.isArray(entity.location) && entity.location.length === 2 && typeof entity.location[0] === 'number') {
+           position = entity.location as [number, number];
       }
 
       if (!position) return null;
 
       
       // --- FIX: Xử lý địa chỉ "Unknown Street" ---
-      let rawVal = entity.address?.value?.streetAddress || entity.address?.value || entity.address;
-      if (typeof rawVal === 'string' && (rawVal === 'Unknown Street' || rawVal === 'Unknown')) {
-          rawVal = 'Đang cập nhật';
+      let rawAddress = '';
+
+      if (typeof entity.address === 'string') {
+          rawAddress = entity.address;
+      } 
+      else if (entity.address?.value) {
+          if (typeof entity.address.value === 'string') {
+              rawAddress = entity.address.value;
+          } else {
+              rawAddress = entity.address.value.streetAddress || entity.address.value.addressLocality || '';
+          }
+      } 
+      else if (typeof entity.address === 'object') {
+          rawAddress = entity.address.streetAddress || entity.address.addressLocality || '';
       }
-      const rawAddress = rawVal || 'Đang cập nhật';
+
+      if (!rawAddress || rawAddress === 'Unknown Street' || rawAddress === 'Unknown') {
+          rawAddress = 'Đang cập nhật';
+      }
       // ------------------------------------------
 
       const displayName = getValue(entity.name) !== 'N/A' ? getValue(entity.name) : (entity.name || entity.id);
@@ -404,14 +429,6 @@ export default function RealMap({
       };
     }).filter((item) => item !== null) as any[];
   }, [filteredEntities, domain, isExternalMode]);
-  }, [entitiesToRender, searchTerm, onDataLoaded]);
-
-  const getValue = (prop: any) => {
-  if (prop === undefined || prop === null) return 'N/A';
-  if (typeof prop === 'object' && prop.value !== undefined) return prop.value;
-  if (typeof prop === 'object' && Object.keys(prop).length === 0) return 'N/A';
-  return prop;
-};
 
   return (
     <MapContainer 

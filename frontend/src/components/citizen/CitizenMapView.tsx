@@ -380,6 +380,25 @@ export function CitizenMapView() {
     return `${hours} giờ ${remainMins} phút`;
   };
 
+  // Hàm giúp lấy địa chỉ dạng chuỗi an toàn tuyệt đối
+  const getSafeAddressString = (entity: any) => {
+    const addr = entity.address;
+    if (!addr) return '';
+
+    if (typeof addr === 'string') return addr;
+
+    if (addr.value) {
+        if (typeof addr.value === 'string') return addr.value;
+        return addr.value.streetAddress || addr.value.addressLocality || '';
+    }
+
+    if (typeof addr === 'object') {
+        return addr.streetAddress || addr.addressLocality || '';
+    }
+
+    return '';
+};
+
   return (
     <div className="space-y-6">
       <div 
@@ -513,7 +532,8 @@ export function CitizenMapView() {
                      <p className="text-sm text-gray-500 mt-2 flex items-start gap-2">
                         <MapPin className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" /> 
                         <span className="line-clamp-3 italic">
-                          {formatAddress((selectedRealEntity.address?.value?.streetAddress || selectedRealEntity.address?.value || selectedRealEntity.address || '').replace('Unknown Street', 'Đang cập nhật'))}
+                          {formatAddress(getSafeAddressString(selectedRealEntity).replace('Unknown Street', 'Đang cập nhật') || 'Đang cập nhật'
+                          )}  
                         </span>
                     </p>
                   )}
@@ -544,56 +564,6 @@ export function CitizenMapView() {
                                         <MousePointerClick className="w-3 h-3 inline mr-1" /> Chọn điểm
                                     </button>
                                 </div>
-                {/* PHÂN LOẠI GIAO DIỆN */}
-                {(() => {
-                  const isWeather = selectedRealEntity.type?.includes('Weather') || getVal(selectedRealEntity.temperature) !== undefined;
-                  const isAir = selectedRealEntity.type?.includes('Air') || getVal(selectedRealEntity.airQualityIndex) !== undefined;
-
-                  if (isWeather) {
-                    const temp = Number(getVal(selectedRealEntity.temperature) ?? 25);
-                    const getTempColors = (temperature: number) => {
-                      if (temperature >= 35) return { gradient: 'from-red-500 to-orange-600', shadow: 'shadow-red-200', text: 'text-red-100', icon: '🔥' };
-                      if (temperature >= 30) return { gradient: 'from-orange-400 to-amber-500', shadow: 'shadow-orange-200', text: 'text-orange-100', icon: '☀️' };
-                      if (temperature >= 25) return { gradient: 'from-yellow-400 to-orange-400', shadow: 'shadow-yellow-200', text: 'text-yellow-100', icon: '🌤️' };
-                      if (temperature >= 20) return { gradient: 'from-green-400 to-teal-500', shadow: 'shadow-green-200', text: 'text-green-100', icon: '🌿' };
-                      if (temperature >= 15) return { gradient: 'from-blue-400 to-cyan-500', shadow: 'shadow-blue-200', text: 'text-blue-100', icon: '❄️' };
-                      return { gradient: 'from-indigo-500 to-blue-600', shadow: 'shadow-indigo-200', text: 'text-indigo-100', icon: '🧊' };
-                    };
-                    const tempColors = getTempColors(temp);
-                    
-                    return (
-                      <div className="space-y-4">
-                        <div className={`bg-gradient-to-br ${tempColors.gradient} rounded-[14px] p-6 text-white shadow-lg ${tempColors.shadow} relative overflow-hidden`}>
-                          <div className="absolute top-[-20px] right-[-20px] opacity-20">
-                            <CloudSun size={120} />
-                          </div>
-                          <div className="relative z-10">
-                            <p className={`${tempColors.text} text-sm font-medium uppercase tracking-wider flex items-center gap-2`}>
-                              <span>{tempColors.icon}</span> Nhiệt độ hiện tại
-                            </p>
-                            <div className="flex items-end gap-2 mt-1">
-                              <span className="text-6xl font-bold tracking-tighter">
-                                {getVal(selectedRealEntity.temperature) ?? '--'}
-                              </span>
-                              <span className="text-3xl font-medium mb-2">°C</span>
-                            </div>
-                            <p className="mt-2 text-white/90 flex items-center gap-2 text-xs">
-                              <Activity className="w-4 h-4" /> 
-                              Cập nhật: {selectedRealEntity.dateObserved?.value ? new Date(selectedRealEntity.dateObserved.value).toLocaleTimeString() : 'Vừa xong'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-blue-50 p-4 rounded-[14px] border border-blue-100">
-                            <div className="flex items-center gap-2 text-blue-600 mb-1">
-                              <Droplets className="w-5 h-5" />
-                              <span className="text-sm font-bold">Độ ẩm</span>
-                            </div>
-                            <p className="text-2xl font-bold text-gray-800">
-                              {getVal(selectedRealEntity.humidity) ?? getVal(selectedRealEntity.relativeHumidity) ?? '--'}%
-                            </p>
-                          </div>
 
                                 {startPointMode === 'custom' && (
                                     <div className="relative">
@@ -702,43 +672,6 @@ export function CitizenMapView() {
                              <Ruler className="w-5 h-5 text-indigo-600 mb-1" />
                              <span className="text-lg font-bold text-indigo-700">{formatDistance(routeInfos.summary.totalDistance)}</span>
                              <span className="text-[10px] text-indigo-500 uppercase">Khoảng cách</span>
-                            <p className="text-2xl font-bold text-gray-800">
-                              {getVal(selectedRealEntity.windSpeed) ?? '--'} <span className="text-sm font-normal text-gray-500">m/s</span>
-                            </p>
-                          </div>
-                          
-                          {getVal(selectedRealEntity.rain) !== undefined && (
-                             <div className="bg-indigo-50 p-4 rounded-[14px] border border-indigo-100 col-span-2">
-                                <div className="flex items-center gap-2 text-indigo-600 mb-1">
-                                  <CloudSun className="w-5 h-5" />
-                                  <span className="text-sm font-bold">Lượng mưa (1h)</span>
-                                </div>
-                                <p className="text-2xl font-bold text-gray-800">
-                                  {getVal(selectedRealEntity.rain)} <span className="text-sm font-normal text-gray-500">mm</span>
-                                </p>
-                             </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  } 
-                  
-                  else if (isAir) {
-                    const aqi = Number(getVal(selectedRealEntity.airQualityIndex) ?? 1);
-                    const getAqiStatus = (val: number) => {
-                      if (val === 1) return { color: 'from-emerald-400 to-green-600', text: 'Tốt', advice: 'Không khí trong lành, tuyệt vời cho hoạt động ngoài trời.', icon: '🌿' };
-                      if (val === 2) return { color: 'from-yellow-400 to-orange-500', text: 'Trung bình', advice: 'Chất lượng chấp nhận được. Nhóm nhạy cảm nên hạn chế.', icon: '😐' };
-                      if (val === 3) return { color: 'from-orange-500 to-red-500', text: 'Kém', advice: 'Người già và trẻ em nên hạn chế ra ngoài.', icon: '😷' };
-                      if (val === 4) return { color: 'from-red-600 to-rose-700', text: 'Xấu', advice: 'Cảnh báo: Có hại cho sức khỏe. Nên đeo khẩu trang.', icon: '🤢' };
-                      return { color: 'from-purple-600 to-indigo-800', text: 'Nguy hại', advice: 'Khẩn cấp: Tránh mọi hoạt động ngoài trời!', icon: '☠️' };
-                    };
-                    const status = getAqiStatus(aqi);
-
-                    return (
-                      <div className="space-y-4">
-                        <div className={`bg-gradient-to-br ${status.color} rounded-[14px] p-6 text-white shadow-lg relative overflow-hidden`}>
-                          <div className="absolute top-[-20px] right-[-20px] opacity-20">
-                            <CloudFog size={120} />
                           </div>
                        </div>
                     ) : (
@@ -785,13 +718,14 @@ export function CitizenMapView() {
                   // --- 3. GIAO DIỆN CHI TIẾT ENTITY (DEFAULT) ---
                   !isPreparingNav && (
                     <div className="flex-1 overflow-y-auto">
-                        {/* Logic hiển thị chi tiết giữ nguyên */}
                         {(() => {
-                        const isWeather = selectedRealEntity.type?.includes('Weather') || selectedRealEntity.temperature?.value !== undefined;
-                        const isAir = selectedRealEntity.type?.includes('Air') || selectedRealEntity.airQualityIndex !== undefined;
+                        const isWeather = selectedRealEntity.type?.includes('Weather') || getVal(selectedRealEntity.temperature) !== undefined;
+                        const isAir = selectedRealEntity.type?.includes('Air') || getVal(selectedRealEntity.airQualityIndex) !== undefined;
 
                         if (isWeather) {
-                            const temp = selectedRealEntity.temperature?.value ?? 25;
+                            const valTemp = getVal(selectedRealEntity.temperature);
+                            const temp = Number(valTemp ?? 25);
+
                             const getTempColors = (temperature: number) => {
                             if (temperature >= 35) return { gradient: 'from-red-500 to-orange-600', shadow: 'shadow-red-200', text: 'text-red-100', icon: '🔥' };
                             if (temperature >= 30) return { gradient: 'from-orange-400 to-amber-500', shadow: 'shadow-orange-200', text: 'text-orange-100', icon: '☀️' };
@@ -814,13 +748,13 @@ export function CitizenMapView() {
                                     </p>
                                     <div className="flex items-end gap-2 mt-1">
                                     <span className="text-6xl font-bold tracking-tighter">
-                                        {selectedRealEntity.temperature?.value ?? '--'}
+                                        {valTemp ?? '--'}
                                     </span>
                                     <span className="text-3xl font-medium mb-2">°C</span>
                                     </div>
                                     <p className="mt-2 text-white/90 flex items-center gap-2 text-xs">
                                     <Activity className="w-4 h-4" /> 
-                                    Cập nhật: {selectedRealEntity.dateObserved?.value ? new Date(selectedRealEntity.dateObserved.value).toLocaleTimeString() : 'Vừa xong'}
+                                    Cập nhật: {getVal(selectedRealEntity.dateObserved) ? new Date(getVal(selectedRealEntity.dateObserved)).toLocaleTimeString() : 'Vừa xong'}
                                     </p>
                                 </div>
                                 </div>
@@ -831,7 +765,7 @@ export function CitizenMapView() {
                                         <span className="text-sm font-bold">Độ ẩm</span>
                                         </div>
                                         <p className="text-2xl font-bold text-gray-800">
-                                        {selectedRealEntity.humidity?.value ?? selectedRealEntity.relativeHumidity?.value ?? '--'}%
+                                        {getVal(selectedRealEntity.humidity) ?? getVal(selectedRealEntity.relativeHumidity) ?? '--'}%
                                         </p>
                                     </div>
 
@@ -841,158 +775,114 @@ export function CitizenMapView() {
                                         <span className="text-sm font-bold">Gió</span>
                                         </div>
                                         <p className="text-2xl font-bold text-gray-800">
-                                        {selectedRealEntity.windSpeed?.value ?? '--'} <span className="text-sm font-normal text-gray-500">m/s</span>
+                                        {getVal(selectedRealEntity.windSpeed) ?? '--'} <span className="text-sm font-normal text-gray-500">m/s</span>
                                         </p>
                                     </div>
                                     
-                                    {selectedRealEntity.rain?.value !== undefined && (
+                                    {getVal(selectedRealEntity.rain) !== undefined && (
                                         <div className="bg-indigo-50 p-4 rounded-[14px] border border-indigo-100 col-span-2">
                                             <div className="flex items-center gap-2 text-indigo-600 mb-1">
                                             <CloudSun className="w-5 h-5" />
                                             <span className="text-sm font-bold">Lượng mưa (1h)</span>
                                             </div>
                                             <p className="text-2xl font-bold text-gray-800">
-                                            {selectedRealEntity.rain.value} <span className="text-sm font-normal text-gray-500">mm</span>
+                                            {getVal(selectedRealEntity.rain)} <span className="text-sm font-normal text-gray-500">mm</span>
                                             </p>
                                         </div>
                                     )}
                                 </div>
-                        <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mt-2">Thành phần ô nhiễm</h4>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
-                            <p className="text-xs text-gray-500 mb-1">Bụi mịn PM2.5</p>
-                            <p className="text-xl font-bold text-gray-800">
-                              {getVal(selectedRealEntity.pm25) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
-                            </p>
-                          </div>
-                          <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
-                            <p className="text-xs text-gray-500 mb-1">Bụi PM10</p>
-                            <p className="text-xl font-bold text-gray-800">
-                              {getVal(selectedRealEntity.pm10) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
-                            </p>
-                          </div>
-                          <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
-                            <p className="text-xs text-gray-500 mb-1">Khí CO</p>
-                            <p className="text-xl font-bold text-gray-800">
-                              {getVal(selectedRealEntity.co) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
-                            </p>
-                          </div>
-                          <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
-                            <p className="text-xs text-gray-500 mb-1">Khí NO2</p>
-                            <p className="text-xl font-bold text-gray-800">
-                              {getVal(selectedRealEntity.no2) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  else {
-                    return (
-                      <>
-                        <div className="bg-blue-50 rounded-[14px] p-4 mb-4 border border-blue-100">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-[10px]">
-                              <Navigation className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-gray-900">Điều hướng thông minh</p>
-                              <p className="text-xs text-blue-600">
-                                {routeCoords ? 'Đang dẫn đường...' : 'Sẵn sàng tính toán lộ trình'}
-                              </p>
                             </div>
                             );
-                        } 
-                        
-                        else if (isAir) {
-                            const aqi = selectedRealEntity.airQualityIndex?.value ?? selectedRealEntity.airQualityIndex ?? 1;
+                        }
+
+                        if (isAir) {
+                            const valAqi = getVal(selectedRealEntity.airQualityIndex);
+                            const aqi = Number(valAqi ?? 1);
+
                             const getAqiStatus = (val: number) => {
-                            if (val === 1) return { color: 'from-emerald-400 to-green-600', text: 'Tốt', advice: 'Không khí trong lành, tuyệt vời cho hoạt động ngoài trời.', icon: '🌿' };
-                            if (val === 2) return { color: 'from-yellow-400 to-orange-500', text: 'Trung bình', advice: 'Chất lượng chấp nhận được. Nhóm nhạy cảm nên hạn chế.', icon: '😐' };
-                            if (val === 3) return { color: 'from-orange-500 to-red-500', text: 'Kém', advice: 'Người già và trẻ em nên hạn chế ra ngoài.', icon: '😷' };
-                            if (val === 4) return { color: 'from-red-600 to-rose-700', text: 'Xấu', advice: 'Cảnh báo: Có hại cho sức khỏe. Nên đeo khẩu trang.', icon: '🤢' };
-                            return { color: 'from-purple-600 to-indigo-800', text: 'Nguy hại', advice: 'Khẩn cấp: Tránh mọi hoạt động ngoài trời!', icon: '☠️' };
+                              if (val === 1) return { color: 'from-emerald-400 to-green-600', text: 'Tốt', advice: 'Không khí trong lành, tuyệt vời cho hoạt động ngoài trời.', icon: '🌿' };
+                              if (val === 2) return { color: 'from-yellow-400 to-orange-500', text: 'Trung bình', advice: 'Chất lượng chấp nhận được. Nhóm nhạy cảm nên hạn chế.', icon: '😐' };
+                              if (val === 3) return { color: 'from-orange-500 to-red-500', text: 'Kém', advice: 'Người già và trẻ em nên hạn chế ra ngoài.', icon: '😷' };
+                              if (val === 4) return { color: 'from-red-600 to-rose-700', text: 'Xấu', advice: 'Cảnh báo: Có hại cho sức khỏe. Nên đeo khẩu trang.', icon: '🤢' };
+                              return { color: 'from-purple-600 to-indigo-800', text: 'Nguy hại', advice: 'Khẩn cấp: Tránh mọi hoạt động ngoài trời!', icon: '☠️' };
                             };
                             const status = getAqiStatus(aqi);
 
                             return (
-                            <div className="space-y-4">
+                              <div className="space-y-4">
                                 <div className={`bg-gradient-to-br ${status.color} rounded-[14px] p-6 text-white shadow-lg relative overflow-hidden`}>
-                                    <div className="absolute top-[-20px] right-[-20px] opacity-20">
+                                  <div className="absolute top-[-20px] right-[-20px] opacity-20">
                                     <CloudFog size={120} />
-                                    </div>
-                                    <div className="relative z-10">
+                                  </div>
+                                  <div className="relative z-10">
                                     <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="text-white/80 text-sm font-bold uppercase tracking-wider">Chỉ số AQI</p>
-                                            <div className="flex items-baseline gap-2">
-                                            <span className="text-6xl font-extrabold">{aqi}</span>
-                                            <span className="text-2xl font-medium">/ 5</span>
-                                            </div>
+                                      <div>
+                                        <p className="text-white/80 text-sm font-bold uppercase tracking-wider">Chỉ số AQI</p>
+                                        <div className="flex items-baseline gap-2">
+                                          <span className="text-6xl font-extrabold">{aqi}</span>
+                                          <span className="text-2xl font-medium">/ 5</span>
                                         </div>
-                                        <span className="text-4xl">{status.icon}</span>
+                                      </div>
+                                      <span className="text-4xl">{status.icon}</span>
                                     </div>
                                     <div className="mt-2 pt-2 border-t border-white/20">
-                                        <p className="text-xl font-bold">{status.text}</p>
-                                        <p className="text-sm text-white/90 mt-1 flex gap-2">
-                                            <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                                            {status.advice}
-                                        </p>
+                                      <p className="text-xl font-bold">{status.text}</p>
+                                      <p className="text-sm text-white/90 mt-1 flex gap-2">
+                                        <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                                        {status.advice}
+                                      </p>
                                     </div>
-                                    </div>
+                                  </div>
                                 </div>
 
-                                <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mt-2">Thành phần ô nhiễm</h4>
+                                <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Thành phần ô nhiễm</h4>
                                 <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
+                                  <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
                                     <p className="text-xs text-gray-500 mb-1">Bụi mịn PM2.5</p>
                                     <p className="text-xl font-bold text-gray-800">
-                                    {selectedRealEntity.pm25?.value ?? selectedRealEntity.pm25 ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                                      {getVal(selectedRealEntity.pm25) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
                                     </p>
-                                </div>
-                                <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
+                                  </div>
+                                  <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
                                     <p className="text-xs text-gray-500 mb-1">Bụi PM10</p>
                                     <p className="text-xl font-bold text-gray-800">
-                                    {selectedRealEntity.pm10?.value ?? selectedRealEntity.pm10 ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                                      {getVal(selectedRealEntity.pm10) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
                                     </p>
-                                </div>
-                                <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
+                                  </div>
+                                  <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
                                     <p className="text-xs text-gray-500 mb-1">Khí CO</p>
                                     <p className="text-xl font-bold text-gray-800">
-                                    {selectedRealEntity.co?.value ?? selectedRealEntity.co ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                                      {getVal(selectedRealEntity.co) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
                                     </p>
-                                </div>
-                                <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
+                                  </div>
+                                  <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-200">
                                     <p className="text-xs text-gray-500 mb-1">Khí NO2</p>
                                     <p className="text-xl font-bold text-gray-800">
-                                    {selectedRealEntity.no2?.value ?? selectedRealEntity.no2 ?? '--'} <span className="text-xs font-normal">µg/m³</span>
+                                      {getVal(selectedRealEntity.no2) ?? '--'} <span className="text-xs font-normal">µg/m³</span>
                                     </p>
+                                  </div>
                                 </div>
-                                </div>
-                            </div>
+                              </div>
                             );
                         }
 
-                        else {
-                            return (
-                            <>
-                                <div className="bg-blue-50 rounded-[14px] p-4 mb-4 border border-blue-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-blue-100 rounded-[10px]">
-                                    <Navigation className="w-5 h-5 text-blue-600" />
-                                    </div>
-                                    <div>
-                                    <p className="text-sm font-semibold text-gray-900">Điều hướng thông minh</p>
-                                    <p className="text-xs text-blue-600">
-                                        Sẵn sàng tính toán lộ trình
-                                    </p>
-                                    </div>
+                        return (
+                          <>
+                            <div className="bg-blue-50 rounded-[14px] p-4 mb-4 border border-blue-100">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-100 rounded-[10px]">
+                                  <Navigation className="w-5 h-5 text-blue-600" />
                                 </div>
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900">Điều hướng thông minh</p>
+                                  <p className="text-xs text-blue-600">
+                                    {routeCoords ? 'Đang dẫn đường...' : 'Sẵn sàng tính toán lộ trình'}
+                                  </p>
                                 </div>
-                            </>
-                            );
-                        }
+                              </div>
+                            </div>
+                          </>
+                        );
                         })()}
                         
                         {/* BUTTON MỞ MENU CHỈ ĐƯỜNG */}
