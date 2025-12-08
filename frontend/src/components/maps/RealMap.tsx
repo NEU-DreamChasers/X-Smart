@@ -7,8 +7,8 @@ LICENSE file in the root directory of this source tree.
 */
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap, CircleMarker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
@@ -51,33 +51,110 @@ interface RealMapProps {
   routeCoordinates?: { start: [number, number]; end: [number, number] } | null;
   onSelectEntity?: (entity: NgsiEntity) => void; 
   entities?: NgsiEntity[];
+  // Callback trả về thông tin tuyến đường
+  onRouteFound?: (summary: any, instructions: any[]) => void;
 }
 
 // --- Helper Functions ---
-function RoutingMachine({ routeCoords }: { routeCoords: { start: [number, number]; end: [number, number] } | null | undefined }) {
+function RoutingMachine({ routeCoords, onRouteFound }: { 
+  routeCoords: { start: [number, number]; end: [number, number] } | null | undefined,
+  onRouteFound?: (summary: any, instructions: any[]) => void
+}) {
   const map = useMap();
+  const routingControlRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!routeCoords || !map) return;
+    if (!map) return;
+    
+    // Nếu không có coords, xóa control nếu đang tồn tại
+    if (!routeCoords) {
+      if (routingControlRef.current) {
+        map.removeControl(routingControlRef.current);
+        routingControlRef.current = null;
+      }
+      return;
+    }
+
+    const startLatLng = L.latLng(routeCoords.start[0], routeCoords.start[1]);
+    const endLatLng = L.latLng(routeCoords.end[0], routeCoords.end[1]);
+    const waypoints = [startLatLng, endLatLng];
+
+    // Nếu control đã tồn tại, chỉ update waypoints để tránh nháy bản đồ (cho tính năng realtime)
+    if (routingControlRef.current) {
+      routingControlRef.current.setWaypoints(waypoints);
+      return;
+    }
+
+    // Nếu chưa có, tạo mới
     // @ts-ignore
     const routingControl = L.Routing.control({
-      waypoints: [
-        L.latLng(routeCoords.start[0], routeCoords.start[1]),
-        L.latLng(routeCoords.end[0], routeCoords.end[1])
-      ],
-      routeWhileDragging: false,
+      waypoints: waypoints,
+      routeWhileDragging: false, 
       showAlternatives: false,
       fitSelectedRoutes: true,
-      lineOptions: { styles: [{ color: '#3b82f6', weight: 6, opacity: 0.8 }] },
-      createMarker: () => null,
-      addWaypoints: false,
-      draggableWaypoints: false,
-      containerClassName: 'hidden', 
+      lineOptions: { 
+        styles: [{ color: '#2563eb', weight: 6, opacity: 0.8 }] 
+      },
+      draggableWaypoints: false, // Tắt kéo thả khi đang dẫn đường realtime để tránh xung đột
+      addWaypoints: false,      
+      createMarker: function(i: number, waypoint: any, n: number) {
+        // Marker điểm đầu (Start) - Hiển thị như một điểm GPS người dùng
+        if (i === 0) {
+             return L.marker(waypoint.latLng, {
+                draggable: false,
+                icon: L.divIcon({
+                    html: renderToStaticMarkup(
+                        <div className="relative flex items-center justify-center">
+                            <span className="absolute w-4 h-4 bg-blue-500 rounded-full animate-ping opacity-75"></span>
+                            <span className="relative w-4 h-4 bg-blue-600 border-2 border-white rounded-full shadow-sm"></span>
+                        </div>
+                    ),
+                    className: 'bg-transparent border-none',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                })
+             });
+        }
+        // Marker điểm cuối (End)
+        const iconHtml = renderToStaticMarkup(
+          <div style={{
+            color: '#dc2626',
+            filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.3))'
+          }}>
+             <MapPin size={32} fill="currentColor" stroke="white" strokeWidth={2} />
+          </div>
+        );
+        return L.marker(waypoint.latLng, {
+          draggable: false,
+          icon: L.divIcon({
+            html: iconHtml,
+            className: 'bg-transparent border-none',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32]
+          })
+        });
+      },
+      containerClassName: 'hidden-routing-container', 
     }).addTo(map);
 
+    routingControl.on('routesfound', function(e: any) {
+      const routes = e.routes;
+      if (routes && routes.length > 0) {
+        const route = routes[0];
+        if (onRouteFound) {
+          onRouteFound(route.summary, route.instructions);
+        }
+      }
+    });
+
+    const style = document.createElement('style');
+    style.innerHTML = `.hidden-routing-container { display: none !important; }`;
+    document.head.appendChild(style);
+
+    routingControlRef.current = routingControl;
+
     return () => {
-      // @ts-ignore
-      if (map && routingControl) map.removeControl(routingControl);
+        // Cleanup function
     };
   }, [routeCoords, map]);
 
@@ -207,7 +284,8 @@ export default function RealMap({
   searchMarker, 
   routeCoordinates, 
   onSelectEntity,
-  entities: externalEntities 
+  entities: externalEntities,
+  onRouteFound 
 }: RealMapProps) {
   
   const [internalEntities, setInternalEntities] = useState<NgsiEntity[]>([]);
@@ -255,8 +333,6 @@ export default function RealMap({
     return result;
   }, [activeEntities, searchTerm]);
 
-  // --- SỬA LỖI: Lọc sạch danh sách marker trước khi render ---
-  // Tạo danh sách các marker hợp lệ, loại bỏ hoàn toàn các giá trị null
   const validMarkers = useMemo(() => {
     if (!filteredEntities) return [];
     
@@ -271,15 +347,22 @@ export default function RealMap({
           position = [coords[1], coords[0]];
       }
 
-      if (!position) return null; // Trả về null nếu không có tọa độ
+      if (!position) return null;
 
       const getValue = (prop: any) => (prop && prop.value !== undefined ? prop.value : 'N/A');
-      const rawAddress = entity.address?.value?.streetAddress || entity.address?.value || entity.address || 'Đang cập nhật';
+      
+      // --- FIX: Xử lý địa chỉ "Unknown Street" ---
+      let rawVal = entity.address?.value?.streetAddress || entity.address?.value || entity.address;
+      if (typeof rawVal === 'string' && (rawVal === 'Unknown Street' || rawVal === 'Unknown')) {
+          rawVal = 'Đang cập nhật';
+      }
+      const rawAddress = rawVal || 'Đang cập nhật';
+      // ------------------------------------------
+
       const displayName = getValue(entity.name) !== 'N/A' ? getValue(entity.name) : (entity.name || entity.id);
       const iconDomain = isExternalMode ? getTypeDomain(entity.type) : domain;
       const icon = createCustomIcon(iconDomain, entity);
 
-      // Trả về object dữ liệu để render marker
       return {
         entity,
         position,
@@ -289,7 +372,7 @@ export default function RealMap({
         temperature: getValue(entity.temperature),
         availableSpots: getValue(entity.availableSpotNumber)
       };
-    }).filter((item) => item !== null) as any[]; // LỌC BỎ NULL Ở ĐÂY
+    }).filter((item) => item !== null) as any[];
   }, [filteredEntities, domain, isExternalMode]);
 
   return (
@@ -304,7 +387,11 @@ export default function RealMap({
       
       <MapController center={center} zoom={zoom} />
       <FilterAutoPan entities={filteredEntities} searchTerm={searchTerm} />
-      <RoutingMachine routeCoords={routeCoordinates} />
+      
+      <RoutingMachine 
+        routeCoords={routeCoordinates} 
+        onRouteFound={onRouteFound}
+      />
 
       {searchMarker && (
         <Marker 
@@ -317,7 +404,7 @@ export default function RealMap({
                 const fakeEntity: NgsiEntity = {
                   id: 'search:result',
                   type: 'SearchResult',
-                  name: { value: 'Vị trí đã chọn' },
+                  name: { value: 'Vị trí tìm kiếm' },
                   location: {
                     type: 'GeoProperty',
                     value: { type: 'Point', coordinates: [searchMarker[1], searchMarker[0]] } 
@@ -339,7 +426,6 @@ export default function RealMap({
         </Marker>
       )}
 
-      {/* Render danh sách đã lọc sạch */}
       <MarkerClusterGroup
         chunkedLoading
         spiderfyOnMaxZoom={false}
