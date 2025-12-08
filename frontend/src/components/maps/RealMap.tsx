@@ -13,6 +13,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
+import { ApiService } from '@/services/api.service';
 
 if (typeof window !== 'undefined') {
   require('leaflet-routing-machine');
@@ -35,12 +36,9 @@ if (typeof window !== 'undefined') {
 export interface NgsiEntity {
   id: string;
   type: string;
-  location?: {
-    type: 'GeoProperty';
-    value: { type: 'Point'; coordinates: [number, number] };
-  };
+  location?: any; 
   address?: any;
-  name?: { value: any } | any;
+  name?: any;
   [key: string]: any;
 }
 
@@ -241,16 +239,49 @@ export default function RealMap({
     if (isExternalMode || !domain || domain === 'default') return;
 
     if (onDataLoaded) onDataLoaded(0, true);
-    const apiDomain = domain === 'traffic' ? 'poi' : domain; 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'; 
-      const apiUrl = `${baseUrl}/${apiDomain}/status`;
-      const res = await fetch(apiUrl, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`API Error`);
-      const data: NgsiEntity[] = await res.json();
-      setInternalEntities(data);
+      let rawData: any[] = [];
+
+      switch (domain) {
+        case 'weather':
+          const resWeather = await ApiService.weather.getAll();
+          rawData = resWeather.data;
+          break;
+        case 'air':
+          const resAir = await ApiService.air.getAll();
+          rawData = resAir.data;
+          break;
+        case 'parking':
+          const resParking = await ApiService.parking.getAll();
+          rawData = resParking.data;
+          break;
+        case 'bus':
+          const resBus = await ApiService.bus.getAll();
+          rawData = resBus.data;
+          break;
+        case 'traffic': 
+           break; 
+        default:
+          break;
+      }
+
+      const normalizedData = rawData.map(item => {
+          let displayType = item.type;
+          
+          if (domain === 'weather') displayType = 'Weather';
+          else if (domain === 'air') displayType = 'AirQuality';
+          else if (domain === 'parking') displayType = 'Parking';
+          else if (domain === 'bus') displayType = 'BusStop';
+
+          return {
+              ...item,
+              type: displayType,
+          };
+      });
+
+      setInternalEntities(normalizedData);
     } catch (error) {
-      console.error("[RealMap] Fetch Failed:", error);
+      console.error("[RealMap] Lỗi thu thập dữ liệu:", error);
       setInternalEntities([]);
     }
   };
@@ -278,16 +309,11 @@ export default function RealMap({
   }, [entitiesToRender, searchTerm, onDataLoaded]);
 
   const getValue = (prop: any) => {
-    if (prop === undefined || prop === null) return 'N/A';
-    if (typeof prop === 'object' && prop.value !== undefined) return prop.value;
-    return prop;
-  };
-  
-  // Helper get Safe Address
-  const getSafeAddress = (entity: NgsiEntity) => {
-    const val = entity.address?.value?.streetAddress || entity.address?.value || entity.address;
-    return formatAddress(val);
-  };
+  if (prop === undefined || prop === null) return 'N/A';
+  if (typeof prop === 'object' && prop.value !== undefined) return prop.value;
+  if (typeof prop === 'object' && Object.keys(prop).length === 0) return 'N/A';
+  return prop;
+};
 
   return (
     <MapContainer 
@@ -324,12 +350,18 @@ export default function RealMap({
       {filteredEntities.map((entity) => {
         let position: [number, number] | null = null;
         
-        if (Array.isArray(entity.location) && entity.location.length === 2 && typeof entity.location[0] === 'number') {
-             position = entity.location as [number, number];
-        } 
-        else if (entity.location?.value?.type === 'Point') {
+        if (entity.location?.coordinates && Array.isArray(entity.location.coordinates)) {
+             const coords = entity.location.coordinates;
+             position = [coords[1], coords[0]];
+        }
+        // Case 2: Dữ liệu thô NGSI-LD (chưa qua Service) -> location.value.coordinates
+        else if (entity.location?.value?.coordinates && Array.isArray(entity.location.value.coordinates)) {
             const coords = entity.location.value.coordinates;
             position = [coords[1], coords[0]];
+        }
+        // Case 3: Dữ liệu AdminMap (đã xử lý thành mảng phẳng [Lat, Lon])
+        else if (Array.isArray(entity.location) && entity.location.length === 2 && typeof entity.location[0] === 'number') {
+             position = entity.location as [number, number];
         }
 
         if (!position) return null;

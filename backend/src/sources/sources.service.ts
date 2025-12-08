@@ -5,7 +5,7 @@ Copyright (c) 2025 NEU-DreamChasers
 This source code is licensed under the MIT license found in the
 LICENSE file in the root directory of this source tree.
 */
-import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DataSource } from './entities/data-source.entity';
@@ -89,10 +89,24 @@ export class SourcesService implements OnModuleInit {
 
   // --- CÁC HÀM CRUD CHO NGUỒN DỮ LIỆU ---
 
-  create(data: Partial<DataSource>) {
-    const newSource = this.dataSourceRepo.create(data);
-    return this.dataSourceRepo.save(newSource);
+  async create(data: any) {
+    if (!data.deviceUsername || !data.devicePassword) {
+      throw new HttpException('Thiếu tài khoản/mật khẩu thiết bị', HttpStatus.BAD_REQUEST);
+    }
+    console.log(`Đang kết nối thử tới thiết bị... (User: ${data.deviceUsername})`);
+    await new Promise(r => setTimeout(r, 1500));
+
+    if (data.devicePassword === 'error') {
+        throw new HttpException('Sai mật khẩu thiết bị!', HttpStatus.UNAUTHORIZED);
+    }
+
+    console.log("✅ Kết nối thành công!");
+
+    // 3. LƯU VÀO DB
+    const newSensor = this.dataSourceRepo.create(data);
+    return await this.dataSourceRepo.save(newSensor);
   }
+
 
   async findAll(limit?: number, offset?: number) {
     if (limit) {

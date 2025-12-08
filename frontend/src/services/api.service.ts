@@ -6,7 +6,6 @@ This source code is licensed under the MIT license found in the
 LICENSE file in the root directory of this source tree.
 */
 import axios from 'axios';
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 export const api = axios.create({
