@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -13,6 +20,8 @@ import { HistoryModule } from './history/history.module';
 import { ReportsModule } from './reports/reports.module';
 import { MinioClientModule } from './minio-client/minio-client.module';
 import { UploadModule } from './upload/upload.module';
+import { WeatherService } from './weather/weather.service';
+import { WeatherController } from './weather/weather.controller';
 
 @Module({
   imports: [
@@ -22,7 +31,7 @@ import { UploadModule } from './upload/upload.module';
     }),
     ThrottlerModule.forRoot([{
       ttl: 60000,
-      limit: 20,
+      limit: 100,
     }]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -51,12 +60,13 @@ import { UploadModule } from './upload/upload.module';
     MinioClientModule,
     UploadModule,
   ],
-  controllers: [],
+  controllers: [WeatherController],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    WeatherService,
   ],
 })
 export class AppModule { }

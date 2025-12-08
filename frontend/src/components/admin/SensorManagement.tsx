@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -14,7 +21,6 @@ interface Sensor {
   status?: string;
 }
 
-// Strict border style match
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 const PAGE_SIZE = 10;
 
@@ -28,12 +34,10 @@ export default function SensorManagement() {
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Form State
   const [formData, setFormData] = useState({
     name: '',
     adapterType: 'openweathermap',

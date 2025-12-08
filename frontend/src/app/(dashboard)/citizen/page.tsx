@@ -1,8 +1,15 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 'use client';
 
 import { useRouter } from 'next/navigation';
 // Đảm bảo đường dẫn import component đúng với dự án của bạn
-import { CitizenDashboard } from '@/components/CitizenDashboard'; 
+import { CitizenDashboard } from '@/components/citizen/CitizenDashboard'; 
 
 export default function CitizenPage() {
   const router = useRouter();

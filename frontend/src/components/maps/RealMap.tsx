@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -6,6 +13,10 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
+
+if (typeof window !== 'undefined') {
+  require('leaflet-routing-machine');
+}
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { 
@@ -34,14 +45,14 @@ export interface NgsiEntity {
 }
 
 interface RealMapProps {
-  domain: string;
-  searchTerm: string;
+  domain?: string;
+  searchTerm?: string;
   onDataLoaded?: (count: number, loading: boolean) => void;
   center?: [number, number];
+  zoom?: number;
   searchMarker?: [number, number] | null;
   routeCoordinates?: { start: [number, number]; end: [number, number] } | null;
   onSelectEntity?: (entity: NgsiEntity) => void; 
-  zoom?: number;
   entities?: NgsiEntity[];
 }
 
@@ -90,8 +101,6 @@ function RoutingMachine({ routeCoords }: { routeCoords: { start: [number, number
   useEffect(() => {
     if (!routeCoords || !map) return;
     // @ts-ignore
-    if (!L.Routing) return;
-    // @ts-ignore
     const routingControl = L.Routing.control({
       waypoints: [ L.latLng(routeCoords.start[0], routeCoords.start[1]), L.latLng(routeCoords.end[0], routeCoords.end[1]) ],
       routeWhileDragging: false, showAlternatives: false, fitSelectedRoutes: true,
@@ -108,15 +117,74 @@ function RoutingMachine({ routeCoords }: { routeCoords: { start: [number, number
 const DOMAIN_CONFIG: Record<string, { color: string, icon: any }> = {
   weather: { color: '#f97316', icon: <CloudSun size={20} color="white" /> },
   air: { color: '#10b981', icon: <Wind size={20} color="white" /> },
-  parking: { color: '#2563eb', icon: <Car size={20} color="white" /> },
+  parking: { color: '#2563eb', icon: <Car size={18} color="white" /> },
   bus: { color: '#4f46e5', icon: <Bus size={20} color="white" /> },
   poi: { color: '#7c3aed', icon: <Store size={20} color="white" /> },
   traffic: { color: '#dc2626', icon: <Navigation size={20} color="white" /> },
   default: { color: '#4b5563', icon: <MapPin size={20} color="white" /> },
 };
 
-const createCustomIcon = (domain: string) => {
+const getTypeDomain = (type: string, defaultDomain: string = 'default') => {
+  const t = type.toLowerCase();
+  if (t.includes('bus')) return 'bus';
+  if (t.includes('air')) return 'air';
+  if (t.includes('parking')) return 'parking';
+  if (t.includes('weather')) return 'weather';
+  if (t.includes('traffic')) return 'traffic';
+  return defaultDomain;
+};
+
+const createCustomIcon = (domain: string, entity?: any) => {
   const config = DOMAIN_CONFIG[domain] || DOMAIN_CONFIG.default;
+
+  if (domain === 'parking' && entity) {
+    const available = entity.availableSpotNumber?.value ?? entity.availableSpotNumber ?? 0;
+    const bgColor = available === 0 ? '#ef4444' : (available < 10 ? '#f59e0b' : config.color); 
+
+    const iconHtml = renderToStaticMarkup(
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: bgColor,
+        padding: '4px 8px',
+        borderRadius: '20px', 
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)',
+        border: '2px solid white',
+        minWidth: '50px',
+        position: 'relative',
+        transform: 'translateY(-10px)' 
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {config.icon}
+          <span style={{ 
+            color: 'white', 
+            fontWeight: '800', 
+            fontSize: '14px',
+            lineHeight: '1',
+            paddingTop: '1px' 
+          }}>
+            {available}
+          </span>
+        </div>
+        
+        <div style={{
+          position: 'absolute',
+          bottom: '-5px',
+          left: '50%',
+          transform: 'translateX(-50%) rotate(45deg)',
+          width: '10px',
+          height: '10px',
+          backgroundColor: bgColor,
+          borderRight: '2px solid white',
+          borderBottom: '2px solid white',
+          zIndex: -1
+        }}></div>
+      </div>
+    );
+    return L.divIcon({ html: iconHtml, className: '', iconSize: [60, 40], iconAnchor: [30, 40], popupAnchor: [0, -45] });
+  }
+
   const iconHtml = renderToStaticMarkup(
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -152,12 +220,26 @@ function MapController({ center }: { center?: [number, number] }) {
   return null;
 }
 
-export default function RealMap({ domain, searchTerm ='', onDataLoaded, center, searchMarker, routeCoordinates, onSelectEntity, entities: propEntities }: RealMapProps) {
+export default function RealMap({ 
+  domain = 'default', 
+  searchTerm = '',
+  onDataLoaded, 
+  center, 
+  zoom = 13,
+  searchMarker, 
+  routeCoordinates, 
+  onSelectEntity,
+  entities: externalEntities 
+}: RealMapProps) {
+  
   const [internalEntities, setInternalEntities] = useState<NgsiEntity[]>([]);
 
-  const entitiesToRender = propEntities || internalEntities;
+  const isExternalMode = !!externalEntities;
+  const activeEntities = isExternalMode ? externalEntities : internalEntities;
 
   const fetchEntities = async () => {
+    if (isExternalMode || !domain || domain === 'default') return;
+
     if (onDataLoaded) onDataLoaded(0, true);
     const apiDomain = domain === 'traffic' ? 'poi' : domain; 
     try {
@@ -176,16 +258,18 @@ export default function RealMap({ domain, searchTerm ='', onDataLoaded, center, 
   useEffect(() => {
     if (propEntities) return;
     fetchEntities();
-    const interval = setInterval(fetchEntities, 30000);
-    return () => clearInterval(interval);
-  }, [domain, propEntities]);
+    if (!isExternalMode) {
+        const interval = setInterval(fetchEntities, 30000);
+        return () => clearInterval(interval);
+    }
+  }, [domain, isExternalMode]);
 
   const filteredEntities = useMemo(() => {
-    let result = entitiesToRender;
+    let result = activeEntities || [];
     if (searchTerm && searchTerm.trim()) {
       const lowerTerm = searchTerm.toLowerCase();
-      result = entitiesToRender.filter(entity => {
-        const name = String(entity.name?.value || entity.name || '').toLowerCase();
+      result = result.filter(entity => {
+        const name = String(entity.name?.value || entity.name || '').toLowerCase(); 
         return name.includes(lowerTerm);
       });
     }
@@ -231,44 +315,57 @@ export default function RealMap({ domain, searchTerm ='', onDataLoaded, center, 
         </Marker>
       )}
 
-      <MarkerClusterGroup chunkedLoading spiderfyOnMaxZoom={false} maxClusterRadius={40} disableClusteringAtZoom={16}>
-        {filteredEntities.map((entity) => {
-          let position: [number, number] | null = null;
-          if (Array.isArray(entity.location) && entity.location.length === 2 && typeof entity.location[0] === 'number') {
-             position = (entity.location as unknown) as [number, number];
-          } else if (entity.location?.value?.type === 'Point') {
-             const coords = entity.location.value.coordinates;
-             position = [coords[1], coords[0]];
-          }
-          if (!position) return null;
-          
-          let itemDomain = domain;
-          
-          if (entity.type === 'BusStop') itemDomain = 'bus';
-          else if (entity.type === 'Parking') itemDomain = 'parking';
-          else if (entity.type === 'AirQuality') itemDomain = 'air';
-          else if (entity.type === 'Weather') itemDomain = 'weather';
-          
-          // Tạo icon tương ứng
-          const itemIcon = createCustomIcon(itemDomain);
+      <MarkerClusterGroup
+        chunkedLoading
+        spiderfyOnMaxZoom={false}
+        maxClusterRadius={40}
+        disableClusteringAtZoom={16}
+      >
+      {filteredEntities.map((entity) => {
+        let position: [number, number] | null = null;
+        
+        if (Array.isArray(entity.location) && entity.location.length === 2 && typeof entity.location[0] === 'number') {
+             position = entity.location as [number, number];
+        } 
+        else if (entity.location?.value?.type === 'Point') {
+            const coords = entity.location.value.coordinates;
+            position = [coords[1], coords[0]];
+        }
 
-          return (
-            <Marker key={entity.id} position={position} icon={itemIcon} eventHandlers={{
-                click: () => { if (onSelectEntity) onSelectEntity(entity); }
-            }}>
-              <Popup className="custom-popup">
-                 <div className="min-w-[220px] p-1 cursor-pointer" onClick={() => onSelectEntity && onSelectEntity(entity)}>
-                    {/* 1. Header Name */}
-                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
-                      <h3 className="font-bold text-gray-900 text-sm line-clamp-1 hover:text-blue-600">
-                        {getValue(entity.name) !== 'N/A' ? getValue(entity.name) : entity.id.split(':').pop()}
-                      </h3>
-                    </div>
-                    
-                    {/* 2. Address */}
-                    <div className="text-xs text-gray-500 mb-3 flex items-start gap-1.5">
-                        <MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />
-                        <span className="italic leading-tight line-clamp-2">{getSafeAddress(entity)}</span>
+        if (!position) return null;
+
+        const rawAddress = entity.address?.value?.streetAddress || entity.address?.value || entity.address || 'Đang cập nhật';
+        const displayName = getValue(entity.name) !== 'N/A' ? getValue(entity.name) : (entity.name || entity.id);
+
+        const iconDomain = isExternalMode ? getTypeDomain(entity.type) : domain;
+        
+        // --- UPDATE: Truyền entity vào createCustomIcon ---
+        const icon = createCustomIcon(iconDomain, entity);
+
+        return (
+          <Marker 
+            key={entity.id} 
+            position={position} 
+            icon={icon}
+            eventHandlers={{
+              click: () => {
+                if (onSelectEntity) onSelectEntity(entity);
+              }
+            }}
+          >
+            <Popup className="custom-popup">
+               <div className="min-w-[200px] p-1 cursor-pointer" onClick={() => onSelectEntity && onSelectEntity(entity)}>
+                  <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
+                    <h3 className="font-semibold text-gray-900 text-sm line-clamp-1 hover:text-blue-600">
+                      {displayName}
+                    </h3>
+                  </div>
+
+                  <div className="text-xs text-gray-500 mb-2 flex items-start gap-1.5">
+                       <MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />
+                       <span className="italic leading-tight">
+                         {typeof rawAddress === 'string' ? rawAddress : formatAddress(rawAddress)}
+                       </span>
                     </div>
 
                     {/* 3. UI Style 'CitizenEnvironment' (Mini Cards) */}

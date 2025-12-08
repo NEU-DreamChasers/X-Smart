@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -7,7 +14,6 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// 1. Interceptor: Tự động gắn Token
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
@@ -21,7 +27,6 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 2. Interceptor: Xử lý lỗi
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -30,7 +35,6 @@ api.interceptors.response.use(
   }
 );
 
-// --- HELPER: Parse NGSI-LD ---
 const parseNgsi = (item: any) => {
   if (!item) return null;
   const result: any = { id: item.id, type: item.type };
@@ -69,7 +73,6 @@ const createNgsiGetAll = (domain: string) =>
   };
 
 export const ApiService = {
-  // --- 1. Map ---
   map: {
     searchNearby: async (lat: number, lon: number, radius: number = 5000) => {
        try {
@@ -81,7 +84,6 @@ export const ApiService = {
     }
   },
 
-  // --- 2. Sources ---
   sources: {
     getAll: async (limit?: number, offset?: number) => {
       const res = await api.get('/sources', { params: { limit, offset } });
@@ -93,9 +95,10 @@ export const ApiService = {
     delete: (id: string) => api.delete(`/sources/${id}`).then(res => res.data),
   },
 
-  // --- 3. Current Status (NGSI-LD) ---
   weather: {
     getAll: createNgsiGetAll('weather'),
+    getForecast: (entityId: string) => 
+      api.get(`/weather/forecast`, { params: { entityId } }).then(res => res.data),
   },
   air: {
     getAll: createNgsiGetAll('air'),
@@ -107,28 +110,36 @@ export const ApiService = {
     getAll: createNgsiGetAll('parking'),
   },
 
-  // --- 4. HISTORY & CHARTS (MỚI) ---
   history: {
-    // Lấy dữ liệu biểu đồ nhiệt độ
     getTemperatureChart: async (location: string) => {
-        try {
-            const res = await api.get(`/history/chart/temperature/${location}`);
-            return res.data; // Mong đợi mảng: [{ time: '...', value: ... }]
-        } catch (e) { return []; }
+        try { const res = await api.get(`/history/chart/temperature/${location}`); return res.data; } catch (e) { return []; }
     },
-    // Lấy dữ liệu biểu đồ AQI
     getAqiChart: async (location: string) => {
-        try {
-            const res = await api.get(`/history/chart/aqi/${location}`);
-            return res.data;
-        } catch (e) { return []; }
+        try { const res = await api.get(`/history/chart/aqi/${location}`); return res.data; } catch (e) { return []; }
     },
-    // Lấy dữ liệu biểu đồ mưa
     getRainChart: async (location: string) => {
+        try { const res = await api.get(`/history/chart/precipitation/${location}`); return res.data; } catch (e) { return []; }
+    }
+  },
+
+  reports: {
+    getMyReports: async () => {
         try {
-            const res = await api.get(`/history/chart/precipitation/${location}`);
-            return res.data;
-        } catch (e) { return []; }
+            const res = await api.get('/reports/my-reports');
+            return { 
+                data: Array.isArray(res.data) ? res.data : [], 
+                totalCount: Array.isArray(res.data) ? res.data.length : 0 
+            };
+        } catch (error) {
+            console.warn('Lỗi lấy báo cáo:', error);
+            return { data: [], totalCount: 0 };
+        }
+    },
+    create: async (formData: FormData) => {
+        const res = await api.post('/reports', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return res.data;
     }
   }
 };
