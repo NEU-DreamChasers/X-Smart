@@ -16,15 +16,15 @@ Dự án này tuân theo [Code of Conduct](./CODE_OF_CONDUCT.md). Bằng cách t
 ### 1. 🐛 Báo cáo lỗi (Bug Reports)
 
 **Trước khi tạo issue:**
-- 🔍 Tìm kiếm [existing issues](https://github.com/NEU-DreamChasers/X-Smart/issues) để tránh duplicate
-- ✅ Đảm bảo bạn đang dùng phiên bản mới nhất
+- Tìm kiếm [existing issues](https://github.com/NEU-DreamChasers/X-Smart/issues) để tránh duplicate
+- Đảm bảo bạn đang dùng phiên bản mới nhất
 
 **Khi tạo bug report, bao gồm:**
-- 📝 **Mô tả rõ ràng** về lỗi
-- 🔄 **Các bước tái tạo** (step-by-step)
-- 🎯 **Kết quả mong đợi** vs **kết quả thực tế**
-- 💻 **Môi trường**: OS, Node version, Browser
-- 📸 **Screenshots/logs** nếu có
+- **Mô tả rõ ràng** về lỗi
+- **Các bước tái tạo** (step-by-step)
+- **Kết quả mong đợi** vs **kết quả thực tế**
+- **Môi trường**: OS, Node version, Browser
+- **Screenshots/logs** nếu có
 
 **Template:**
 ```markdown
@@ -57,10 +57,10 @@ Dự án này tuân theo [Code of Conduct](./CODE_OF_CONDUCT.md). Bằng cách t
 ### 2. 💡 Đề xuất tính năng (Feature Requests)
 
 **Khi đề xuất tính năng mới:**
-- 🎯 **Mô tả vấn đề** mà tính năng giải quyết
-- 💭 **Giải pháp đề xuất** của bạn
-- 🔄 **Các lựa chọn khác** bạn đã xem xét
-- 📊 **Lợi ích** cho người dùng/dự án
+- **Mô tả vấn đề** mà tính năng giải quyết
+- **Giải pháp đề xuất** của bạn
+- **Các lựa chọn khác** bạn đã xem xét
+- **Lợi ích** cho người dùng/dự án
 
 **Template:**
 ```markdown
@@ -81,13 +81,13 @@ Dự án này tuân theo [Code of Conduct](./CODE_OF_CONDUCT.md). Bằng cách t
 
 ### 3. 🔧 Sửa code (Code Contributions)
 
-- 🐛 **Bug fixes** — Sửa lỗi hiện có
-- ✨ **New features** — Thêm tính năng mới
-- 📚 **Documentation** — Cải thiện docs
-- 🎨 **UI/UX** — Cải thiện giao diện
-- ⚡ **Performance** — Tối ưu hóa
-- ♻️ **Refactoring** — Cải thiện code structure
-- 🧪 **Tests** — Thêm/cải thiện tests
+- **Bug fixes** — Sửa lỗi hiện có
+- **New features** — Thêm tính năng mới
+- **Documentation** — Cải thiện docs
+- **UI/UX** — Cải thiện giao diện
+- **Performance** — Tối ưu hóa
+- **Refactoring** — Cải thiện code structure
+- **Tests** — Thêm/cải thiện tests
 
 ---
 

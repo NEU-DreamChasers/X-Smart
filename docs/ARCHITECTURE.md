@@ -63,11 +63,11 @@
 **Tệp chính:** `frontend/src/`
 
 **Chức năng:**
-- 📊 Dashboard tương tác (thời tiết, không khí, giao thông)
-- 🗺️ Bản đồ interaktif (Leaflet.js + clustering)
-- 📈 Biểu đồ & phân tích (Recharts)
-- 👥 Quản lý báo cáo công dân
-- 🔐 Xác thực người dùng (JWT + Google OAuth)
+- Dashboard tương tác (thời tiết, không khí, giao thông)
+- Bản đồ interaktif (Leaflet.js + clustering)
+- Biểu đồ & phân tích (Recharts)
+- Quản lý báo cáo công dân
+- Xác thực người dùng (JWT + Google OAuth)
 
 **Công nghệ:**
 - React 19, TypeScript
