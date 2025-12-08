@@ -26,12 +26,12 @@ export class SourcesController {
   // --- TẠO MỚI ---
   @Post()
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Thêm mới một nguồn dữ liệu (Create)' })
+  @ApiOperation({ summary: 'Thêm mới một nguồn dữ liệu' })
   @ApiBody({
     description: 'Thông tin nguồn dữ liệu',
-    schema: { example: { name: 'New Station', adapterType: 'openweathermap', latitude: 21.0, longitude: 105.8 } },
+    schema: { example: { name: 'New Station', adapterType: 'openweathermap', latitude: 21.0, longitude: 105.8, deviceUsername: 'deviceUser', devicePassword: 'devicePass' } },
   })
-  create(@Body() data: Partial<DataSource>) {
+  create(@Body() data: any) {
     return this.sourcesService.create(data);
   }
 
@@ -58,8 +58,8 @@ export class SourcesController {
   // --- LẤY CHI TIẾT --- 
   @Get(':id')
   @Public()
-  @ApiOperation({ summary: 'Xem chi tiết một nguồn theo ID (Read One)' })
-  @ApiParam({ name: 'id', description: 'ID của nguồn dữ liệu (UUID)' })
+  @ApiOperation({ summary: 'Xem chi tiết một nguồn theo ID' })
+  @ApiParam({ name: 'id', description: 'ID của nguồn dữ liệu' })
   findOne(@Param('id') id: string) {
     return this.sourcesService.findOne(id);
   }
@@ -67,7 +67,7 @@ export class SourcesController {
   // --- CẬP NHẬT ---
   @Patch(':id')
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Cập nhật thông tin nguồn dữ liệu (Update)' })
+  @ApiOperation({ summary: 'Cập nhật thông tin nguồn dữ liệu' })
   @ApiParam({ name: 'id', description: 'ID của nguồn cần sửa' })
   @ApiBody({
     description: 'Thông tin cần sửa (Gửi trường nào sửa trường đó)',
@@ -80,7 +80,7 @@ export class SourcesController {
   // --- XÓA ---
   @Delete(':id')
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Xóa bỏ một nguồn dữ liệu (Delete)' })
+  @ApiOperation({ summary: 'Xóa bỏ một nguồn dữ liệu' })
   @ApiParam({ name: 'id', description: 'ID của nguồn cần xóa' })
   @ApiResponse({ status: 200, description: 'Xóa thành công.' })
   remove(@Param('id') id: string) {

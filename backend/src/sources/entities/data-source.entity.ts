@@ -26,4 +26,10 @@ export class DataSource {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({ nullable: true})
+  deviceUsername: string;
+
+  @Column({ nullable: true})
+  devicePassword: string; 
 }

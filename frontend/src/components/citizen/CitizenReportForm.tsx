@@ -9,7 +9,8 @@ LICENSE file in the root directory of this source tree.
 
 import React, { useState, ChangeEvent, FormEvent, useEffect } from 'react';
 import { createCitizenReport, ReportFormState } from '../../services/report.service';
-import { MapPin, Send, AlertTriangle, Loader2, X, ImagePlus, Phone, Type } from 'lucide-react';
+// 1. Thêm ChevronDown vào import
+import { MapPin, Send, AlertTriangle, Loader2, X, ImagePlus, Phone, Type, ChevronDown } from 'lucide-react';
 
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
@@ -165,6 +166,8 @@ export default function CitizenReportForm({ onSuccess }: Props) {
                 <option value="environment">🗑️ Môi trường</option>
                 <option value="infrastructure">🚧 Hạ tầng</option>
               </select>
+              {/* 2. Thêm icon ChevronDown vào đây, định vị absolute để nằm bên phải */}
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
             </div>
           </div>
 
@@ -198,12 +201,10 @@ export default function CitizenReportForm({ onSuccess }: Props) {
           </div>
 
           <div className="space-y-2">
-            {/* SỬA: Luôn hiện dấu sao bắt buộc */}
             <label className="text-sm font-medium text-gray-900">
               Số điện thoại liên hệ <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              {/* SỬA: Xóa thuộc tính disabled và cập nhật placeholder */}
               <input
                 type="tel"
                 value={formData.phoneNumber}

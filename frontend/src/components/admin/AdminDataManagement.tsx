@@ -7,13 +7,17 @@ LICENSE file in the root directory of this source tree.
 */
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { 
   CloudRain, Wind, Bus, ParkingCircle, RefreshCw, 
-  Database, Loader2, Play, ChevronLeft, ChevronRight, Server, Lock 
+  Loader2, Play, ChevronLeft, ChevronRight, Server, Lock, Map, BarChart3 
 } from 'lucide-react';
 import { api, ApiService } from '../../services/api.service';
+// Import Recharts để vẽ biểu đồ
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell 
+} from 'recharts';
 
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 const PAGE_SIZE = 10;
@@ -79,24 +83,28 @@ export function AdminDataManagement() {
 
 
   const handleImportAll = async () => {
- 
     if (!isLoggedIn) {
-        alert("Vui lòng đăng nhập tài khoản Admin để sử dụng tính năng nhập liệu này!");
+        alert("Vui lòng đăng nhập tài khoản Admin để sử dụng tính năng này!");
         return;
     }
 
-    if (!confirm('Bạn có chắc muốn nhập TOÀN BỘ dữ liệu (Xe buýt, Bãi đỗ, POI) không?\nQuá trình này sẽ chạy ngầm và mất khoảng 1-2 phút.')) return;
+    if (!confirm('Bạn có chắc muốn CẬP NHẬT lại toàn bộ dữ liệu bản đồ (Xe buýt, Bãi đỗ, Địa điểm) từ OpenStreetMap không?\nQuá trình này sẽ chạy ngầm và mất vài phút.')) return;
 
     setIsImporting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000)); 
+      await Promise.all([
+          api.post('/admin/import-static?category=bus'),
+          api.post('/admin/import-static?category=parking'),
+          api.post('/admin/import-static?category=poi')
+      ]);
       
-      alert('✅ Đã kích hoạt nhập liệu thành công cho tất cả các nguồn!\nDữ liệu sẽ dần xuất hiện trong vài phút tới.');
+      alert('✅ Đã gửi lệnh cập nhật thành công!\nHệ thống đang thu thập dữ liệu mới từ OpenStreetMap. Vui lòng đợi 1-2 phút rồi tải lại trang.');
+      
       setTimeout(fetchData, 3000);
 
     } catch (error: any) {
       console.error("Import All error:", error);
-      alert(`❌ Có lỗi xảy ra: ${error.message}`);
+      alert(`❌ Có lỗi xảy ra khi gọi API: ${error.response?.data?.message || error.message}`);
     } finally {
       setIsImporting(false);
     }
@@ -109,6 +117,98 @@ export function AdminDataManagement() {
     if (domain === 'parking') return <span className="text-purple-600 font-medium bg-purple-50 px-2 py-1 rounded-[8px] border border-purple-100">{item.availableSpotNumber} chỗ trống</span>;
     return <span className="text-gray-500">--</span>;
   };
+
+  // --- LOGIC BIỂU ĐỒ ---
+  const chartData = useMemo(() => {
+    if (!data || data.length === 0) return [];
+    
+    // Nếu là Bus, đếm số lượng xe theo tuyến
+    if (domain === 'bus') {
+        const routeCounts: Record<string, number> = {};
+        data.forEach(item => {
+            const route = item.refBusRoute || 'Khác';
+            routeCounts[route] = (routeCounts[route] || 0) + 1;
+        });
+        return Object.keys(routeCounts).map(route => ({
+            name: `Tuyến ${route}`,
+            value: routeCounts[route],
+            id: route
+        }));
+    }
+
+    // Các domain khác: Lấy giá trị trực tiếp của từng entity
+    return data.map(item => {
+        let val = 0;
+        let shortName = item.id.replace('urn:ngsi-ld:', '').split(':').pop() || item.id;
+        
+        // Rút gọn tên hiển thị
+        if (shortName.length > 10) shortName = shortName.substring(0, 10) + '...';
+
+        if (domain === 'weather') val = item.temperature || 0;
+        if (domain === 'air') val = item.airQualityIndex || 0;
+        if (domain === 'parking') val = item.availableSpotNumber || 0;
+
+        return {
+            name: shortName,
+            value: val,
+            fullId: item.id
+        };
+    });
+  }, [data, domain]);
+
+  const renderChart = () => {
+    if (loading || chartData.length === 0) return null;
+
+    let barColor = '#8884d8';
+    let yLabel = 'Giá trị';
+    
+    if (domain === 'weather') { barColor = '#f97316'; yLabel = 'Nhiệt độ (°C)'; }
+    if (domain === 'air') { barColor = '#10b981'; yLabel = 'Chỉ số AQI'; }
+    if (domain === 'parking') { barColor = '#9333ea'; yLabel = 'Chỗ trống'; }
+    if (domain === 'bus') { barColor = '#3b82f6'; yLabel = 'Số lượng xe'; }
+
+    return (
+        <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+            <div className="flex items-center gap-2 mb-4">
+                <BarChart3 className="w-5 h-5 text-gray-500" />
+                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+                    Thống kê {domain === 'bus' ? 'số lượng xe theo tuyến' : `giá trị ${yLabel} của danh sách bên dưới`}
+                </h3>
+            </div>
+            <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                        <XAxis 
+                            dataKey="name" 
+                            stroke="#6b7280" 
+                            fontSize={12} 
+                            tickLine={false} 
+                            axisLine={false} 
+                        />
+                        <YAxis 
+                            stroke="#6b7280" 
+                            fontSize={12} 
+                            tickLine={false} 
+                            axisLine={false} 
+                            label={{ value: yLabel, angle: -90, position: 'insideLeft', style: { fill: '#9ca3af' } }} 
+                        />
+                        <Tooltip 
+                            cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                        />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
+                            {chartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={barColor} />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+    );
+  };
+  // --- KẾT THÚC LOGIC BIỂU ĐỒ ---
 
   const columns = [
     { header: 'ID Entity (NGSI-LD)', accessor: 'id', width: 'w-1/3' },
@@ -130,12 +230,12 @@ export function AdminDataManagement() {
       >
         <div className="flex items-center gap-4">
           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-[10px] border border-indigo-100">
-            <Database className="w-6 h-6" />
+            <Map className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Nhập dữ liệu Thành phố</h2>
+            <h2 className="text-lg font-bold text-gray-900">Cập nhật dữ liệu bản đồ</h2>
             <p className="text-sm text-gray-500">
-              Kích hoạt quy trình thu thập dữ liệu tĩnh từ OpenStreetMap (Xe buýt, Bãi đỗ, Địa điểm)
+              Kích hoạt quy trình đồng bộ dữ liệu tĩnh từ OpenStreetMap (Xe buýt, Bãi đỗ, Địa điểm)
             </p>
           </div>
         </div>
@@ -152,7 +252,7 @@ export function AdminDataManagement() {
                     : 'bg-neutral-900 text-white hover:bg-neutral-800' 
             }
           `}
-          title={!isLoggedIn ? "Vui lòng đăng nhập để sử dụng" : "Nhập dữ liệu từ OSM"}
+          title={!isLoggedIn ? "Vui lòng đăng nhập để sử dụng" : "Đồng bộ dữ liệu từ OSM"}
         >
           {isImporting ? (
             <>
@@ -162,7 +262,7 @@ export function AdminDataManagement() {
           ) : (
             <>
               {!isLoggedIn ? <Lock className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
-              <span>Bắt đầu Import Tất cả</span>
+              <span>Cập nhật dữ liệu bản đồ</span>
             </>
           )}
         </button>
@@ -194,9 +294,13 @@ export function AdminDataManagement() {
         </TabsList>
 
         <div className="bg-white rounded-[14px] shadow-sm overflow-hidden" style={borderStyle}>
+            
+            {/* --- INSERT CHART HERE --- */}
+            {renderChart()}
+
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 text-gray-600 font-medium">
+                    <thead className="bg-gray-50 text-gray-600 font-medium border-y border-gray-100">
                         <tr>
                             {columns.map((col, idx) => <th key={idx} className={`px-6 py-4 font-medium ${col.width}`}>{col.header}</th>)}
                         </tr>
@@ -211,7 +315,7 @@ export function AdminDataManagement() {
                             </td></tr>
                         ) : data.length === 0 ? (
                             <tr><td colSpan={4} className="px-6 py-12 text-center text-gray-500">
-                                Chưa có dữ liệu. Hãy bấm nút <b>Bắt đầu Import Tất cả</b> ở trên.
+                                Chưa có dữ liệu. Hãy bấm nút <b>Cập nhật dữ liệu bản đồ</b> ở trên.
                             </td></tr>
                         ) : (
                             data.map((item, idx) => (

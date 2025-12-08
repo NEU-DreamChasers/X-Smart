@@ -46,17 +46,25 @@ export class IngestionService {
   async handleSensorIngestion() {
     this.logger.debug('📡 [Ingestion] Đang thu thập dữ liệu Môi trường...');
     
-    const [sources] = await this.sourcesService.findAll();
+    const [allSources] = await this.sourcesService.findAll();
+    const sources = allSources.filter(s => 
+      s.isActive === true && 
+      (s.adapterType === 'openweathermap' || s.adapterType === 'openweathermap_aqi')
+    );
 
     for (const source of sources) {
-      if (!source.adapterType.includes('openweathermap')) continue;
-
       try {
         let apiUrl = '';
+        let entityId = '';
+
         if (source.adapterType === 'openweathermap') {
           apiUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${source.latitude}&lon=${source.longitude}&appid=${this.openWeatherApiKey}&units=metric`;
-        } else {
+        } 
+        else if (source.adapterType === 'openweathermap_aqi') {
           apiUrl = `https://api.openweathermap.org/data/2.5/air_pollution?lat=${source.latitude}&lon=${source.longitude}&appid=${this.openWeatherApiKey}`;
+        } 
+        else {
+            continue; 
         }
 
         const response = await firstValueFrom(this.httpService.get(apiUrl));
@@ -69,18 +77,17 @@ export class IngestionService {
         });
 
         // --- LƯU LỊCH SỬ ---
-        let entityId = '';
-
         if (source.adapterType === 'openweathermap') {
              const owmId = rawData.id || rawData.name; 
              entityId = `urn:ngsi-ld:WeatherObserved:OpenWeatherMap:${owmId}`;
         } else {
-             const lat = source.latitude; 
-             const lon = source.longitude;
+             const lat = Number(source.latitude).toFixed(4);
+             const lon = Number(source.longitude).toFixed(4);
              entityId = `urn:ngsi-ld:AirQualityObserved:AirQuality:Lat${lat}_Lon${lon}`;
         }
-
-        await this.historyService.saveHistoryFromRaw(entityId, source.adapterType, rawData);
+        if (entityId) {
+            await this.historyService.saveHistoryFromRaw(entityId, source.adapterType, rawData);
+        }
 
         await new Promise((r) => setTimeout(r, 3000));
 
