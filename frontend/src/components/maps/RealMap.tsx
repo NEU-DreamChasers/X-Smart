@@ -13,6 +13,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
+import { ApiService } from '@/services/api.service';
 
 if (typeof window !== 'undefined') {
   require('leaflet-routing-machine');
@@ -20,24 +21,24 @@ if (typeof window !== 'undefined') {
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { 
-  CloudSun, Wind, Car, Bus, MapPin, Navigation, Store
+  CloudSun, Wind, Car, Bus, MapPin, Navigation, Store, 
+  Thermometer, Droplets
 } from 'lucide-react';
 import { formatAddress } from '@/lib/utils';
 
-// --- Interfaces ---
+// Fix lỗi SSR cho Routing Machine
+if (typeof window !== 'undefined') {
+  try {
+    require('leaflet-routing-machine');
+  } catch (e) { console.error(e); }
+}
+
 export interface NgsiEntity {
   id: string;
   type: string;
-  location?: {
-    type: 'GeoProperty';
-    value: { type: 'Point'; coordinates: [number, number] };
-  };
-  address?: {
-    addressLocality: any;
-    streetAddress: any; 
-    value: any 
-  };
-  name?: { value: any };
+  location?: any; 
+  address?: any;
+  name?: any;
   [key: string]: any;
 }
 
@@ -157,7 +158,6 @@ function RoutingMachine({ routeCoords, onRouteFound }: {
         // Cleanup function
     };
   }, [routeCoords, map]);
-
   return null;
 }
 
@@ -267,11 +267,9 @@ const searchResultIcon = L.divIcon({
   className: '', iconSize: [48, 48], iconAnchor: [24, 48], popupAnchor: [0, -48]
 });
 
-function MapController({ center, zoom }: { center?: [number, number], zoom?: number }) {
+function MapController({ center }: { center?: [number, number] }) {
   const map = useMap();
-  useEffect(() => {
-    if (center) map.flyTo(center, zoom || 16, { duration: 1.5 });
-  }, [center, zoom, map]);
+  useEffect(() => { if (center) map.flyTo(center, 16, { duration: 1.5 }); }, [center, map]);
   return null;
 }
 
@@ -297,22 +295,55 @@ export default function RealMap({
     if (isExternalMode || !domain || domain === 'default') return;
 
     if (onDataLoaded) onDataLoaded(0, true);
-    const apiDomain = domain === 'traffic' ? 'poi' : domain; 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'; 
-      const apiUrl = `${baseUrl}/${apiDomain}/status`;
-      
-      const res = await fetch(apiUrl, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`API Error`);
-      const data: NgsiEntity[] = await res.json();
-      setInternalEntities(data);
+      let rawData: any[] = [];
+
+      switch (domain) {
+        case 'weather':
+          const resWeather = await ApiService.weather.getAll();
+          rawData = resWeather.data;
+          break;
+        case 'air':
+          const resAir = await ApiService.air.getAll();
+          rawData = resAir.data;
+          break;
+        case 'parking':
+          const resParking = await ApiService.parking.getAll();
+          rawData = resParking.data;
+          break;
+        case 'bus':
+          const resBus = await ApiService.bus.getAll();
+          rawData = resBus.data;
+          break;
+        case 'traffic': 
+           break; 
+        default:
+          break;
+      }
+
+      const normalizedData = rawData.map(item => {
+          let displayType = item.type;
+          
+          if (domain === 'weather') displayType = 'Weather';
+          else if (domain === 'air') displayType = 'AirQuality';
+          else if (domain === 'parking') displayType = 'Parking';
+          else if (domain === 'bus') displayType = 'BusStop';
+
+          return {
+              ...item,
+              type: displayType,
+          };
+      });
+
+      setInternalEntities(normalizedData);
     } catch (error) {
-      console.error("[RealMap] Fetch Failed:", error);
+      console.error("[RealMap] Lỗi thu thập dữ liệu:", error);
       setInternalEntities([]);
     }
   };
 
   useEffect(() => {
+    if (propEntities) return;
     fetchEntities();
     if (!isExternalMode) {
         const interval = setInterval(fetchEntities, 30000);
@@ -349,7 +380,6 @@ export default function RealMap({
 
       if (!position) return null;
 
-      const getValue = (prop: any) => (prop && prop.value !== undefined ? prop.value : 'N/A');
       
       // --- FIX: Xử lý địa chỉ "Unknown Street" ---
       let rawVal = entity.address?.value?.streetAddress || entity.address?.value || entity.address;
@@ -374,14 +404,19 @@ export default function RealMap({
       };
     }).filter((item) => item !== null) as any[];
   }, [filteredEntities, domain, isExternalMode]);
+  }, [entitiesToRender, searchTerm, onDataLoaded]);
+
+  const getValue = (prop: any) => {
+  if (prop === undefined || prop === null) return 'N/A';
+  if (typeof prop === 'object' && prop.value !== undefined) return prop.value;
+  if (typeof prop === 'object' && Object.keys(prop).length === 0) return 'N/A';
+  return prop;
+};
 
   return (
     <MapContainer 
-      center={center || [10.7769, 106.7009]} 
-      zoom={zoom} 
+      center={center || [10.7769, 106.7009]} zoom={13} zoomControl={false} attributionControl={false}
       style={{ height: '100%', width: '100%', borderRadius: '0 0 14px 14px' }}
-      zoomControl={false}
-      attributionControl={false}
     >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       
@@ -394,11 +429,7 @@ export default function RealMap({
       />
 
       {searchMarker && (
-        <Marker 
-          position={searchMarker} 
-          icon={searchResultIcon} 
-          zIndexOffset={1000}
-          eventHandlers={{
+        <Marker position={searchMarker} icon={searchResultIcon} zIndexOffset={1000} eventHandlers={{
             click: () => {
               if (onSelectEntity) {
                 const fakeEntity: NgsiEntity = {
@@ -420,9 +451,7 @@ export default function RealMap({
             }
           }}
         >
-          <Popup className="custom-popup">
-            <div className="font-bold text-red-600 text-sm p-1 text-center">📍 Vị trí tìm kiếm</div>
-          </Popup>
+          <Popup className="custom-popup"><div className="font-bold text-red-600 text-sm p-1 text-center">📍 Vị trí tìm kiếm</div></Popup>
         </Marker>
       )}
 

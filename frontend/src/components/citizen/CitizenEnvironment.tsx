@@ -381,7 +381,6 @@ export function CitizenEnvironment() {
                         return (
                             <div 
                                 key={idx} 
-                                // 👇 STYLE MỚI: Bỏ border đen, dùng Gradient & Shadow mềm
                                 className={`
                                     min-w-[160px] p-6 rounded-[20px] 
                                     flex flex-col items-center text-center shrink-0 

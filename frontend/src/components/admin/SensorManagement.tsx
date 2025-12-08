@@ -8,7 +8,7 @@ LICENSE file in the root directory of this source tree.
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, Server, MapPin, X, Loader2, Save, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Server, MapPin, X, Loader2, Save, ChevronRight, ChevronLeft, ShieldCheck, Power } from 'lucide-react';
 import { ApiService } from '@/services/api.service';
 
 interface Sensor {
@@ -19,10 +19,16 @@ interface Sensor {
   longitude: number;
   isActive: boolean;
   status?: string;
+  deviceUsername?: string;
+  devicePassword?: string;
 }
 
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 const PAGE_SIZE = 10;
+const ADAPTER_TYPES = [
+    { value: 'openweathermap', label: 'OpenWeatherMap (Thời tiết)' },
+    { value: 'openweathermap_aqi', label: 'Air Quality API (Không khí)' }
+]
 
 export default function SensorManagement() {
   const [sensors, setSensors] = useState<Sensor[]>([]);
@@ -43,6 +49,9 @@ export default function SensorManagement() {
     adapterType: 'openweathermap',
     latitude: 0,
     longitude: 0,
+    isActive: true,
+    deviceUsername: '',
+    devicePassword: '',
   });
 
   // --- 1. GET: Lấy danh sách ---
@@ -81,7 +90,7 @@ export default function SensorManagement() {
   // --- 2. HANDLERS ---
   const resetForm = () => {
     setEditingId(null);
-    setFormData({ name: '', adapterType: 'openweathermap', latitude: 0, longitude: 0 });
+    setFormData({ name: '', adapterType: 'openweathermap', latitude: 0, longitude: 0, isActive: true, deviceUsername: '', devicePassword: '' });
     setIsModalOpen(false);
   };
 
@@ -90,8 +99,11 @@ export default function SensorManagement() {
     setFormData({
       name: sensor.name,
       adapterType: sensor.adapterType,
-      latitude: sensor.latitude,
+      latitude: sensor.latitude,    
       longitude: sensor.longitude,
+      isActive: sensor.isActive,
+      deviceUsername: sensor.deviceUsername || '',
+      devicePassword: sensor.devicePassword || '',
     });
     setIsModalOpen(true);
   };
@@ -107,9 +119,10 @@ export default function SensorManagement() {
       }
       await fetchSensors();
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Có lỗi xảy ra khi lưu dữ liệu!");
+      const msg = error?.response?.data?.message || "Lỗi không xác định";
+      alert(msg);
     } finally {
       setIsSaving(false);
     }
@@ -155,7 +168,6 @@ export default function SensorManagement() {
       <div className="bg-white rounded-[14px] shadow-sm overflow-hidden" style={borderStyle}>
         <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-                {/* Đã xóa border-b ở đây */}
                 <thead className="bg-gray-50 text-gray-600 font-medium">
                     <tr>
                         <th className="px-6 py-4">Tên nguồn</th>
@@ -165,7 +177,6 @@ export default function SensorManagement() {
                         <th className="px-6 py-4 text-right">Hành động</th>
                     </tr>
                 </thead>
-                {/* Đã xóa divide-y divide-gray-100 ở đây */}
                 <tbody>
                     {loading ? (
                         <tr>
@@ -185,7 +196,10 @@ export default function SensorManagement() {
                                     <div className="p-2 bg-blue-50 rounded-[8px] text-blue-600 border border-blue-100">
                                         <Server className="w-4 h-4" />
                                     </div>
-                                    {s.name}
+                                    <div>
+                                        <p>{s.name}</p>
+                                        {s.deviceUsername && <p className="text-[10px] text-gray-400 font-mono">User: {s.deviceUsername}</p>}
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4 text-gray-600">
                                     <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded text-gray-700 border border-gray-200">
@@ -287,17 +301,41 @@ export default function SensorManagement() {
                         />
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className = "space-y-1.5">
                         <label className="text-sm font-medium text-gray-700">Loại Adapter</label>
-                        <input 
-                            required
-                            type="text" 
-                            placeholder="openweathermap / overpass_parking..."
-                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-neutral-900"
-                            value={formData.adapterType}
-                            onChange={(e) => setFormData({...formData, adapterType: e.target.value})}
-                        />
+                            <div className="relative">
+                                <select 
+                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none cursor-pointer"
+                                    value={formData.adapterType}
+                                    onChange={(e) => setFormData({...formData, adapterType: e.target.value})}
+                                >
+                                    {ADAPTER_TYPES.map(type => (
+                                        <option key={type.value} value={type.value}>{type.label}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                    <ChevronRight className="w-3 h-3 rotate-90" />
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                    <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-gray-700">Trạng thái</label>
+                            <div className="relative">
+                                <select 
+                                    className={`w-full px-3 py-2 border border-gray-200 rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none cursor-pointer ${formData.isActive ? 'text-green-700 bg-green-50' : 'text-gray-600 bg-gray-50'}`}
+                                    value={formData.isActive ? 'true' : 'false'}
+                                    onChange={(e) => setFormData({...formData, isActive: e.target.value === 'true'})}
+                                >
+                                    <option value="true">Hoạt động (Active)</option>
+                                    <option value="false">Tạm dừng (Inactive)</option>
+                                </select>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                    <Power className={`w-3 h-3 ${formData.isActive ? 'text-green-500' : 'text-gray-400'}`} />
+                                </div>
+                            </div>
+                        </div>     
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
@@ -324,21 +362,50 @@ export default function SensorManagement() {
                         </div>
                     </div>
 
-                    <div className="pt-4 flex gap-3">
-                        <button 
-                            type="button" 
-                            onClick={resetForm}
-                            className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-[10px] hover:bg-gray-200 transition-colors text-sm"
-                        >
-                            Hủy bỏ
-                        </button>
-                        <button 
-                            type="submit" 
-                            disabled={isSaving}
-                            className="flex-1 px-4 py-2.5 bg-neutral-900 text-white font-medium rounded-[10px] hover:bg-neutral-800 transition-colors text-sm flex items-center justify-center gap-2"
-                        >
-                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                            {editingId ? 'Lưu thay đổi' : 'Tạo mới'}
+                    <div className="pt-4 border-t border-gray-100 mt-4">
+                        <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-3">
+                            <ShieldCheck className="w-4 h-4 text-blue-600" />
+                            Xác thực thiết bị (Device Auth)
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-gray-500">Tài khoản (Username)</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="admin" 
+                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    value={formData.deviceUsername}
+                                    onChange={(e) => setFormData({...formData, deviceUsername: e.target.value})}
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-gray-500">Mật khẩu (Password)</label>
+                                <input 
+                                    type="password" 
+                                    placeholder="••••••" 
+                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    value={formData.devicePassword}
+                                    onChange={(e) => setFormData({...formData, devicePassword: e.target.value})}
+                                />
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-2 italic">Hệ thống sẽ thử kết nối và xác thực với thiết bị trước khi lưu.</p>
+                    </div>
+
+                    <div className="pt-2 flex gap-3">
+                        <button type="button" onClick={resetForm} className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-[10px] hover:bg-gray-200 transition-colors text-sm">Hủy bỏ</button>
+                        <button type="submit" disabled={isSaving} className="flex-1 px-4 py-2.5 bg-neutral-900 text-white font-medium rounded-[10px] hover:bg-neutral-800 transition-colors text-sm flex items-center justify-center gap-2">
+                            {isSaving ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" /> 
+                                    <span>Đang kết nối...</span> 
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="w-4 h-4" /> 
+                                    <span>{editingId ? 'Lưu thay đổi' : 'Tạo & Kết nối'}</span>
+                                </>
+                            )}
                         </button>
                     </div>
                 </form>

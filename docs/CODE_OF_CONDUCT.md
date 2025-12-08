@@ -20,11 +20,11 @@
 
 Với vai trò là thành viên, người đóng góp và người lãnh đạo, chúng tôi cam kết tạo ra một cộng đồng **không có quấy rối** cho tất cả mọi người, bất kể:
 
-- 🌍 Tuổi tác, cơ thể, khuyết tật nhìn thấy hoặc vô hình
-- 🏳️ Dân tộc, bản sắc và biểu hiện giới tính
-- 🎓 Trình độ kinh nghiệm, giáo dục, địa vị kinh tế xã hội
-- 🇻🇳 Quốc tịch, ngoại hình, chủng tộc, tôn giáo
-- 🏳️‍🌈 Bản sắc và khuynh hướng tình dục
+- Tuổi tác, cơ thể, khuyết tật nhìn thấy hoặc vô hình
+- Dân tộc, bản sắc và biểu hiện giới tính
+- Trình độ kinh nghiệm, giáo dục, địa vị kinh tế xã hội
+- Quốc tịch, ngoại hình, chủng tộc, tôn giáo
+- Bản sắc và khuynh hướng tình dục
 
 Chúng tôi cam kết hành động và tương tác theo cách góp phần vào một cộng đồng **mở, thân thiện, đa dạng, hòa nhập và lành mạnh**.
 
@@ -34,23 +34,23 @@ Chúng tôi cam kết hành động và tương tác theo cách góp phần vào
 
 ### Hành vi được khuyến khích ✅
 
-- ✨ Thể hiện **sự đồng cảm và tử tế** đối với người khác
-- 🤝 **Tôn trọng** các quan điểm, quan điểm và kinh nghiệm khác nhau
-- 💬 Đưa ra và **chấp nhận nhã nhặn** phản hồi mang tính xây dựng
-- 🙏 Chấp nhận **trách nhiệm**, xin lỗi những người bị ảnh hưởng bởi sai lầm và học hỏi từ kinh nghiệm
-- 🎯 Tập trung vào điều **tốt nhất cho cộng đồng**, không chỉ cho cá nhân chúng ta
-- 📚 Giúp đỡ người mới, chia sẻ kiến thức và kinh nghiệm
-- 🔍 Đặt câu hỏi một cách **xây dựng** và giải thích rõ ràng
+- Thể hiện **sự đồng cảm và tử tế** đối với người khác
+- **Tôn trọng** các quan điểm, quan điểm và kinh nghiệm khác nhau
+- Đưa ra và **chấp nhận nhã nhặn** phản hồi mang tính xây dựng
+- Chấp nhận **trách nhiệm**, xin lỗi những người bị ảnh hưởng bởi sai lầm và học hỏi từ kinh nghiệm
+- Tập trung vào điều **tốt nhất cho cộng đồng**, không chỉ cho cá nhân chúng ta
+- Giúp đỡ người mới, chia sẻ kiến thức và kinh nghiệm
+- Đặt câu hỏi một cách **xây dựng** và giải thích rõ ràng
 
 ### Hành vi không được chấp nhận ❌
 
-- ⛔ **Ngôn ngữ hoặc hình ảnh khiêu dâm** và bất kỳ hình thức chú ý hoặc tiến triển tình dục nào
-- 🚫 **Trolling, bình luận xúc phạm hoặc xúc phạm**, tấn công cá nhân hoặc chính trị
-- ❌ **Quấy rối công khai hoặc riêng tư** dưới mọi hình thức
-- 🔒 Công bố **thông tin cá nhân** của người khác mà không có sự cho phép rõ ràng (địa chỉ, email, điện thoại, v.v.)
-- 💢 **Spam, quảng cáo** không liên quan hoặc nội dung lặp đi lặp lại
-- 🎭 **Mạo danh** người khác hoặc tổ chức
-- 🗣️ Hành vi khác có thể **được coi là không phù hợp** trong môi trường chuyên nghiệp
+- **Ngôn ngữ hoặc hình ảnh khiêu dâm** và bất kỳ hình thức chú ý hoặc tiến triển tình dục nào
+- **Trolling, bình luận xúc phạm hoặc xúc phạm**, tấn công cá nhân hoặc chính trị
+- **Quấy rối công khai hoặc riêng tư** dưới mọi hình thức
+- Công bố **thông tin cá nhân** của người khác mà không có sự cho phép rõ ràng (địa chỉ, email, điện thoại, v.v.)
+- **Spam, quảng cáo** không liên quan hoặc nội dung lặp đi lặp lại
+- **Mạo danh** người khác hoặc tổ chức
+- Hành vi khác có thể **được coi là không phù hợp** trong môi trường chuyên nghiệp
 
 ---
 
@@ -71,10 +71,10 @@ Những người lãnh đạo cộng đồng có **quyền và trách nhiệm** 
 
 Quy tắc ứng xử này áp dụng trong **tất cả các không gian cộng đồng**, bao gồm:
 
-- 💻 **GitHub repository**: Issues, Pull Requests, Discussions, Wiki
-- 💬 **Communication channels**: Discord, Slack, Email, Meetings
-- 🌍 **Public spaces**: Conferences, meetups, events khi đại diện cho cộng đồng
-- 📱 **Social media**: Twitter, Facebook, LinkedIn khi đề cập đến dự án
+- **GitHub repository**: Issues, Pull Requests, Discussions, Wiki
+- **Communication channels**: Discord, Slack, Email, Meetings
+- **Public spaces**: Conferences, meetups, events khi đại diện cho cộng đồng
+- **Social media**: Twitter, Facebook, LinkedIn khi đề cập đến dự án
 
 Quy tắc này cũng áp dụng khi cá nhân **đại diện chính thức** cho cộng đồng trong các không gian công cộng.
 
@@ -93,11 +93,11 @@ Nếu bạn **chứng kiến hoặc trải nghiệm** hành vi lạm dụng, qu�
 
 Khi báo cáo, vui lòng bao gồm:
 
-1. ✏️ **Mô tả chi tiết** về sự việc
-2. 🔗 **Link** đến nội dung vi phạm (issue, PR, comment)
-3. 👥 **Người liên quan** (nếu biết)
-4. 📅 **Thời gian** xảy ra sự việc
-5. 📸 **Screenshots** hoặc bằng chứng (nếu có)
+1. **Mô tả chi tiết** về sự việc
+2. **Link** đến nội dung vi phạm (issue, PR, comment)
+3. **Người liên quan** (nếu biết)
+4. **Thời gian** xảy ra sự việc
+5. **Screenshots** hoặc bằng chứng (nếu có)
 
 ### Quy trình xử lý
 
