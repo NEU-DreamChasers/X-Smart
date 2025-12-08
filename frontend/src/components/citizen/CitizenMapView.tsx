@@ -176,8 +176,9 @@ export function CitizenMapView() {
   return (
     <div className="space-y-6">
       
+      {/* SỬA LỖI: Giảm z-index từ 1001 xuống 30 để không đè lên Header chính của trang */}
       <div 
-        className="bg-white rounded-[14px] p-4 shadow-sm sticky top-0 z-[1001]" 
+        className="bg-white rounded-[14px] p-4 shadow-sm sticky top-0 z-30" 
         style={borderStyle} 
         ref={searchContainerRef}
       >
@@ -204,9 +205,10 @@ export function CitizenMapView() {
               }
             </div>
 
+            {/* SỬA LỖI: Dropdown dùng z-40 để cao hơn thanh tìm kiếm nhưng không quá cao */}
             {showSuggestions && suggestions.length > 0 && (
               <div 
-                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[14px] shadow-lg overflow-hidden max-h-[300px] overflow-y-auto animate-in fade-in slide-in-from-top-2 z-[1002]"
+                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[14px] shadow-lg overflow-hidden max-h-[300px] overflow-y-auto animate-in fade-in slide-in-from-top-2 z-40"
                 style={borderStyle}
               >
                 {suggestions.map((item, index) => (

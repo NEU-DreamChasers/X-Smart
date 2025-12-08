@@ -76,9 +76,40 @@ function RoutingMachine({ routeCoords }: { routeCoords: { start: [number, number
     }).addTo(map);
 
     return () => {
+      // @ts-ignore
       if (map && routingControl) map.removeControl(routingControl);
     };
   }, [routeCoords, map]);
+
+  return null;
+}
+
+// --- NEW COMPONENT: FilterAutoPan ---
+function FilterAutoPan({ entities, searchTerm }: { entities: NgsiEntity[], searchTerm: string }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (!searchTerm || !searchTerm.trim() || entities.length === 0) return;
+
+      const target = entities[0];
+      let position: [number, number] | null = null;
+
+      if (Array.isArray(target.location) && target.location.length === 2 && typeof target.location[0] === 'number') {
+           position = target.location as [number, number];
+      } 
+      else if (target.location?.value?.type === 'Point') {
+          const coords = target.location.value.coordinates;
+          position = [coords[1], coords[0]];
+      }
+
+      if (position) {
+        map.flyTo(position, 16, { duration: 1.5 });
+      }
+    }, 800);
+
+    return () => clearTimeout(handler);
+  }, [searchTerm, entities, map]);
 
   return null;
 }
@@ -112,42 +143,20 @@ const createCustomIcon = (domain: string, entity?: any) => {
 
     const iconHtml = renderToStaticMarkup(
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: bgColor,
-        padding: '4px 8px',
-        borderRadius: '20px', 
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: bgColor, padding: '4px 8px', borderRadius: '20px', 
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-        border: '2px solid white',
-        minWidth: '50px',
-        position: 'relative',
-        transform: 'translateY(-10px)' 
+        border: '2px solid white', minWidth: '50px', position: 'relative', transform: 'translateY(-10px)' 
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {config.icon}
-          <span style={{ 
-            color: 'white', 
-            fontWeight: '800', 
-            fontSize: '14px',
-            lineHeight: '1',
-            paddingTop: '1px' 
-          }}>
+          <span style={{ color: 'white', fontWeight: '800', fontSize: '14px', lineHeight: '1', paddingTop: '1px' }}>
             {available}
           </span>
         </div>
-        
         <div style={{
-          position: 'absolute',
-          bottom: '-5px',
-          left: '50%',
-          transform: 'translateX(-50%) rotate(45deg)',
-          width: '10px',
-          height: '10px',
-          backgroundColor: bgColor,
-          borderRight: '2px solid white',
-          borderBottom: '2px solid white',
-          zIndex: -1
+          position: 'absolute', bottom: '-5px', left: '50%', transform: 'translateX(-50%) rotate(45deg)',
+          width: '10px', height: '10px', backgroundColor: bgColor, borderRight: '2px solid white', borderBottom: '2px solid white', zIndex: -1
         }}></div>
       </div>
     );
@@ -157,16 +166,14 @@ const createCustomIcon = (domain: string, entity?: any) => {
   const iconHtml = renderToStaticMarkup(
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      width: '40px', height: '40px', borderRadius: '50%',
-      backgroundColor: config.color,
+      width: '40px', height: '40px', borderRadius: '50%', backgroundColor: config.color,
       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       border: '2px solid white', position: 'relative'
     }}>
       {config.icon}
       <div style={{
         position: 'absolute', bottom: '-4px', left: '50%', transform: 'translateX(-50%) rotate(45deg)',
-        width: '12px', height: '12px', backgroundColor: config.color,
-        borderRight: '2px solid white', borderBottom: '2px solid white', zIndex: -1
+        width: '12px', height: '12px', backgroundColor: config.color, borderRight: '2px solid white', borderBottom: '2px solid white', zIndex: -1
       }}></div>
     </div>
   );
@@ -246,9 +253,44 @@ export default function RealMap({
     }
     if (onDataLoaded) onDataLoaded(result.length, false);
     return result;
-  }, [activeEntities, searchTerm, onDataLoaded]);
+  }, [activeEntities, searchTerm]);
 
-  const getValue = (prop: any) => (prop && prop.value !== undefined ? prop.value : 'N/A');
+  // --- SỬA LỖI: Lọc sạch danh sách marker trước khi render ---
+  // Tạo danh sách các marker hợp lệ, loại bỏ hoàn toàn các giá trị null
+  const validMarkers = useMemo(() => {
+    if (!filteredEntities) return [];
+    
+    return filteredEntities.map((entity) => {
+      let position: [number, number] | null = null;
+      
+      if (Array.isArray(entity.location) && entity.location.length === 2 && typeof entity.location[0] === 'number') {
+           position = entity.location as [number, number];
+      } 
+      else if (entity.location?.value?.type === 'Point') {
+          const coords = entity.location.value.coordinates;
+          position = [coords[1], coords[0]];
+      }
+
+      if (!position) return null; // Trả về null nếu không có tọa độ
+
+      const getValue = (prop: any) => (prop && prop.value !== undefined ? prop.value : 'N/A');
+      const rawAddress = entity.address?.value?.streetAddress || entity.address?.value || entity.address || 'Đang cập nhật';
+      const displayName = getValue(entity.name) !== 'N/A' ? getValue(entity.name) : (entity.name || entity.id);
+      const iconDomain = isExternalMode ? getTypeDomain(entity.type) : domain;
+      const icon = createCustomIcon(iconDomain, entity);
+
+      // Trả về object dữ liệu để render marker
+      return {
+        entity,
+        position,
+        icon,
+        displayName,
+        rawAddress,
+        temperature: getValue(entity.temperature),
+        availableSpots: getValue(entity.availableSpotNumber)
+      };
+    }).filter((item) => item !== null) as any[]; // LỌC BỎ NULL Ở ĐÂY
+  }, [filteredEntities, domain, isExternalMode]);
 
   return (
     <MapContainer 
@@ -261,6 +303,7 @@ export default function RealMap({
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       
       <MapController center={center} zoom={zoom} />
+      <FilterAutoPan entities={filteredEntities} searchTerm={searchTerm} />
       <RoutingMachine routeCoords={routeCoordinates} />
 
       {searchMarker && (
@@ -296,34 +339,14 @@ export default function RealMap({
         </Marker>
       )}
 
+      {/* Render danh sách đã lọc sạch */}
       <MarkerClusterGroup
         chunkedLoading
         spiderfyOnMaxZoom={false}
         maxClusterRadius={40}
         disableClusteringAtZoom={16}
       >
-      {filteredEntities.map((entity) => {
-        let position: [number, number] | null = null;
-        
-        if (Array.isArray(entity.location) && entity.location.length === 2 && typeof entity.location[0] === 'number') {
-             position = entity.location as [number, number];
-        } 
-        else if (entity.location?.value?.type === 'Point') {
-            const coords = entity.location.value.coordinates;
-            position = [coords[1], coords[0]];
-        }
-
-        if (!position) return null;
-
-        const rawAddress = entity.address?.value?.streetAddress || entity.address?.value || entity.address || 'Đang cập nhật';
-        const displayName = getValue(entity.name) !== 'N/A' ? getValue(entity.name) : (entity.name || entity.id);
-
-        const iconDomain = isExternalMode ? getTypeDomain(entity.type) : domain;
-        
-        // --- UPDATE: Truyền entity vào createCustomIcon ---
-        const icon = createCustomIcon(iconDomain, entity);
-
-        return (
+      {validMarkers.map(({ entity, position, icon, displayName, rawAddress, temperature, availableSpots }) => (
           <Marker 
             key={entity.id} 
             position={position} 
@@ -350,14 +373,13 @@ export default function RealMap({
                     </div>
 
                   <div className="text-sm space-y-1">
-                     {entity.type === 'Weather' && <p className="text-orange-600 font-bold">{getValue(entity.temperature)}°C</p>}
-                     {entity.type === 'Parking' && <p className="text-blue-600 font-bold">Trống: {getValue(entity.availableSpotNumber)}</p>}
+                     {entity.type === 'Weather' && <p className="text-orange-600 font-bold">{temperature}°C</p>}
+                     {entity.type === 'Parking' && <p className="text-blue-600 font-bold">Trống: {availableSpots}</p>}
                   </div>
                </div>
             </Popup>
           </Marker>
-        );
-      })}
+      ))}
       </MarkerClusterGroup>
     </MapContainer>
   );
