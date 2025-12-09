@@ -10,6 +10,28 @@ Mọi thay đổi đáng chú ý của dự án sẽ được ghi lại trong t�
 **Tái cấu trúc & Sửa lỗi**
 - Refactor luồng dữ liệu: Chuyển logic xử lý thông báo từ MonitorService sang NotificationsService.
 - Khắc phục lỗi thông báo realtime không được lưu lại lịch sử.
+# 2025-12-08
+**Tính năng mới**
+- Triển khai phần đăng nhập cảm biến cho admin
+- Nâng cấp tính năng tìm đường
+
+**Sửa lỗi**
+- Sửa lỗi UI nhỏ cho trang người dùng và admin
+##
+# 2025-12-07
+**Sửa lỗi**
+- Sửa một vài lỗi UI của trang người dùng và trang admin
+- Sửa lỗi biểu đồ không hiển thị
+##
+
+# 2025-12-06
+**Tính năng mới**
+- Một số cải thiện UI cho web
+##
+# 2025-12-05
+**Tính năng mới**
+- Cập nhật license header cho các file
+- Cập nhật tài liệu
 ##
 
 # 2025-12-04
