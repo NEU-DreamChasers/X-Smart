@@ -21,6 +21,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AirQualityAdapter } from './strategies/air-quality.adapter';
 import { OverpassAdapter } from './strategies/overpass.adapter';
 import { HistoryModule } from 'src/history/history.module';
+import { MonitorService } from './monitor.service';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { MonitorController } from './monitor.controller';
+import { Min } from 'class-validator';
 
 @Module({
   imports: [
@@ -30,6 +34,7 @@ import { HistoryModule } from 'src/history/history.module';
     SourcesModule,
     HistoryModule,
     ConfigModule,
+    NotificationsModule,
     ClientsModule.registerAsync([
       {
         name: 'KAFKA_SERVICE',
@@ -52,7 +57,7 @@ import { HistoryModule } from 'src/history/history.module';
       },
     ]),
   ],
-  providers: [IngestionService, AdapterFactory, OpenWeatherMapAdapter, AirQualityAdapter, OverpassAdapter],
-  controllers: [DataProcessor, ContextController],
+  providers: [IngestionService, AdapterFactory, OpenWeatherMapAdapter, AirQualityAdapter, OverpassAdapter, MonitorService,],
+  controllers: [DataProcessor, ContextController, MonitorController],
 })
-export class IngestionModule {}
+export class IngestionModule { }

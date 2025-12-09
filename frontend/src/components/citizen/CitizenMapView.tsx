@@ -407,6 +407,7 @@ export function CitizenMapView() {
       return () => stopRealtimeTracking();
   }, []);
 
+  // [UPDATED] Hàm lấy tên hiển thị, đã được cập nhật để hiển thị tên chuẩn cho Bus
   const getEntityName = () => {
     if (!selectedRealEntity) return '';
 
@@ -578,6 +579,7 @@ export function CitizenMapView() {
                     <CornerUpRight className="w-3 h-3 rotate-180" /> Quay lại danh sách
                   </button>
                   
+                  {/* [UPDATED] Hiển thị tên (Đã dùng getEntityName mới) */}
                   <h3 className="text-xl font-bold text-gray-900 leading-tight line-clamp-2">
                     {getEntityName()}
                   </h3>
