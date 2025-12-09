@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 import { Injectable, NotFoundException, ForbiddenException, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -256,14 +263,10 @@ export class ReportsService {
 
     if (!report) throw new NotFoundException('Báo cáo không tồn tại');
 
-    // Logic bảo mật xem chi tiết:
-    // 1. Admin xem được hết
     if (user?.role === UserRole.ADMIN) return report;
 
-    // 2. Chủ sở hữu xem được bài mình
     if (user && report.user?.id === user.id) return report;
 
-    // 3. Người lạ chỉ xem được bài Đã duyệt/Đã xong
     if ([ReportStatus.APPROVED, ReportStatus.RESOLVED].includes(report.status)) {
       return report;
     }

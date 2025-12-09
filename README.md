@@ -1,168 +1,280 @@
-# X-Smart
+# 🌍 X-Smart — Nền tảng dữ liệu mở cho đô thị thông minh
 
-> Nền tảng dữ liệu mở cho đô thị thông minh (Open Data Platform for Smart Cities)
+![GitHub License](https://img.shields.io/badge/license-MIT-green) ![Node.js](https://img.shields.io/badge/node-18+-brightgreen) ![Docker](https://img.shields.io/badge/docker-20.10+-blue) ![TypeScript](https://img.shields.io/badge/typescript-5.0+-blue)
 
-**X-Smart** là một dự án mã nguồn mở xây dựng nền tảng quản lý và trực quan hoá dữ liệu cho các thành phố thông minh, sử dụng các tiêu chuẩn mở và kiến trúc microservices.
+---
 
-## Tính năng chính
+## 📑 Mục Lục
 
-- **NGSI-LD Context Broker** (Scorpio) — quản lý entity theo chuẩn ETSI
-- **Backend NestJS** — REST API wrapper cho NGSI-LD, xử lý batch entities
-- **Frontend Next.js** — dashboard tương tác, trực quan hoá dữ liệu, bản đồ
-- **SOSA/SSN Ontology** — mô tả sensor, observation, property
-- **FiWARE Smart Data Models** — kiểu dữ liệu cụ thể (WeatherObserved, AirQualityObserved, ...)
-- **PostgreSQL + PostGIS** — lưu trữ dữ liệu không gian
-- **Kafka (KRaft)** — streaming event cho subscription & notification
-- **Docker Compose** — triển khai toàn bộ hệ thống với một lệnh
+- [Giới thiệu](#-giới-thiệu)
+- [Tính năng](#-tính-năng)
+- [Kiến trúc Hệ thống](#️-kiến-trúc-hệ-thống)
+- [Tech Stack](#-tech-stack)
+- [Yêu cầu Hệ thống](#-yêu-cầu-hệ-thống)
+- [Hướng dẫn Cài đặt Nhanh](#-hướng-dẫn-cài-đặt-nhanh)
+- [Tài liệu](#-tài-liệu)
+- [Đóng góp](#-đóng-góp)
+- [Liên hệ](#-liên-hệ)
+- [Quy tắc Ứng xử](#-quy-tắc-ứng-xử)
+- [Báo cáo Lỗi & Góp ý](#-báo-cáo-lỗi--góp-ý)
+- [Giấy phép](#-giấy-phép)
 
-## Yêu cầu trước
+---
 
-- Docker & Docker Compose (v20.10+)
-- Node.js (v18+) — cho phát triển cục bộ
-- Git
+## 📌 Giới Thiệu
 
-## Khởi động nhanh
+**X-Smart** là một nền tảng mã nguồn mở xây dựng cho các thành phố thông minh. Dự án cung cấp giải pháp quản lý, trực quan hoá và phân tích dữ liệu đô thị theo các tiêu chuẩn mở như **NGSI-LD (ETSI)**, **SOSA/SSN (W3C)** và **FiWARE Smart Data Models**.
 
-### 1. Clone repository
+Dự án tập trung vào xây dựng một nền tảng toàn diện, kết hợp dữ liệu mở liên kết phục vụ chuyển đổi số, hướng tới các mục tiêu:
+
+- Cung cấp cho người dân **nền tảng tra cứu** hữu ích, dễ sử dụng
+- Cho phép **các nhà quản lý** quản lý dữ liệu thu thập qua cảm biến, **gửi cảnh báo** và **xử lý phản ánh** của người dân
+- Cho phép **người dân** nhận thông báo, **gửi báo cáo sự cố** về các vấn đề trong thành phố
+
+> Xây dựng bởi **NEU-DreamChasers** cho cuộc thi Olympic Tin học Sinh viên - Mã nguồn mở năm 2025
+
+---
+
+## 🎯 Tính Năng
+
+### 👤 Người Dùng
+
+- 🗺️ **Xem bản đồ tương tác** — Hiển thị vị trí các cảm biến, tìm kiếm địa điểm
+- 🌡️ **Kiểm tra thời tiết & AQI** — Xem nhiệt độ, độ ẩm, chất lượng không khí real-time
+- 🚗 **Tìm bãi đỗ xe** — Xem số chỗ trống, vị trí bãi đỗ gần nhất
+- 🚌 **Tra cứu xe bus** — Xem tuyến đường, lịch trình, vị trí xe
+- 📝 **Báo cáo sự cố** — Gửi báo cáo về tình trạng đô thị (môi trường, giao thông, cơ sở hạ tầng, v.v)
+- 📱 **Responsive design** — Sử dụng trên điện thoại, tablet, máy tính
+- 🔍 **Tìm kiếm & Lọc** — Tìm cảm biến, điểm quan tâm theo vị trí, loại
+
+### 👨‍💼 Admin / Quản Trị Viên
+
+- 📊 **Dashboard thống kê** — Xem tổng quan entity, cảm biến, báo cáo hệ thống
+- 📈 **Biểu đồ phân tích** — Trực quan hoá dữ liệu nhiệt độ, AQI, lượng mưa
+- 🗺️ **Quản lý bản đồ** — Thêm/sửa/xoá marker, điều chỉnh layer hiển thị
+- 📋 **Quản lý dữ liệu** — CRUD tất cả entity (thời tiết, không khí, bãi đỗ, xe bus)
+- 👥 **Quản lý báo cáo** — Xem, duyệt, từ chối báo cáo từ công dân
+- 🔔 **Thông báo & Cảnh báo** — Theo dõi bất thường, gửi cảnh báo tới người dân
+- 💾 **Lưu trữ báo cáo** — Lưu file PDF, hình ảnh trong MinIO storage
+
+---
+
+## 🏗️ Kiến Trúc Hệ Thống
+
+### Sơ đồ kiến trúc
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                        EXTERNAL DATA SOURCES                         │
+│  (OpenWeatherMap, OpenAQ, OSM, GTFS, User Submissions)               │
+└────────────────────────┬─────────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                   INGESTION SERVICE (NestJS)                         │
+│  ┌─────────────────────────────────────────────────────────────┐     │
+│  │  Data Adapters: Weather | Air | Bus | Parking               │     │
+│  │  - Normalization → NGSI-LD format                           │     │
+│  │  - Kafka Event Publishing                                   │     │
+│  │  - History Recording                                        │     │
+│  └─────────────────────────────────────────────────────────────┘     │
+└────┬────────────────────────────────┬─────────────────────────┬──────┘
+     │                                │                         │
+     ▼                                ▼                         ▼
+┌────────────────────┐  ┌────────────────────┐  ┌──────────────────────┐
+│  Scorpio Broker    │  │  PostgreSQL        │  │  Kafka Message Bus   │
+│  (NGSI-LD)         │  │  (History + GIS)   │  │  (Events)            │
+│  Port: 9090        │  │  Port: 5432        │  │  Port: 9092          │
+└────────┬───────────┘  └────────────────────┘  └──────────────────────┘
+         │
+         │ ┌────────────────────────────────────┐
+         │ │  Backend API (NestJS)              │
+         │ │  REST Endpoints                    │
+         │ │  Port: 8080                        │
+         │ └────────────────────┬───────────────┘
+         │                      │
+         └──────────────────────┼──────────────────┐
+                                │                  │
+                                ▼                  ▼
+                        ┌──────────────────┐  ┌────────────────┐
+                        │  Frontend (Next) │  │  MinIO Storage │
+                        │  Dashboard       │  │  Port: 9001    │
+                        │  Port: 3000      │  │  (S3-like)     │
+                        └──────────────────┘  └────────────────┘
+```
+
+
+
+---
+
+## 🛠️ Tech Stack
+
+**Công nghệ sử dụng chính:**
+
+- **Backend Framework**: NestJS (TypeScript)
+- **Frontend Framework**: Next.js (React 19, TypeScript), Tailwind CSS
+- **Database**: PostgreSQL 16 + PostGIS
+- **NGSI-LD Broker**: Scorpio
+- **Message Queue**: Kafka (KRaft mode)
+- **Object Storage**: MinIO (S3-compatible)
+- **Data Sources**: OpenWeatherMap API, OpenStreetMap API 
+- **Containerization**: Docker & Docker Compose
+- **Standards**: NGSI-LD (ETSI), SOSA/SSN (W3C), FiWARE Smart Data Models
+
+---
+
+## 📦 Yêu Cầu Hệ Thống
+
+### Bắt buộc
+
+| Thành phần | Phiên bản | Ghi chú |
+|-----------|----------|--------|
+| **Docker** | 20.10+ | Desktop hoặc Server |
+| **Docker Compose** | 2.0+ | Bao gồm trong Docker Desktop |
+| **Git** | 2.25+ | Version control |
+
+### Đề xuất
+
+- **RAM**: 4GB tối thiểu, 8GB khuyến nghị
+- **Storage**: 5GB cho images, 2GB cho volumes
+- **OS**: Linux, macOS, hoặc Windows 10+ (với WSL2)
+
+---
+
+## 🚀 Hướng Dẫn Cài Đặt Nhanh
+
+### Bước 1: Clone Repository
 
 ```bash
 git clone https://github.com/NEU-DreamChasers/X-Smart.git
 cd X-Smart
 ```
 
-### 2. Chạy toàn bộ hệ thống
+### Bước 2: Cấu hình Biến Môi trường
 
 ```bash
+# Sao chép file mẫu
+cp .env.example .env
+
+# Chỉnh sửa các biến quan trọng:
+# - OPENWEATHER_API_KEY
+# - DATABASE_PASSWORD
+# - JWT_SECRET
+```
+
+### Bước 3: Khởi động Services
+
+```bash
+# Build và khởi động tất cả services
+docker-compose up -d --build
+
+# Hoặc chỉ up (nếu đã build)
 docker-compose up -d
 ```
 
-### 3. Kiểm tra Scorpio
+### Bước 4: Truy cập các dịch vụ
+
+| Ứng dụng | URL | Thông tin đăng nhập |
+|---------|-----|-------------------|
+| **Frontend Dashboard** | http://localhost:3000 | User & Admin Dashboard |
+| **Backend Swagger API** | http://localhost:8080/api/docs | REST API & Swagger Docs |
+| **Scorpio Broker** | http://localhost:9090 | Context Broker |
+| **MinIO Console** | http://localhost:9001 | Object Storage UI |
+
+### Dừng Stack
 
 ```bash
-curl http://localhost:9090/ngsi-ld/v1/info
+# Dừng tất cả services
+docker-compose down
+
+# Dừng + xóa volumes (data sẽ bị mất)
+docker-compose down -v
 ```
-
-### 4. Truy cập frontend
-
-Mở trình duyệt: `http://localhost:3000`
-
-## Cấu trúc dự án
-
-```
-X-Smart/
-├── backend/           # NestJS API server
-│   ├── src/
-│   │   ├── ngsi-ld/   # NGSI-LD service/controller (scaffold)
-│   │   ├── sosa-ssn/  # SOSA/SSN models
-│   │   └── ...
-│   ├── package.json
-│   └── Dockerfile
-├── frontend/          # Next.js web dashboard
-│   ├── src/app/
-│   ├── package.json
-│   └── Dockerfile
-├── docs/              # Documentation (Việt, Anh)
-│   ├── SETUP.md
-│   ├── ARCHITECTURE.md
-│   ├── API.md
-│   └── ...
-├── scripts/           # Helper scripts
-│   ├── setup.sh
-│   ├── setup.bat
-│   └── ...
-├── docker-compose.yml # Full stack orchestration
-└── README.md          # This file
-```
-
-## Dịch vụ chính
-
-| Dịch vụ        | Cổng | Mô tả                           |
-| -------------- | ---- | ------------------------------- |
-| **Scorpio**    | 9090 | NGSI-LD Context Broker (FIWARE) |
-| **Backend**    | 8080 | NestJS REST API                 |
-| **Frontend**   | 3000 | Next.js Dashboard               |
-| **PostgreSQL** | 5432 | Database (+ PostGIS)            |
-| **Kafka**      | 9092 | Message Bus (KRaft mode)        |
-
-## Tài liệu
-
-- [SETUP.md](./docs/SETUP.md) — Hướng dẫn thiết lập chi tiết
-- [ARCHITECTURE.md](./docs/ARCHITECTURE.md) — Kiến trúc hệ thống
-- [DEPENDENCIES.md](./docs/DEPENDENCIES.md) — Phụ thuộc, library, packages & lý do lựa chọn
-- [API.md](./docs/API.md) — Tài liệu API
-- [CONTRIBUTING.md](./docs/CONTRIBUTING.md) — Quy trình đóng góp
-- [SECURITY.md](./docs/SECURITY.md) — Chính sách bảo mật
-
-## Ví dụ sử dụng
-
-### Tạo một entity WeatherObserved
-
-```bash
-curl -X POST "http://localhost:8080/api/entities" \
-  -H "Content-Type: application/ld+json" \
-  -d '{
-    "type": "WeatherObserved",
-    "temperature": { "type": "Property", "value": 25.5 },
-    "location": { "type": "GeoProperty", "value": { "type": "Point", "coordinates": [105.83, 21.03] } }
-  }'
-```
-
-### Truy vấn entities
-
-```bash
-curl "http://localhost:8080/api/entities?type=WeatherObserved&limit=10"
-```
-
-## Phát triển cục bộ
-
-### Backend
-
-```bash
-cd backend
-npm install
-npm run start:dev
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## Công nghệ sử dụng
-
-- **Backend**: TypeScript, NestJS, TypeORM, Axios
-- **Frontend**: React, Next.js, TypeScript
-- **Broker**: Scorpio (Java/Quarkus)
-- **Database**: PostgreSQL 16, PostGIS
-- **Message Bus**: Kafka (KRaft)
-- **Containers**: Docker, Docker Compose
-
-## Các cải tiến trong tương lai
-
-- [ ] Thêm real data adapters (OpenWeatherMap, OpenAQ, OSM, GTFS)
-- [ ] Truy vấn nâng cao (temporal, geospatial, aggregations)
-- [ ] Subscriptions & notifications (webhook, MQTT)
-- [ ] Authentication & authorization
-- [ ] Dashboards & analytics
-- [ ] Kubernetes support
-
-## Tham gia đóng góp
-
-Mọi đóng góp đều được chào đón! Vui lòng đọc [CONTRIBUTING.md](./docs/CONTRIBUTING.md) để biết quy trình.
-
-## Giấy phép
-
-Dự án này được cấp phép dưới giấy phép [LICENSE](./LICENSE).
-
-## Liên hệ & Hỗ trợ
-
-- GitHub Issues: Báo bug hoặc đề xuất tính năng
-- Discussions: Thảo luận chung
-- Email: contact@neudreamchasers.example (thay bằng email thực tế)
 
 ---
 
-Xây dựng với ❤️ bởi **NEU-DreamChasers** dành cho cuộc thi phần mềm mã nguồn mở
+## 📚 Tài Liệu
+
+| Tài liệu | Nội dung |
+|---------|---------|
+| **[SETUP.md](./docs/SETUP.md)** | Hướng dẫn cài đặt chi tiết, troubleshooting, cấu hình nâng cao |
+| **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** | Kiến trúc hệ thống, component diagram, data flow, design patterns |
+| **[API.md](./docs/API.md)** | Tài liệu REST API chi tiết, endpoint, request/response examples |
+| **[DEPENDENCIES.md](./docs/DEPENDENCIES.md)** | Danh sách packages, phiên bản, lý do lựa chọn, alternatives |
+| **[TECH_STACK.md](./docs/TECH_STACK.md)** | Chi tiết công nghệ sử dụng, so sánh, lợi ích |
+| **[CONTRIBUTING.md](./docs/CONTRIBUTING.md)** | Hướng dẫn đóng góp, workflow, coding standards |
+| **[CODE_OF_CONDUCT.md](./docs/CODE_OF_CONDUCT.md)** | Quy tắc ứng xử cộng đồng, công bằng, tôn trọng |
+
+Để xem đầy đủ, truy cập thư mục [/docs](./docs/).
+
+---
+
+## 🤝 Đóng Góp Cho Dự Án
+
+### Quy trình đóng góp
+
+1. **Fork** repository
+2. **Tạo feature branch** từ `main`:
+   ```bash
+   git checkout -b feature/my-awesome-feature
+   ```
+3. **Commit changes** với message rõ ràng:
+   ```bash
+   git commit -m "Add: new feature description"
+   ```
+4. **Push** đến branch:
+   ```bash
+   git push origin feature/my-awesome-feature
+   ```
+5. **Mở Pull Request** với:
+   - Tiêu đề rõ ràng
+   - Mô tả chi tiết thay đổi
+   - Reference issue nếu có (#123)
+
+Chi tiết xem tại: [CONTRIBUTING.md](./docs/CONTRIBUTING.md)
+
+---
+
+## 📞 Liên Hệ
+
+### Thông tin liên lạc
+
+- **GitHub**: [NEU-DreamChasers](https://github.com/NEU-DreamChasers)
+
+---
+
+## 📜 Changelog
+
+Xem [CHANGELOG.md](./CHANGELOG.md) để biết lịch sử thay đổi
+
+## 📋 Quy Tắc Ứng Xử
+
+Dự án này tuân theo bộ quy tắc ứng xử cho cộng đồng. Xem file [CODE_OF_CONDUCT.md](./docs/CODE_OF_CONDUCT.md) để biết thêm chi tiết về các quy tắc và hành vi được chấp nhận.
+
+---
+
+## 🐛 Báo Cáo Lỗi & Góp Ý
+
+Báo cáo lỗi và đề xuất tính năng mới tại [GitHub Issues](https://github.com/NEU-DreamChasers/X-Smart/issues)
+
+
+
+---
+
+## 📄 Giấy Phép
+
+Dự án này được phát hành dưới **[MIT License](./LICENSE)**.
+
+Xem file [LICENSE](./LICENSE) để biết thêm chi tiết
+
+---
+
+<div align="center">
+
+© 2025 **X-Smart** — *Dữ liệu mở cho thành phố thông minh*
+
+🌍 **Building smarter cities, one data point at a time** 🌍
+
+</div>
+
+

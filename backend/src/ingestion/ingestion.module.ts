@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 import { Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { HttpModule } from '@nestjs/axios';
@@ -13,6 +20,11 @@ import { OpenWeatherMapAdapter } from './strategies/openweathermap.adapter';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AirQualityAdapter } from './strategies/air-quality.adapter';
 import { OverpassAdapter } from './strategies/overpass.adapter';
+import { HistoryModule } from 'src/history/history.module';
+import { MonitorService } from './monitor.service';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { MonitorController } from './monitor.controller';
+import { Min } from 'class-validator';
 
 @Module({
   imports: [
@@ -20,7 +32,9 @@ import { OverpassAdapter } from './strategies/overpass.adapter';
     ScheduleModule.forRoot(),
     ScorpioModule,
     SourcesModule,
+    HistoryModule,
     ConfigModule,
+    NotificationsModule,
     ClientsModule.registerAsync([
       {
         name: 'KAFKA_SERVICE',
@@ -43,7 +57,7 @@ import { OverpassAdapter } from './strategies/overpass.adapter';
       },
     ]),
   ],
-  providers: [IngestionService, AdapterFactory, OpenWeatherMapAdapter, AirQualityAdapter, OverpassAdapter],
-  controllers: [DataProcessor, ContextController],
+  providers: [IngestionService, AdapterFactory, OpenWeatherMapAdapter, AirQualityAdapter, OverpassAdapter, MonitorService,],
+  controllers: [DataProcessor, ContextController, MonitorController],
 })
-export class IngestionModule {}
+export class IngestionModule { }

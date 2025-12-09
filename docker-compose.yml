@@ -6,9 +6,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: ngb
-      POSTGRES_PASSWORD: ngb
-      POSTGRES_DB: ngb
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -51,9 +51,9 @@ services:
       QUARKUS_HTTP_PORT: 9090
       DBHOST: postgres
       DBPORT: 5432
-      DBUSER: ngb
-      DBPASS: ngb
-      DBNAME: ngb
+      DBUSER: ${DB_USERNAME}
+      DBPASS: ${DB_PASSWORD}
+      DBNAME: ${DB_DATABASE}
       BUSHOST: kafka
       BUSPORT: 29092
       GATEWAY_HOST: localhost
@@ -69,63 +69,38 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # HISTORY STORAGE - TimescaleDB
-  timescale:
-    image: timescale/timescaledb:latest-pg14
-    container_name: xsmart_timescale
+  
+  # miniio
+  minio:
+    image: minio/minio:latest
+    container_name: xsmart_minio
     ports:
-      - "5433:5432"
+      - "9000:9000" # API Port
+      - "9001:9001" # Console UI Port
     environment:
-      POSTGRES_USER: ngb
-      POSTGRES_PASSWORD: ngb
-      POSTGRES_DB: ngb
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     networks:
       xsmart: {}
-    restart: always
     volumes:
-      - timescale_data:/var/lib/postgresql/data
-
-  # HISTORY ADAPTER - QuantumLeap
-  quantumleap:
-    image: orchestracities/quantumleap:1.0.0
-    container_name: xsmart_quantumleap
-    ports:
-      - "8668:8668"
-    depends_on:
-      - timescale
-      - scorpio
-    environment:
-      # Force sử dụng Timescale backend
-      QL_DEFAULT_DB: timescale
-      USE_GEOCODING: "false"
-      CACHE_QUERIES: "true"
-      
-      # Timescale connection
-      POSTGRES_HOST: timescale
-      POSTGRES_PORT: 5432
-      POSTGRES_DB_NAME: ngb
-      POSTGRES_DB_USER: ngb
-      POSTGRES_DB_PASS: ngb
-      POSTGRES_USE_SSL: "False"
-      
-      # Disable CrateDB
-      CRATE_WAIT_ACTIVE_SHARDS: 0
-      
-      # NGSI-LD Support
-      KEEP_RAW_ENTITY: "true"
-      
-      # Logging
-      LOG_LEVEL: DEBUG
-      LOGLEVEL: DEBUG
-    networks:
-      xsmart: {}
+      - ./minio_data:/data
+    command: server /data --console-address ":9001"
     restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8668/v2/version"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+
+  # (Tùy chọn) Service để tự động tạo Bucket khi khởi động
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    env_file:
+      - .env
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc mb --ignore-existing myminio/x-smart-reports;
+      /usr/bin/mc policy set download myminio/x-smart-reports;
+      exit 0;
+      "
 
   # Dịch vụ Backend (Nest.js)
   backend:
@@ -134,7 +109,7 @@ services:
       dockerfile: Dockerfile
     container_name: xsmart_backend
     ports:
-      - "8080:8080"
+      - "${PORT}:${PORT}"
     env_file:
       - .env  
     depends_on:
@@ -142,22 +117,18 @@ services:
       - scorpio
       - kafka
     environment:
-      PORT: 8080
+      PORT: ${PORT}
       
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USERNAME: ngb
-      DB_PASSWORD: ngb
-      DB_DATABASE: ngb
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_DATABASE}
       
       KAFKA_BROKER: kafka:29092
       
       SCORPIO_URL: http://scorpio:9090
       SCORPIO_API_VERSION: v1
-
-      OPENWEATHER_API_KEY: eb3a4947904547285aa7bdecca8cc396
-
-      JWT_SECRET: DAY_LA_BI_MAT_KHONG_DUOC_LO_RA_NGOAI
 
     networks:
       xsmart: {}
@@ -174,8 +145,8 @@ services:
     depends_on:
       - backend
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8080/api
-      NEXT_PUBLIC_SCORPIO_URL: http://localhost:9090
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_SCORPIO_URL: ${NEXT_PUBLIC_SCORPIO_URL}
     networks:
       xsmart: {}
     restart: unless-stopped
@@ -183,7 +154,6 @@ services:
 volumes:
   postgres_data:
   kafka_data:
-  timescale_data:
 
 networks:
   xsmart:

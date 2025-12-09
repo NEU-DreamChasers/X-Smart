@@ -1,3 +1,10 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../../users/user.entity';
 
@@ -12,14 +19,20 @@ export class Notification {
   @Column()
   message: string;
 
+  @Column({ default: 'INFO' })
+  type: string;
+
+  @Column({ nullable: true })
+  source: string;
+
   @Column({ default: false })
   isRead: boolean;
 
   @Column({ nullable: true })
   reportId: string;
 
-  @Column()
-  userId: number; 
+  @Column({ nullable: true })
+  userId: number | null;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'userId' })

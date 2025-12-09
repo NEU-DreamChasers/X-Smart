@@ -1,6 +1,12 @@
+/*
+X-Smart
+Copyright (c) 2025 NEU-DreamChasers
+
+This source code is licensed under the MIT license found in the
+LICENSE file in the root directory of this source tree.
+*/
 import { api } from './api.service';
 
-// --- Interface & DTO ---
 
 export interface ReportFormState {
   category: string;
@@ -19,18 +25,16 @@ export interface ReportDto {
   address: string;
   lat: number;
   lon: number;
-  image?: string;
+  imageUrl?: string;
   guestPhone?: string;
 }
 
-// Cấu trúc NGSI-LD Property
 export interface NgsiProperty<T> {
   type: 'Property';
   value: T;
   observedAt?: string;
 }
 
-// Cấu trúc Report chuẩn NGSI-LD (cho UI Admin)
 export interface NgsiReport {
   id: string;
   type: string;
@@ -48,7 +52,6 @@ export interface NgsiReport {
   [key: string]: any;
 }
 
-// --- API Calls ---
 
 export const createCitizenReport = async (formData: ReportFormState) => {
   let finalDescription = `[${formData.title}] ${formData.description}`;
@@ -62,7 +65,7 @@ export const createCitizenReport = async (formData: ReportFormState) => {
     address: formData.address,
     lat: Number(formData.lat),
     lon: Number(formData.lng),
-    image: formData.imageBase64 || undefined,
+    imageUrl: formData.imageBase64 || undefined,
     guestPhone: formData.phoneNumber || undefined,
   };
 
@@ -70,39 +73,46 @@ export const createCitizenReport = async (formData: ReportFormState) => {
   return response.data;
 };
 
-// Hàm map dữ liệu từ Backend sang format NGSI-LD cho UI
-const mapToNgsiReport = (item: any): NgsiReport => ({
-  id: item.id,
-  type: 'Report',
+const mapToNgsiReport = (item: any): NgsiReport => {
+  let coordinates: [number, number] = [0, 0];
   
-  category: { type: 'Property', value: item.category || 'other' },
-  
-  description: { type: 'Property', value: item.description || item.title || '' },
-  
-  address: { type: 'Property', value: item.address || 'Chưa cập nhật' },
-  
-  // Quan trọng: Backend trả về status, map vào value
-  status: { type: 'Property', value: item.status || 'PENDING' },
-  
-  media: { type: 'Property', value: item.image || '' },
-  
-  dateObserved: { type: 'Property', value: item.createdAt || new Date().toISOString() },
-  
-  reporter: { type: 'Property', value: item.user?.fullName || item.guestPhone || 'Khách vãng lai' },
-  
-  location: {
-    type: 'GeoProperty',
-    value: { 
-      type: 'Point', 
-      coordinates: [Number(item.lon || item.lng || 0), Number(item.lat || 0)] 
-    }
+  if (item.location && item.location.coordinates) {
+      coordinates = item.location.coordinates; 
+  } else if (item.lon && item.lat) {
+      coordinates = [Number(item.lon), Number(item.lat)];
   }
-});
 
-// Lấy danh sách Public (người dùng thường)
+  return {
+    id: String(item.id),
+    type: 'Report',
+    
+    category: { type: 'Property', value: item.category || 'other' },
+    
+    description: { type: 'Property', value: item.description || item.title || '' },
+    
+    address: { type: 'Property', value: item.address || 'Chưa cập nhật' },
+    
+    status: { type: 'Property', value: item.status || 'PENDING' },
+    
+    media: { type: 'Property', value: item.imageUrl || item.image || '' },
+    
+    dateObserved: { type: 'Property', value: item.createdAt || new Date().toISOString() },
+    
+    reporter: { type: 'Property', value: item.user?.fullName || item.guestName || 'Khách vãng lai' },
+    
+    location: {
+      type: 'GeoProperty',
+      value: { 
+        type: 'Point', 
+        coordinates: coordinates
+      }
+    }
+  };
+};
+
 export const getReports = async (): Promise<NgsiReport[]> => {
   try {
-    const response = await api.get('/reports'); // Endpoint public
+    const response = await api.get('/reports/public');
     if (Array.isArray(response.data)) {
       return response.data.map(mapToNgsiReport);
     }
@@ -113,38 +123,37 @@ export const getReports = async (): Promise<NgsiReport[]> => {
   }
 };
 
-// --- ADMIN API ---
-
-// 1. Lấy TẤT CẢ báo cáo (bao gồm Pending, Rejected...)
 export const getAdminReports = async (): Promise<NgsiReport[]> => {
   try {
     const response = await api.get('/reports/admin/all');
+    let rawList = [];
+    
     if (Array.isArray(response.data)) {
-      return response.data.map(mapToNgsiReport);
+        rawList = response.data;
+    } else if (response.data && Array.isArray(response.data.data)) {
+        rawList = response.data.data; 
     }
-    return [];
+
+    return rawList.map(mapToNgsiReport);
+
   } catch (error) {
     console.error("Lỗi khi lấy danh sách Admin reports:", error);
     return [];
   }
 };
 
-// 2. Duyệt báo cáo
 export const approveReport = async (id: string) => {
   return await api.patch(`/reports/${id}/approve`);
 };
 
-// 3. Từ chối báo cáo
 export const rejectReport = async (id: string) => {
   return await api.patch(`/reports/${id}/reject`);
 };
 
-// 4. Đánh dấu đã xử lý xong
 export const resolveReport = async (id: string) => {
   return await api.patch(`/reports/${id}/resolve`);
 };
 
-// --- MỚI THÊM: Lấy lịch sử báo cáo cá nhân ---
 export const getMyReports = async (): Promise<NgsiReport[]> => {
   try {
     const response = await api.get('/reports/my-reports');
@@ -162,7 +171,6 @@ export const getReportById = async (id: string): Promise<NgsiReport | null> => {
   try {
     const response = await api.get(`/reports/${id}`);
     if (response.data) {
-      // Backend có thể trả về object thuần, cần map lại để đảm bảo cấu trúc NGSI
       return mapToNgsiReport(response.data);
     }
     return null;
@@ -171,4 +179,3 @@ export const getReportById = async (id: string): Promise<NgsiReport | null> => {
     return null;
   }
 };
-
