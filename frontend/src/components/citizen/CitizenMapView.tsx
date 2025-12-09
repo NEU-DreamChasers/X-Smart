@@ -14,7 +14,9 @@ import {
   Bus, MapPin, Search, 
   Map, Activity, X, Loader2, Navigation, CornerUpRight, Compass,
   Wind, CloudSun, Droplets, CloudFog, AlertTriangle, Car,
-  Clock, Ruler, CornerDownRight, CornerUpLeft, ArrowUp, Flag, MousePointerClick, LocateFixed
+  Clock, Ruler, CornerDownRight, CornerUpLeft, ArrowUp, Flag, MousePointerClick, LocateFixed,
+  // Icon mới cho Parking
+  Warehouse, CircleDollarSign, Ticket
 } from 'lucide-react';
 import type { NgsiEntity } from '../maps/RealMap';
 import { formatAddress } from '@/lib/utils';
@@ -65,41 +67,34 @@ const getDisplayName = (item: any) => {
   return item.display_name.split(',')[0];
 };
 
-// --- HELPER: LẤY TOẠ ĐỘ AN TOÀN (FIX LỖI CHỈ ĐƯỜNG) ---
+// --- HELPER: LẤY TOẠ ĐỘ AN TOÀN ---
 const getEntityCoordinates = (entity: NgsiEntity): [number, number] | null => {
     if (!entity.location) return null;
     
     let coords: any = null;
-    
-    // Trường hợp 1: location.value.coordinates (Chuẩn NGSI-LD GeoJSON nested)
     if (entity.location.value && Array.isArray(entity.location.value.coordinates)) {
         coords = entity.location.value.coordinates;
     }
-    // Trường hợp 2: location.coordinates (Flattened)
     else if (Array.isArray(entity.location.coordinates)) {
         coords = entity.location.coordinates;
     }
-    // Trường hợp 3: location là mảng trực tiếp
     else if (Array.isArray(entity.location)) {
         coords = entity.location;
     }
 
-    // GeoJSON luôn là [Lon, Lat]. Trả về nguyên bản để xử lý sau.
+    // GeoJSON [Lon, Lat] -> Trả về nguyên bản để xử lý sau
     if (coords && coords.length === 2) {
         return [coords[0], coords[1]]; 
     }
     return null;
 };
 
-// --- HELPER: LẤY TÊN HIỂN THỊ CHO BUS (UPDATED) ---
+// --- HELPER: LẤY TÊN HIỂN THỊ CHO BUS ---
 const getBusDisplayName = (entity: NgsiEntity) => {
-    // 1. Ưu tiên lấy Tên thực (Name) trước (VD: "Trạm Xe Bus Cầu Rạch Tôm")
     const nameVal = entity.name?.value || entity.name;
     if (nameVal && typeof nameVal === 'string' && nameVal !== 'N/A') {
         return nameVal;
     }
-
-    // 2. Nếu không có tên, mới tìm đến địa chỉ/tên đường
     const addr = entity.address;
     if (!addr) return entity.id;
 
@@ -113,7 +108,7 @@ const getBusDisplayName = (entity: NgsiEntity) => {
     return String(addr) || entity.id;
 };
 
-// --- HELPER DỊCH THUẬT NÂNG CAO ---
+// --- HELPER DỊCH THUẬT ---
 const translateInstruction = (text: string) => {
     if (!text) return "";
     let t = text;
@@ -262,7 +257,6 @@ export function CitizenMapView() {
     return prop;
   };
 
-  // --- HANDLER: CHỌN GỢI Ý ---
   const handleSelectSuggestion = (item: any) => {
     const lat = parseFloat(item.lat);
     const lon = parseFloat(item.lon);
@@ -329,7 +323,7 @@ export function CitizenMapView() {
   const executeNavigation = () => {
      if (!selectedRealEntity) return;
 
-     // [FIXED] Sử dụng helper để lấy toạ độ an toàn hơn
+     // Lấy toạ độ an toàn từ helper
      const coords = getEntityCoordinates(selectedRealEntity);
      if (!coords) {
          alert("Không xác định được toạ độ điểm đến.");
@@ -381,10 +375,8 @@ export function CitizenMapView() {
                         const newLat = newPos.coords.latitude;
                         const newLon = newPos.coords.longitude;
                         
-                        // UPDATE 1: Di chuyển Camera theo người dùng (Tracking)
                         setMapCenter([newLat, newLon]);
 
-                        // UPDATE 2: Cập nhật lại đường đi
                         setRouteCoords(prev => {
                             if (!prev) return null;
                             const dist = Math.sqrt(Math.pow(newLat - prev.start[0], 2) + Math.pow(newLon - prev.start[1], 2));
@@ -413,7 +405,6 @@ export function CitizenMapView() {
       return () => stopRealtimeTracking();
   }, []);
 
-  // [UPDATED] Hàm lấy tên hiển thị, đã được cập nhật để hiển thị tên chuẩn cho Bus
   const getEntityName = () => {
     if (!selectedRealEntity) return '';
 
@@ -547,9 +538,6 @@ export function CitizenMapView() {
                 <option value="parking">🅿️ Bãi đỗ xe</option>
                 <option value="bus">🚌 Trạm Bus</option>
               </select>
-              
-              {/* [DELETED] ĐÃ XOÁ INPUT LỌC TẠI ĐÂY THEO YÊU CẦU */}
-              
             </div>
             <div className={`px-3 py-1.5 rounded-[10px] flex items-center gap-1.5 text-xs font-medium border ${isMapLoading ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
               {isMapLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
@@ -589,7 +577,6 @@ export function CitizenMapView() {
                     <CornerUpRight className="w-3 h-3 rotate-180" /> Quay lại danh sách
                   </button>
                   
-                  {/* [UPDATED] Hiển thị tên (Đã dùng getEntityName mới) */}
                   <h3 className="text-xl font-bold text-gray-900 leading-tight line-clamp-2">
                     {getEntityName()}
                   </h3>
@@ -663,11 +650,6 @@ export function CitizenMapView() {
                                                 ))}
                                             </div>
                                         )}
-                                    </div>
-                                )}
-                                {startPointMode === 'gps' && (
-                                    <div className="text-xs text-green-600 flex items-center gap-1 mt-1 font-medium">
-                                        <Activity className="w-3 h-3 animate-pulse" /> Sẽ cập nhật theo vị trí thực của bạn
                                     </div>
                                 )}
                             </div>
@@ -789,8 +771,9 @@ export function CitizenMapView() {
                         {(() => {
                         const isWeather = selectedRealEntity.type?.includes('Weather') || getVal(selectedRealEntity.temperature) !== undefined;
                         const isAir = selectedRealEntity.type?.includes('Air') || getVal(selectedRealEntity.airQualityIndex) !== undefined;
-                        // [NEW] Xác định xem có phải Bus không
                         const isBus = selectedRealEntity.type?.includes('Bus') || layerDomain === 'bus';
+                        // [NEW] Xác định xem có phải Parking không
+                        const isParking = selectedRealEntity.type?.includes('Parking') || layerDomain === 'parking';
 
                         if (isWeather) {
                             const valTemp = getVal(selectedRealEntity.temperature);
@@ -988,9 +971,105 @@ export function CitizenMapView() {
                             );
                         }
 
+                        // [NEW] Giao diện chi tiết cho Parking
+                        if (isParking) {
+                            const available = Number(getVal(selectedRealEntity.availableSpotNumber) ?? 0);
+                            const total = Number(getVal(selectedRealEntity.totalSpotNumber) ?? 100); 
+                            const occupancy = total > 0 ? Math.round(((total - available) / total) * 100) : 0;
+                            const price = getVal(selectedRealEntity.price) ?? 'Miễn phí';
+                            const openingHours = getVal(selectedRealEntity.openingHours) ?? '24/7';
+                            
+                            // Xác định màu sắc dựa trên trạng thái
+                            let statusColor = { gradient: 'from-blue-600 to-indigo-600', text: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' };
+                            if (available === 0) statusColor = { gradient: 'from-red-600 to-rose-600', text: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' };
+                            else if (available < 10) statusColor = { gradient: 'from-orange-500 to-amber-500', text: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' };
+                            else statusColor = { gradient: 'from-emerald-500 to-green-600', text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' };
+
+                            return (
+                                <div className="space-y-4">
+                                    {/* Header Status Card */}
+                                    <div className={`bg-gradient-to-br ${statusColor.gradient} rounded-[14px] p-6 text-white shadow-lg relative overflow-hidden`}>
+                                        <div className="relative z-10">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                                                    <Car className="w-6 h-6 text-white" />
+                                                </div>
+                                                <span className="text-sm font-bold uppercase tracking-wider opacity-90">Bãi đỗ xe</span>
+                                            </div>
+                                            
+                                            <div className="flex items-end gap-2 mb-1">
+                                                <span className="text-6xl font-bold tracking-tighter">{available}</span>
+                                                <span className="text-xl font-medium mb-2 opacity-90">chỗ trống</span>
+                                            </div>
+                                            <p className="text-sm text-white/80">Tổng sức chứa: {total} xe</p>
+                                        </div>
+                                        <div className="absolute -bottom-4 -right-4 opacity-10 rotate-12">
+                                            <Car size={140} />
+                                        </div>
+                                    </div>
+
+                                    {/* Occupancy Progress */}
+                                    <div className="bg-white border border-gray-100 rounded-[14px] p-4 shadow-sm">
+                                        <div className="flex justify-between text-sm mb-2">
+                                            <span className="text-gray-500 font-medium">Trạng thái lấp đầy</span>
+                                            <span className={`font-bold ${statusColor.text}`}>{occupancy}%</span>
+                                        </div>
+                                        <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                                            <div 
+                                                className={`h-full rounded-full transition-all duration-500 ${available === 0 ? 'bg-red-500' : available < 10 ? 'bg-orange-500' : 'bg-emerald-500'}`} 
+                                                style={{ width: `${occupancy}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Detail Grid */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-100">
+                                            <div className="flex items-center gap-2 text-gray-500 mb-1">
+                                                <Warehouse className="w-4 h-4" />
+                                                <span className="text-xs font-bold uppercase">Loại hình</span>
+                                            </div>
+                                            <p className="text-sm font-bold text-gray-800 line-clamp-1">
+                                                {getVal(selectedRealEntity.category) || 'Công cộng'}
+                                            </p>
+                                        </div>
+                                        <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-100">
+                                            <div className="flex items-center gap-2 text-gray-500 mb-1">
+                                                <CircleDollarSign className="w-4 h-4" />
+                                                <span className="text-xs font-bold uppercase">Giá vé</span>
+                                            </div>
+                                            <p className="text-sm font-bold text-gray-800 truncate" title={price}>
+                                                {price}
+                                            </p>
+                                        </div>
+                                        <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-100 col-span-2">
+                                            <div className="flex items-center gap-2 text-gray-500 mb-1">
+                                                <Clock className="w-4 h-4" />
+                                                <span className="text-xs font-bold uppercase">Giờ mở cửa</span>
+                                            </div>
+                                            <p className="text-sm font-bold text-gray-800">
+                                                {openingHours}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Navigation Button */}
+                                    <div className="mt-2 pt-2 border-t border-gray-100">
+                                        <button 
+                                            onClick={openNavigationSetup}
+                                            disabled={isRoutingLoading}
+                                            className="w-full py-3 bg-blue-600 text-white rounded-[14px] font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
+                                        >
+                                            <Navigation className="w-5 h-5" />
+                                            Dẫn đường đến bãi đỗ
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        }
+
                         return (
-                          <>
-                            <div className="bg-blue-50 rounded-[14px] p-4 mb-4 border border-blue-100">
+                          <div className="bg-blue-50 rounded-[14px] p-4 mb-4 border border-blue-100">
                               <div className="flex items-center gap-3">
                                 <div className="p-2 bg-blue-100 rounded-[10px]">
                                   <Navigation className="w-5 h-5 text-blue-600" />
@@ -1002,22 +1081,22 @@ export function CitizenMapView() {
                                   </p>
                                 </div>
                               </div>
-                            </div>
-                          </>
+                          </div>
                         );
                         })()}
                         
-                        {/* BUTTON MỞ MENU CHỈ ĐƯỜNG */}
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                            <button 
-                            onClick={openNavigationSetup}
-                            disabled={isRoutingLoading}
-                            className="w-full py-3 bg-blue-600 text-white rounded-[14px] font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100 disabled:opacity-70 disabled:bg-gray-400"
-                            >
-                            <Compass className="w-5 h-5" />
-                            Chỉ đường tới đây
-                            </button>
-                        </div>
+                        {!selectedRealEntity.type?.includes('Parking') && !selectedRealEntity.type?.includes('Bus') && (
+                            <div className="mt-4 pt-4 border-t border-gray-100">
+                                <button 
+                                onClick={openNavigationSetup}
+                                disabled={isRoutingLoading}
+                                className="w-full py-3 bg-blue-600 text-white rounded-[14px] font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100 disabled:opacity-70 disabled:bg-gray-400"
+                                >
+                                <Compass className="w-5 h-5" />
+                                Chỉ đường tới đây
+                                </button>
+                            </div>
+                        )}
                     </div>
                   )
                 )}
