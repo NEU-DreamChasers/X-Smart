@@ -65,7 +65,55 @@ const getDisplayName = (item: any) => {
   return item.display_name.split(',')[0];
 };
 
-// --- HELPER DỊCH THUẬT NÂNG CAO (ĐÃ CẬP NHẬT) ---
+// --- HELPER: LẤY TOẠ ĐỘ AN TOÀN (FIX LỖI CHỈ ĐƯỜNG) ---
+const getEntityCoordinates = (entity: NgsiEntity): [number, number] | null => {
+    if (!entity.location) return null;
+    
+    let coords: any = null;
+    
+    // Trường hợp 1: location.value.coordinates (Chuẩn NGSI-LD GeoJSON nested)
+    if (entity.location.value && Array.isArray(entity.location.value.coordinates)) {
+        coords = entity.location.value.coordinates;
+    }
+    // Trường hợp 2: location.coordinates (Flattened)
+    else if (Array.isArray(entity.location.coordinates)) {
+        coords = entity.location.coordinates;
+    }
+    // Trường hợp 3: location là mảng trực tiếp
+    else if (Array.isArray(entity.location)) {
+        coords = entity.location;
+    }
+
+    // GeoJSON luôn là [Lon, Lat]. Trả về nguyên bản để xử lý sau.
+    if (coords && coords.length === 2) {
+        return [coords[0], coords[1]]; 
+    }
+    return null;
+};
+
+// --- HELPER: LẤY TÊN HIỂN THỊ CHO BUS (UPDATED) ---
+const getBusDisplayName = (entity: NgsiEntity) => {
+    // 1. Ưu tiên lấy Tên thực (Name) trước (VD: "Trạm Xe Bus Cầu Rạch Tôm")
+    const nameVal = entity.name?.value || entity.name;
+    if (nameVal && typeof nameVal === 'string' && nameVal !== 'N/A') {
+        return nameVal;
+    }
+
+    // 2. Nếu không có tên, mới tìm đến địa chỉ/tên đường
+    const addr = entity.address;
+    if (!addr) return entity.id;
+
+    if (typeof addr === 'object') {
+        if (addr.value) { 
+             return addr.value.streetAddress || addr.value.addressLocality || addr.value.road || entity.id;
+        }
+        return addr.streetAddress || addr.road || addr.addressLocality || entity.id;
+    }
+    
+    return String(addr) || entity.id;
+};
+
+// --- HELPER DỊCH THUẬT NÂNG CAO ---
 const translateInstruction = (text: string) => {
     if (!text) return "";
     let t = text;
@@ -279,9 +327,17 @@ export function CitizenMapView() {
 
   // --- STEP 2: BẮT ĐẦU CHỈ ĐƯỜNG (EXECUTE) ---
   const executeNavigation = () => {
-     if (!selectedRealEntity?.location?.value?.coordinates) return;
-     const [destLng, destLat] = selectedRealEntity.location.value.coordinates;
-     const destCoords: [number, number] = [destLat, destLng];
+     if (!selectedRealEntity) return;
+
+     // [FIXED] Sử dụng helper để lấy toạ độ an toàn hơn
+     const coords = getEntityCoordinates(selectedRealEntity);
+     if (!coords) {
+         alert("Không xác định được toạ độ điểm đến.");
+         return;
+     }
+
+     const [destLng, destLat] = coords; // GeoJSON: [Lon, Lat]
+     const destCoords: [number, number] = [destLat, destLng]; // Leaflet: [Lat, Lon]
 
      setIsRoutingLoading(true);
      setRouteInfos(null);
@@ -300,6 +356,12 @@ export function CitizenMapView() {
         setMapCenter([selectedCustomStart.lat, selectedCustomStart.lon]);
      } else {
         // Mode 2: GPS Real-time (TRACKING)
+        if (!navigator.geolocation) {
+             alert("Trình duyệt không hỗ trợ định vị GPS.");
+             setIsRoutingLoading(false);
+             return;
+        }
+
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 const currentLat = pos.coords.latitude;
@@ -323,12 +385,10 @@ export function CitizenMapView() {
                         setMapCenter([newLat, newLon]);
 
                         // UPDATE 2: Cập nhật lại đường đi
-                        // Chỉ update nếu khoảng cách thay đổi đáng kể (>10m) để tránh spam re-route liên tục
                         setRouteCoords(prev => {
                             if (!prev) return null;
                             const dist = Math.sqrt(Math.pow(newLat - prev.start[0], 2) + Math.pow(newLon - prev.start[1], 2));
-                            // Khoảng 0.0001 độ ~ 11m
-                            if (dist > 0.0001) {
+                            if (dist > 0.0001) { // Chỉ update nếu di chuyển > ~10m
                                 return { ...prev, start: [newLat, newLon] };
                             }
                             return prev;
@@ -340,7 +400,8 @@ export function CitizenMapView() {
                 watchIdRef.current = id;
             },
             (err) => {
-                alert("Không thể lấy vị trí GPS. Vui lòng kiểm tra quyền truy cập.");
+                console.error(err);
+                alert("Không thể lấy vị trí GPS. Hãy kiểm tra quyền truy cập.");
                 setIsRoutingLoading(false);
             },
             { enableHighAccuracy: true }
@@ -352,8 +413,16 @@ export function CitizenMapView() {
       return () => stopRealtimeTracking();
   }, []);
 
+  // [UPDATED] Hàm lấy tên hiển thị, đã được cập nhật để hiển thị tên chuẩn cho Bus
   const getEntityName = () => {
     if (!selectedRealEntity) return '';
+
+    // Nếu là Bus, dùng helper lấy tên hiển thị (Ưu tiên Name)
+    const isBus = selectedRealEntity.type?.includes('Bus') || layerDomain === 'bus';
+    if (isBus) {
+        return getBusDisplayName(selectedRealEntity);
+    }
+
     return selectedRealEntity.name?.value || selectedRealEntity.id.split(':').pop() || 'Địa điểm đã chọn';
   };
 
@@ -471,20 +540,16 @@ export function CitizenMapView() {
               <select
                 value={layerDomain}
                 onChange={(e) => { setLayerDomain(e.target.value); setMarkerFilter(''); }}
-                className="pl-3 pr-8 py-2.5 bg-gray-50 rounded-[14px] text-sm font-medium border-transparent focus:ring-2 focus:ring-blue-500 cursor-pointer outline-none transition-all hover:bg-gray-100"
+                className="pl-3 pr-8 py-2.5 bg-gray-50 rounded-[14px] text-sm font-medium border-transparent focus:ring-2 focus:ring-blue-500 cursor-pointer outline-none transition-all hover:bg-gray-100 w-full xl:w-auto"
               >
                 <option value="weather">⛈️ Thời tiết</option>
                 <option value="air">🌫 Không khí</option>
                 <option value="parking">🅿️ Bãi đỗ xe</option>
                 <option value="bus">🚌 Trạm Bus</option>
               </select>
-              <input 
-                type="text"
-                placeholder={`Lọc trong lớp ${layerDomain}...`}
-                value={markerFilter}
-                onChange={(e) => setMarkerFilter(e.target.value)}
-                className="pl-3 pr-3 py-2.5 bg-white border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full transition-all"
-              />
+              
+              {/* [DELETED] ĐÃ XOÁ INPUT LỌC TẠI ĐÂY THEO YÊU CẦU */}
+              
             </div>
             <div className={`px-3 py-1.5 rounded-[10px] flex items-center gap-1.5 text-xs font-medium border ${isMapLoading ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
               {isMapLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
@@ -524,6 +589,7 @@ export function CitizenMapView() {
                     <CornerUpRight className="w-3 h-3 rotate-180" /> Quay lại danh sách
                   </button>
                   
+                  {/* [UPDATED] Hiển thị tên (Đã dùng getEntityName mới) */}
                   <h3 className="text-xl font-bold text-gray-900 leading-tight line-clamp-2">
                     {getEntityName()}
                   </h3>
@@ -532,8 +598,10 @@ export function CitizenMapView() {
                      <p className="text-sm text-gray-500 mt-2 flex items-start gap-2">
                         <MapPin className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" /> 
                         <span className="line-clamp-3 italic">
-                          {formatAddress(getSafeAddressString(selectedRealEntity).replace('Unknown Street', 'Đang cập nhật') || 'Đang cập nhật'
-                          )}  
+                          {selectedRealEntity.type?.includes('Bus') 
+                            ? 'Đang cập nhật' 
+                            : formatAddress(getSafeAddressString(selectedRealEntity).replace('Unknown Street', 'Đang cập nhật') || 'Đang cập nhật')
+                          }
                         </span>
                     </p>
                   )}
@@ -721,6 +789,8 @@ export function CitizenMapView() {
                         {(() => {
                         const isWeather = selectedRealEntity.type?.includes('Weather') || getVal(selectedRealEntity.temperature) !== undefined;
                         const isAir = selectedRealEntity.type?.includes('Air') || getVal(selectedRealEntity.airQualityIndex) !== undefined;
+                        // [NEW] Xác định xem có phải Bus không
+                        const isBus = selectedRealEntity.type?.includes('Bus') || layerDomain === 'bus';
 
                         if (isWeather) {
                             const valTemp = getVal(selectedRealEntity.temperature);
@@ -863,6 +933,58 @@ export function CitizenMapView() {
                                   </div>
                                 </div>
                               </div>
+                            );
+                        }
+
+                        // [NEW] Hiển thị thông tin xe Bus (Tên bến & Toạ độ)
+                        if (isBus) {
+                            const coords = getEntityCoordinates(selectedRealEntity);
+                            const lon = coords ? coords[0] : 0;
+                            const lat = coords ? coords[1] : 0;
+
+                            return (
+                                <div className="space-y-4">
+                                    <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-[14px] p-6 text-white shadow-lg shadow-blue-200 relative overflow-hidden">
+                                        {/* Icon & Label */}
+                                        <div className="relative z-10">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                                                    <Bus className="w-6 h-6 text-white" />
+                                                </div>
+                                                <span className="text-sm font-bold uppercase tracking-wider opacity-90">Trạm xe buýt</span>
+                                            </div>
+                                            
+                                            {/* [UPDATED] Hiển thị tên đường (getEntityName đã xử lý) */}
+                                            <h2 className="text-2xl font-bold leading-tight mb-4">
+                                                {getEntityName()}
+                                            </h2>
+
+                                            {/* [UPDATED] Xoá nền và viền đen (bars) quanh toạ độ. Thay bằng viền mỏng */}
+                                            <div className="flex items-center gap-2 text-sm text-white/90 font-medium border border-white/30 rounded-lg px-3 py-1.5 w-fit">
+                                                <MapPin className="w-4 h-4 shrink-0" />
+                                                <span className="font-mono">{lat.toFixed(6)}, {lon.toFixed(6)}</span>
+                                            </div>
+                                        </div>
+                                        {/* Decorative BG Icon */}
+                                        <div className="absolute -bottom-4 -right-4 opacity-10 rotate-12">
+                                            <Bus size={120} />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-blue-50 rounded-[14px] p-4 border border-blue-100">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-blue-100 rounded-[10px]">
+                                                <Navigation className="w-5 h-5 text-blue-600" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-900">Điều hướng thông minh</p>
+                                                <p className="text-xs text-blue-600">
+                                                    {routeCoords ? 'Đang dẫn đường...' : 'Sẵn sàng tính toán lộ trình tới trạm này'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             );
                         }
 
