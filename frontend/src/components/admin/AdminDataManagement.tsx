@@ -11,7 +11,9 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { 
   CloudRain, Wind, Bus, ParkingCircle, RefreshCw, 
-  Loader2, Play, ChevronLeft, ChevronRight, Server, Lock, Map, BarChart3 
+  Loader2, Play, ChevronLeft, ChevronRight, Server, Lock, Map, BarChart3,
+  MapPin, // Import cũ
+  X, CheckCircle, AlertTriangle, AlertCircle, Database // [NEW] Import thêm icon cho Popup
 } from 'lucide-react';
 import { api, ApiService } from '../../services/api.service';
 // Import Recharts để vẽ biểu đồ
@@ -35,8 +37,12 @@ export function AdminDataManagement() {
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   const [isImporting, setIsImporting] = useState(false);
-  
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // [NEW] State quản lý Modal Popup
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [importMessage, setImportMessage] = useState('');
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -78,18 +84,21 @@ export function AdminDataManagement() {
   
   useEffect(() => { 
     fetchData(); 
-
   }, [domain, offset]);
 
 
-  const handleImportAll = async () => {
+  // [UPDATED] Hàm mở Modal thay vì dùng confirm()
+  const handleImportClick = () => {
     if (!isLoggedIn) {
         alert("Vui lòng đăng nhập tài khoản Admin để sử dụng tính năng này!");
         return;
     }
+    setImportStatus('idle');
+    setShowImportModal(true);
+  };
 
-    if (!confirm('Bạn có chắc muốn CẬP NHẬT lại toàn bộ dữ liệu bản đồ (Xe buýt, Bãi đỗ, Địa điểm) từ OpenStreetMap không?\nQuá trình này sẽ chạy ngầm và mất vài phút.')) return;
-
+  // [UPDATED] Hàm thực hiện logic Import khi bấm "Xác nhận" trong Modal
+  const handleConfirmImport = async () => {
     setIsImporting(true);
     try {
       await Promise.all([
@@ -98,16 +107,29 @@ export function AdminDataManagement() {
           api.post('/admin/import-static?category=poi')
       ]);
       
-      alert('✅ Đã gửi lệnh cập nhật thành công!\nHệ thống đang thu thập dữ liệu mới từ OpenStreetMap. Vui lòng đợi 1-2 phút rồi tải lại trang.');
+      setImportStatus('success');
+      setImportMessage('Hệ thống đang thu thập dữ liệu mới từ OpenStreetMap. Quá trình này sẽ diễn ra ngầm trong 1-2 phút.');
       
-      setTimeout(fetchData, 3000);
+      // Tự động tải lại sau 3s
+      setTimeout(() => {
+        fetchData();
+        // Không đóng modal ngay để user đọc thông báo thành công
+      }, 3000);
 
     } catch (error: any) {
       console.error("Import All error:", error);
-      alert(`❌ Có lỗi xảy ra khi gọi API: ${error.response?.data?.message || error.message}`);
+      setImportStatus('error');
+      setImportMessage(error.response?.data?.message || error.message);
     } finally {
       setIsImporting(false);
     }
+  };
+
+  // [NEW] Hàm đóng modal
+  const handleCloseModal = () => {
+    if (isImporting) return; // Không cho đóng khi đang chạy
+    setShowImportModal(false);
+    setImportStatus('idle');
   };
 
   const renderValue = (item: any) => {
@@ -118,11 +140,32 @@ export function AdminDataManagement() {
     return <span className="text-gray-500">--</span>;
   };
 
+  const renderLocation = (item: any) => {
+    const loc = item.location;
+    let coords = null;
+
+    if (loc) {
+        if (Array.isArray(loc.coordinates)) coords = loc.coordinates;
+        else if (loc.value && Array.isArray(loc.value.coordinates)) coords = loc.value.coordinates;
+    }
+
+    if (coords && coords.length === 2) {
+        const lat = coords[1];
+        const lon = coords[0];
+        return (
+            <div className="flex items-center gap-1.5 text-xs font-mono text-gray-600 bg-gray-100 px-2 py-1 rounded border border-gray-200 w-fit">
+                <MapPin className="w-3 h-3 text-gray-400" />
+                <span>{lat.toFixed(5)}, {lon.toFixed(5)}</span>
+            </div>
+        );
+    }
+    return <span className="text-gray-400 text-xs italic">Không có toạ độ</span>;
+  };
+
   // --- LOGIC BIỂU ĐỒ ---
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
     
-    // Nếu là Bus, đếm số lượng xe theo tuyến
     if (domain === 'bus') {
         const routeCounts: Record<string, number> = {};
         data.forEach(item => {
@@ -136,12 +179,9 @@ export function AdminDataManagement() {
         }));
     }
 
-    // Các domain khác: Lấy giá trị trực tiếp của từng entity
     return data.map(item => {
         let val = 0;
         let shortName = item.id.replace('urn:ngsi-ld:', '').split(':').pop() || item.id;
-        
-        // Rút gọn tên hiển thị
         if (shortName.length > 10) shortName = shortName.substring(0, 10) + '...';
 
         if (domain === 'weather') val = item.temperature || 0;
@@ -208,13 +248,13 @@ export function AdminDataManagement() {
         </div>
     );
   };
-  // --- KẾT THÚC LOGIC BIỂU ĐỒ ---
 
   const columns = [
-    { header: 'ID Entity (NGSI-LD)', accessor: 'id', width: 'w-1/3' },
-    { header: 'Loại', accessor: 'type', width: 'w-1/6' },
-    { header: 'Giá trị chính', accessor: 'value', width: 'w-1/4' },
-    { header: 'Cập nhật cuối', accessor: 'observedAt', width: 'w-1/4' },
+    { header: 'ID Entity (NGSI-LD)', accessor: 'id', width: 'w-[30%]' },
+    { header: 'Loại', accessor: 'type', width: 'w-[10%]' },
+    { header: 'Toạ độ (Lat, Lon)', accessor: 'location', width: 'w-[20%]' },
+    { header: 'Giá trị chính', accessor: 'value', width: 'w-[20%]' },
+    { header: 'Cập nhật cuối', accessor: 'observedAt', width: 'w-[20%]' },
   ];
 
   const handleTabChange = (value: string) => {
@@ -222,8 +262,106 @@ export function AdminDataManagement() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       
+      {/* --- START: GIAO DIỆN MODAL POPUP --- */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 scale-100 animate-in zoom-in-95 duration-200">
+            {/* Header Modal */}
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                {importStatus === 'success' ? (
+                   <span className="text-green-600 flex items-center gap-2"><CheckCircle className="w-5 h-5"/> Thành công</span>
+                ) : importStatus === 'error' ? (
+                   <span className="text-red-600 flex items-center gap-2"><AlertCircle className="w-5 h-5"/> Lỗi</span>
+                ) : (
+                   <span className="flex items-center gap-2"><Database className="w-5 h-5 text-indigo-600"/> Cập nhật dữ liệu</span>
+                )}
+              </h3>
+              <button 
+                onClick={handleCloseModal} 
+                disabled={isImporting}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-full transition-colors disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body Modal */}
+            <div className="p-6">
+              {importStatus === 'idle' && (
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 rounded-full bg-yellow-50 flex items-center justify-center flex-shrink-0 border border-yellow-100">
+                      <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-gray-700 font-medium">Bạn có chắc chắn muốn cập nhật?</p>
+                      <p className="text-sm text-gray-500 leading-relaxed">
+                        Hệ thống sẽ tải lại toàn bộ dữ liệu <b>Xe buýt, Bãi đỗ, Địa điểm</b> từ OpenStreetMap.
+                        Quá trình này có thể mất vài phút.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {importStatus === 'success' && (
+                <div className="text-center py-4 space-y-3">
+                  <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <CheckCircle className="w-8 h-8 text-green-600" />
+                  </div>
+                  <h4 className="text-gray-900 font-bold">Đã gửi lệnh cập nhật!</h4>
+                  <p className="text-sm text-gray-500">{importMessage}</p>
+                </div>
+              )}
+
+              {importStatus === 'error' && (
+                <div className="text-center py-4 space-y-3">
+                   <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <AlertCircle className="w-8 h-8 text-red-600" />
+                  </div>
+                  <h4 className="text-red-600 font-bold">Có lỗi xảy ra</h4>
+                  <p className="text-sm text-gray-500">{importMessage}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Modal */}
+            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+              {importStatus === 'idle' ? (
+                <>
+                  <button 
+                    onClick={handleCloseModal}
+                    disabled={isImporting}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button 
+                    onClick={handleConfirmImport}
+                    disabled={isImporting}
+                    className="px-4 py-2 text-sm font-medium text-white bg-neutral-900 rounded-lg hover:bg-neutral-800 disabled:opacity-70 flex items-center gap-2 transition-colors shadow-sm"
+                  >
+                    {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    {isImporting ? 'Đang xử lý...' : 'Xác nhận cập nhật'}
+                  </button>
+                </>
+              ) : (
+                <button 
+                  onClick={handleCloseModal}
+                  className="w-full px-4 py-2 text-sm font-medium text-white bg-neutral-900 rounded-lg hover:bg-neutral-800 transition-colors shadow-sm"
+                >
+                  Đóng cửa sổ
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* --- END: GIAO DIỆN MODAL POPUP --- */}
+
       <div 
         className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-[14px] shadow-sm"
         style={borderStyle}
@@ -241,7 +379,7 @@ export function AdminDataManagement() {
         </div>
 
         <button
-          onClick={handleImportAll}
+          onClick={handleImportClick} // [UPDATED] Gọi hàm mở modal
           disabled={isImporting} 
           className={`
             flex items-center gap-2 px-6 py-2.5 rounded-[10px] font-medium text-sm transition-colors shadow-sm
@@ -295,7 +433,6 @@ export function AdminDataManagement() {
 
         <div className="bg-white rounded-[14px] shadow-sm overflow-hidden" style={borderStyle}>
             
-            {/* --- INSERT CHART HERE --- */}
             {renderChart()}
 
             <div className="overflow-x-auto">
@@ -307,14 +444,14 @@ export function AdminDataManagement() {
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                            <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                               <div className="flex flex-col items-center gap-2">
                                 <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                                 <span>Đang tải dữ liệu...</span>
                               </div>
                             </td></tr>
                         ) : data.length === 0 ? (
-                            <tr><td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                            <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                                 Chưa có dữ liệu. Hãy bấm nút <b>Cập nhật dữ liệu bản đồ</b> ở trên.
                             </td></tr>
                         ) : (
@@ -332,6 +469,9 @@ export function AdminDataManagement() {
                                         <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded text-gray-700 border border-gray-200">
                                             {item.type}
                                         </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {renderLocation(item)}
                                     </td>
                                     <td className="px-6 py-4">{renderValue(item)}</td>
                                     <td className="px-6 py-4 text-gray-500 text-xs">
