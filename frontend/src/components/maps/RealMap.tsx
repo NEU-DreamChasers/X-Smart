@@ -164,7 +164,6 @@ function RoutingMachine({ routeCoords, onRouteFound }: {
 // --- NEW COMPONENT: FilterAutoPan ---
 function FilterAutoPan({ entities, searchTerm }: { entities: NgsiEntity[], searchTerm: string }) {
   const map = useMap();
-
   useEffect(() => {
     const handler = setTimeout(() => {
       if (!searchTerm || !searchTerm.trim() || entities.length === 0) return;
@@ -191,6 +190,7 @@ function FilterAutoPan({ entities, searchTerm }: { entities: NgsiEntity[], searc
   return null;
 }
 
+// --- CONFIG MÀU SẮC ---
 const DOMAIN_CONFIG: Record<string, { color: string, icon: any }> = {
   weather: { color: '#f97316', icon: <CloudSun size={20} color="white" /> },
   air: { color: '#10b981', icon: <Wind size={20} color="white" /> },

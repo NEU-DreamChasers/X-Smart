@@ -65,7 +65,7 @@ Copy-Item frontend/.env.example frontend/.env -Force
 Sau đó mở các file `.env` để chỉnh các biến nhạy cảm cho phù hợp môi trường.
 
 - `JWT_SECRET` (bắt buộc đổi cho production)
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (dùng cho OAuth)
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, 'GOOGLE_CALLBACK_URL (dùng cho OAuth)
 - `OPENWEATHER_API_KEY`, (Dùng cho dữ liệu thời tiết)
 
 **Lưu Ý**
