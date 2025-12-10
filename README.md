@@ -59,9 +59,8 @@ Dự án tập trung vào xây dựng một nền tảng toàn diện, kết h�
 - **Xem bản đồ tương tác** — Hiển thị vị trí các cảm biến, tìm kiếm địa điểm
 - **Kiểm tra thời tiết & AQI** — Xem nhiệt độ, độ ẩm, chất lượng không khí real-time
 - **Tìm bãi đỗ xe** — Xem số chỗ trống, vị trí bãi đỗ gần nhất
-- **Tra cứu xe bus** — Xem tuyến đường, lịch trình, vị trí xe
+- **Tra cứu xe bus** — Xem vị trí xe
 - **Báo cáo sự cố** — Gửi báo cáo về tình trạng đô thị (môi trường, giao thông, cơ sở hạ tầng, v.v)
-- **Responsive design** — Sử dụng trên điện thoại, tablet, máy tính
 - **Tìm kiếm & Lọc** — Tìm cảm biến, điểm quan tâm theo vị trí, loại
 
 ### 👨‍💼 Admin / Quản Trị Viên
@@ -69,7 +68,7 @@ Dự án tập trung vào xây dựng một nền tảng toàn diện, kết h�
 - **Dashboard thống kê** — Xem tổng quan entity, cảm biến, báo cáo hệ thống
 - **Biểu đồ phân tích** — Trực quan hoá dữ liệu nhiệt độ, AQI, lượng mưa
 - **Quản lý bản đồ** — Thêm/sửa/xoá marker, điều chỉnh layer hiển thị
-- **Quản lý dữ liệu** — CRUD tất cả entity (thời tiết, không khí, bãi đỗ, xe bus)
+- **Quản lý dữ liệu** — Xem dữ liệu tất cả entity (thời tiết, không khí, bãi đỗ, xe bus)
 - **Quản lý báo cáo** — Xem, duyệt, từ chối báo cáo từ công dân
 - **Thông báo & Cảnh báo** — Theo dõi bất thường, gửi cảnh báo tới người dân
 - **Lưu trữ báo cáo** — Lưu file PDF, hình ảnh trong MinIO storage

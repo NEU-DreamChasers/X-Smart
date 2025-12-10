@@ -44,7 +44,7 @@ export class IngestionService {
   }
 
   // LUỒNG 1: THU THẬP CẢM BIẾN (Weather/Air) - Chạy 5 phút/lần
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_30_SECONDS)
   async handleSensorIngestion() {
     this.logger.debug('📡 [Ingestion] Đang thu thập dữ liệu Môi trường...');
     
