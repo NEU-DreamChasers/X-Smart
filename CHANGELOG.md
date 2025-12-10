@@ -1,6 +1,11 @@
 # Changelog
 Mọi thay đổi đáng chú ý của dự án sẽ được ghi lại trong tệp này.
 
+# 2025-12-10
+**Tính năng mới**
+- Triển khai Worker tự động đồng bộ dữ liệu  định kỳ 10 phút/lần.
+- Hỗ trợ thu thập đa nguồn dữ liệu: Thời tiết và Chất lượng không khí từ OpenWeatherMap.
+
 # 2025-12-09
 **Tính năng mới**
 - Hoàn thiện hệ thống cảnh báo (Persistent Alerts): Tích hợp lưu trữ cảnh báo vào CSDL trước khi phát tin qua Socket.
