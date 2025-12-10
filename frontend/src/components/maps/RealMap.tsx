@@ -507,8 +507,7 @@ export default function RealMap({
               />
             )}
             
-            {/* Lớp cảnh báo ngập có điều kiện */}
-            {floodLayerUrl && showFloodLayer && (
+            {floodLayerUrl && (
               <TileLayer 
                 url={floodLayerUrl} 
                 opacity={0.8}
