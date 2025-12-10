@@ -20,16 +20,20 @@ import { OpenWeatherMapAdapter } from './strategies/openweathermap.adapter';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AirQualityAdapter } from './strategies/air-quality.adapter';
 import { OverpassAdapter } from './strategies/overpass.adapter';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { HistoryModule } from 'src/history/history.module';
 import { MonitorService } from './monitor.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MonitorController } from './monitor.controller';
+import { SyncCronService } from './sync-cron.service';
+import { DataSource } from 'src/sources/entities/data-source.entity';
 import { Min } from 'class-validator';
 
 @Module({
   imports: [
     HttpModule,
     ScheduleModule.forRoot(),
+    TypeOrmModule.forFeature([DataSource]),
     ScorpioModule,
     SourcesModule,
     HistoryModule,
@@ -57,7 +61,7 @@ import { Min } from 'class-validator';
       },
     ]),
   ],
-  providers: [IngestionService, AdapterFactory, OpenWeatherMapAdapter, AirQualityAdapter, OverpassAdapter, MonitorService,],
+  providers: [IngestionService, AdapterFactory, OpenWeatherMapAdapter, AirQualityAdapter, OverpassAdapter, MonitorService,SyncCronService,],
   controllers: [DataProcessor, ContextController, MonitorController],
 })
 export class IngestionModule { }
