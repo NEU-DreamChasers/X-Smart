@@ -68,6 +68,8 @@ Sau đó mở các file `.env` để chỉnh các biến nhạy cảm cho phù h
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, 'GOOGLE_CALLBACK_URL (dùng cho OAuth)
 - `OPENWEATHER_API_KEY`, (Dùng cho dữ liệu thời tiết)
 
+Tạo file service-account.json chứa key cho phép Google Earth Engine lấy từ Google Cloud Console
+
 **Lưu Ý**
 - Google Client Keys: tạo trong [Google Cloud Console](https://console.cloud.google.com).
 - Weather/Air quality keys: đăng ký tại [OpenWeatherMap](openweathermap.org)
@@ -109,7 +111,7 @@ curl -I http://localhost:9001
 | **Backend API (Swagger)** | http://localhost:8080/api/docs#/ | API Documentation & Testing |
 | **Scorpio Context Broker** | http://localhost:9090/ngsi-ld/v1 | NGSI-LD API endpoints |
 | **MinIO Console** | http://localhost:9001 | Object Storage (minioadmin / minioadminpassword) |
-| **PostgreSQL** | http://localhost:5432 | Database (ngb / ngb) |
+| **PostgreSQL** | http://localhost:5432 | Database |
 
 ---
 

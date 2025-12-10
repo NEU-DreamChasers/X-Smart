@@ -9,7 +9,6 @@ LICENSE file in the root directory of this source tree.
 
 import React, { useState, ChangeEvent, FormEvent, useEffect } from 'react';
 import { createCitizenReport, ReportFormState } from '../../services/report.service';
-// 1. Thêm ChevronDown vào import
 import { MapPin, Send, AlertTriangle, Loader2, X, ImagePlus, Phone, Type, ChevronDown } from 'lucide-react';
 
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
