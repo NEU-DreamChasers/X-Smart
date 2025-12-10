@@ -9,18 +9,18 @@ import { Controller, Get, Patch, Param, UseGuards, Request } from '@nestjs/commo
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Public } from 'src/common/decorators/public.decorator';
 
 @ApiTags('Notifications')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private readonly service: NotificationsService) {}
+  constructor(private readonly service: NotificationsService) { }
 
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách thông báo của tôi' })
   findAll(@Request() req) {
-    // Lấy userId từ Token
     return this.service.findAllByUser(req.user.userId);
   }
 

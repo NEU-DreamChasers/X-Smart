@@ -14,7 +14,8 @@ import {
   Bus, MapPin, Search, 
   Map, Activity, X, Loader2, Navigation, CornerUpRight, Compass,
   Wind, CloudSun, Droplets, CloudFog, AlertTriangle, Car,
-  Clock, Ruler, CornerDownRight, CornerUpLeft, ArrowUp, Flag, MousePointerClick, LocateFixed
+  Clock, Ruler, CornerDownRight, CornerUpLeft, ArrowUp, Flag, MousePointerClick, LocateFixed,
+  Warehouse, CircleDollarSign, Ticket
 } from 'lucide-react';
 import type { NgsiEntity } from '../maps/RealMap';
 import { formatAddress } from '@/lib/utils';
@@ -40,6 +41,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+// --- HELPER: LẤY TÊN HIỂN THỊ CHO SUGGESTION ---
 const getDisplayName = (item: any) => {
   if (item.name) return item.name;
 
@@ -65,55 +67,57 @@ const getDisplayName = (item: any) => {
   return item.display_name.split(',')[0];
 };
 
-// --- HELPER: LẤY TOẠ ĐỘ AN TOÀN (FIX LỖI CHỈ ĐƯỜNG) ---
+// --- HELPER: LẤY TOẠ ĐỘ AN TOÀN ---
 const getEntityCoordinates = (entity: NgsiEntity): [number, number] | null => {
     if (!entity.location) return null;
     
     let coords: any = null;
-    
-    // Trường hợp 1: location.value.coordinates (Chuẩn NGSI-LD GeoJSON nested)
+    // Trường hợp 1: GeoJSON nested (NGSI-LD chuẩn)
     if (entity.location.value && Array.isArray(entity.location.value.coordinates)) {
         coords = entity.location.value.coordinates;
     }
-    // Trường hợp 2: location.coordinates (Flattened)
+    // Trường hợp 2: GeoJSON flattened
     else if (Array.isArray(entity.location.coordinates)) {
         coords = entity.location.coordinates;
     }
-    // Trường hợp 3: location là mảng trực tiếp
+    // Trường hợp 3: Mảng trực tiếp
     else if (Array.isArray(entity.location)) {
         coords = entity.location;
     }
 
-    // GeoJSON luôn là [Lon, Lat]. Trả về nguyên bản để xử lý sau.
+    // GeoJSON [Lon, Lat] -> Cần trả về để map xử lý
     if (coords && coords.length === 2) {
         return [coords[0], coords[1]]; 
     }
     return null;
 };
 
-// --- HELPER: LẤY TÊN HIỂN THỊ CHO BUS (UPDATED) ---
+// --- HELPER: LẤY TÊN HIỂN THỊ CHO BUS ---
 const getBusDisplayName = (entity: NgsiEntity) => {
-    // 1. Ưu tiên lấy Tên thực (Name) trước (VD: "Trạm Xe Bus Cầu Rạch Tôm")
     const nameVal = entity.name?.value || entity.name;
+    // Nếu có tên và không phải N/A
     if (nameVal && typeof nameVal === 'string' && nameVal !== 'N/A') {
         return nameVal;
     }
+    
+    // Nếu ID là số, thêm chữ "Trạm"
+    const idDisplay = entity.id.split(':').pop() || entity.id;
+    if (/^\d+$/.test(idDisplay)) return `Trạm ${idDisplay}`;
 
-    // 2. Nếu không có tên, mới tìm đến địa chỉ/tên đường
     const addr = entity.address;
-    if (!addr) return entity.id;
+    if (!addr) return idDisplay;
 
     if (typeof addr === 'object') {
         if (addr.value) { 
-             return addr.value.streetAddress || addr.value.addressLocality || addr.value.road || entity.id;
+             return addr.value.streetAddress || addr.value.addressLocality || addr.value.road || idDisplay;
         }
-        return addr.streetAddress || addr.road || addr.addressLocality || entity.id;
+        return addr.streetAddress || addr.road || addr.addressLocality || idDisplay;
     }
     
-    return String(addr) || entity.id;
+    return String(addr) || idDisplay;
 };
 
-// --- HELPER DỊCH THUẬT NÂNG CAO ---
+// --- HELPER DỊCH THUẬT ---
 const translateInstruction = (text: string) => {
     if (!text) return "";
     let t = text;
@@ -193,6 +197,10 @@ export function CitizenMapView() {
   const [realEntityCount, setRealEntityCount] = useState(0);
   const [isMapLoading, setIsMapLoading] = useState(false);
   const [selectedRealEntity, setSelectedRealEntity] = useState<NgsiEntity | null>(null);
+  const [showFloodLayer, setShowFloodLayer] = useState(false);
+  const [floodUrl, setFloodUrl] = useState<string | null>(null);
+  const [isLoadingFlood, setIsLoadingFlood] = useState(false);
+  const [satelliteUrl, setSatelliteUrl] = useState<string | null>(null);
   
   // --- STATES CHO NAVIGATION ---
   const [isPreparingNav, setIsPreparingNav] = useState(false);
@@ -255,14 +263,12 @@ export function CitizenMapView() {
     fetchStartSuggestions();
   }, [debouncedStartQuery, startPointMode]);
 
-  // --- HANDLERS ---
   const getVal = (prop: any) => {
     if (prop === undefined || prop === null) return undefined;
     if (typeof prop === 'object' && prop !== null && 'value' in prop) return prop.value;
     return prop;
   };
 
-  // --- HANDLER: CHỌN GỢI Ý ---
   const handleSelectSuggestion = (item: any) => {
     const lat = parseFloat(item.lat);
     const lon = parseFloat(item.lon);
@@ -272,9 +278,10 @@ export function CitizenMapView() {
     setSearchQuery(getDisplayName(item));
     setShowSuggestions(false);
   
+    // Tạo entity giả lập cho kết quả tìm kiếm với type đặc biệt
     const fakeEntity: any = {
       id: 'search:result',
-      type: 'SearchResult',
+      type: 'SearchResult', // Đánh dấu để phân biệt
       name: { value: getDisplayName(item) },
       location: { value: { coordinates: [lon, lat] } }, 
       address: { value: { streetAddress: item.display_name } }
@@ -320,30 +327,26 @@ export function CitizenMapView() {
       }
   };
 
-  // --- STEP 1: MỞ GIAO DIỆN CHUẨN BỊ (PREPARE) ---
   const openNavigationSetup = () => {
     setIsPreparingNav(true);
   };
 
-  // --- STEP 2: BẮT ĐẦU CHỈ ĐƯỜNG (EXECUTE) ---
   const executeNavigation = () => {
      if (!selectedRealEntity) return;
 
-     // [FIXED] Sử dụng helper để lấy toạ độ an toàn hơn
      const coords = getEntityCoordinates(selectedRealEntity);
      if (!coords) {
          alert("Không xác định được toạ độ điểm đến.");
          return;
      }
 
-     const [destLng, destLat] = coords; // GeoJSON: [Lon, Lat]
-     const destCoords: [number, number] = [destLat, destLng]; // Leaflet: [Lat, Lon]
+     const [destLng, destLat] = coords;
+     const destCoords: [number, number] = [destLat, destLng];
 
      setIsRoutingLoading(true);
      setRouteInfos(null);
 
      if (startPointMode === 'custom') {
-        // Mode 1: Điểm bắt đầu tùy chỉnh (Tĩnh)
         if (!selectedCustomStart) {
             alert("Vui lòng chọn điểm bắt đầu từ gợi ý tìm kiếm.");
             setIsRoutingLoading(false);
@@ -355,7 +358,6 @@ export function CitizenMapView() {
         });
         setMapCenter([selectedCustomStart.lat, selectedCustomStart.lon]);
      } else {
-        // Mode 2: GPS Real-time (TRACKING)
         if (!navigator.geolocation) {
              alert("Trình duyệt không hỗ trợ định vị GPS.");
              setIsRoutingLoading(false);
@@ -367,28 +369,24 @@ export function CitizenMapView() {
                 const currentLat = pos.coords.latitude;
                 const currentLon = pos.coords.longitude;
                 
-                // Set route ban đầu
                 setRouteCoords({
                     start: [currentLat, currentLon],
                     end: destCoords
                 });
                 setMapCenter([currentLat, currentLon]);
 
-                // Bắt đầu Watch Position để cập nhật real-time
                 stopRealtimeTracking(); 
                 const id = navigator.geolocation.watchPosition(
                     (newPos) => {
                         const newLat = newPos.coords.latitude;
                         const newLon = newPos.coords.longitude;
                         
-                        // UPDATE 1: Di chuyển Camera theo người dùng (Tracking)
                         setMapCenter([newLat, newLon]);
 
-                        // UPDATE 2: Cập nhật lại đường đi
                         setRouteCoords(prev => {
                             if (!prev) return null;
                             const dist = Math.sqrt(Math.pow(newLat - prev.start[0], 2) + Math.pow(newLon - prev.start[1], 2));
-                            if (dist > 0.0001) { // Chỉ update nếu di chuyển > ~10m
+                            if (dist > 0.0001) {
                                 return { ...prev, start: [newLat, newLon] };
                             }
                             return prev;
@@ -413,12 +411,47 @@ export function CitizenMapView() {
       return () => stopRealtimeTracking();
   }, []);
 
+  // --- LOGIC BẬT/TẮT LỚP NGẬP LỤT ---
+  const toggleFloodLayer = async () => {
+  if (!showFloodLayer) {
+    // BẬT: Gọi cả 2 API cùng lúc
+    setIsLoadingFlood(true);
+    try {
+      // Kiểm tra xem URL đã có chưa (cache lại để đỡ gọi nhiều lần)
+      if (!floodUrl || !satelliteUrl) {
+         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+         // Gọi song song 2 request cho nhanh
+         const [floodRes, satRes] = await Promise.all([
+            fetch(`${API_URL}/flood/layer`),
+            fetch(`${API_URL}/flood/satellite`)
+         ]);
+
+         const floodData = await floodRes.json();
+         const satData = await satRes.json();
+
+         setFloodUrl(floodData.url);
+         setSatelliteUrl(satData.url); // <--- LƯU URL VỆ TINH
+      }
+      setShowFloodLayer(true);
+    } catch (error) {
+      console.error("Lỗi tải bản đồ:", error);
+      alert("Không thể tải dữ liệu vệ tinh.");
+    } finally {
+      setIsLoadingFlood(false);
+    }
+  } else {
+    // TẮT: Chỉ cần ẩn đi
+    setShowFloodLayer(false);
+    }
+  };
+
   // [UPDATED] Hàm lấy tên hiển thị, đã được cập nhật để hiển thị tên chuẩn cho Bus
   const getEntityName = () => {
     if (!selectedRealEntity) return '';
 
-    // Nếu là Bus, dùng helper lấy tên hiển thị (Ưu tiên Name)
-    const isBus = selectedRealEntity.type?.includes('Bus') || layerDomain === 'bus';
+    // [FIXED] Chỉ coi là Bus nếu không phải kết quả tìm kiếm
+    const isBus = (selectedRealEntity.type?.includes('Bus') || layerDomain === 'bus') && selectedRealEntity.type !== 'SearchResult';
     if (isBus) {
         return getBusDisplayName(selectedRealEntity);
     }
@@ -430,9 +463,9 @@ export function CitizenMapView() {
     const lower = text.toLowerCase();
     if (lower.includes('left') || lower.includes('trái')) return <CornerUpLeft className="w-4 h-4 text-blue-600" />;
     if (lower.includes('right') || lower.includes('phải')) return <CornerUpRight className="w-4 h-4 text-blue-600" />;
-    if (lower.includes('straight') || lower.includes('thẳng') || lower.includes('tiếp tục')) return <ArrowUp className="w-4 h-4 text-blue-600" />;
-    if (lower.includes('finish') || lower.includes('đến') || lower.includes('đã đến')) return <Flag className="w-4 h-4 text-red-600" />;
-    if (lower.includes('u-turn') || lower.includes('quay đầu')) return <Navigation className="w-4 h-4 text-orange-600 rotate-180" />;
+    if (lower.includes('straight') || lower.includes('thẳng')) return <ArrowUp className="w-4 h-4 text-blue-600" />;
+    if (lower.includes('finish') || lower.includes('đến')) return <Flag className="w-4 h-4 text-red-600" />;
+    if (lower.includes('u-turn')) return <Navigation className="w-4 h-4 text-orange-600 rotate-180" />;
     return <CornerDownRight className="w-4 h-4 text-gray-400" />;
   };
 
@@ -449,7 +482,6 @@ export function CitizenMapView() {
     return `${hours} giờ ${remainMins} phút`;
   };
 
-  // Hàm giúp lấy địa chỉ dạng chuỗi an toàn tuyệt đối
   const getSafeAddressString = (entity: any) => {
     const addr = entity.address;
     if (!addr) return '';
@@ -470,6 +502,7 @@ export function CitizenMapView() {
 
   return (
     <div className="space-y-6">
+      {/* Search Bar */}
       <div 
         className="bg-white rounded-[14px] p-4 shadow-sm sticky top-0 z-30" 
         style={borderStyle} 
@@ -538,18 +571,30 @@ export function CitizenMapView() {
           <div className="p-4 flex flex-col xl:flex-row gap-3 justify-between items-center">
             <div className="flex gap-3 w-full xl:w-auto">
               <select
+                title="Chọn lớp dữ liệu bản đồ muốn hiển thị"
                 value={layerDomain}
                 onChange={(e) => { setLayerDomain(e.target.value); setMarkerFilter(''); }}
                 className="pl-3 pr-8 py-2.5 bg-gray-50 rounded-[14px] text-sm font-medium border-transparent focus:ring-2 focus:ring-blue-500 cursor-pointer outline-none transition-all hover:bg-gray-100 w-full xl:w-auto"
               >
-                <option value="weather">⛈️ Thời tiết</option>
-                <option value="air">🌫 Không khí</option>
-                <option value="parking">🅿️ Bãi đỗ xe</option>
-                <option value="bus">🚌 Trạm Bus</option>
+                <option value="weather" title="Xem nhiệt độ, độ ẩm và sức gió hiện tại">⛈️ Thời tiết</option>
+                <option value="air" title="Xem chỉ số chất lượng không khí (AQI) và bụi mịn">🌫 Không khí</option>
+                <option value="parking" title="Tìm kiếm bãi đỗ xe và xem số lượng chỗ trống">🅿️ Bãi đỗ xe</option>
+                <option value="bus" title="Hiển thị mạng lưới trạm dừng xe buýt">🚌 Trạm Bus</option>
               </select>
-              
-              {/* [DELETED] ĐÃ XOÁ INPUT LỌC TẠI ĐÂY THEO YÊU CẦU */}
-              
+
+              <button
+                onClick={toggleFloodLayer}
+                disabled={isLoadingFlood}
+                className={`px-3 py-2.5 rounded-[14px] text-sm font-medium border flex items-center gap-2 transition-all whitespace-nowrap ${
+                  showFloodLayer 
+                    ? 'bg-red-50 text-red-600 border-red-200 shadow-sm'
+                    : 'bg-gray-50 text-gray-600 border-transparent hover:bg-gray-100'
+                }`}
+                title="Dữ liệu vệ tinh Sentinel-1"
+              >
+                {isLoadingFlood ? <Loader2 className="w-4 h-4 animate-spin" /> : <Droplets className="w-4 h-4" />}
+                <span className="hidden sm:inline">{showFloodLayer ? 'Tắt cảnh báo ngập' : 'Cảnh báo ngập'}</span>
+              </button>
             </div>
             <div className={`px-3 py-1.5 rounded-[10px] flex items-center gap-1.5 text-xs font-medium border ${isMapLoading ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
               {isMapLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
@@ -567,6 +612,8 @@ export function CitizenMapView() {
               routeCoordinates={routeCoords}
               onSelectEntity={handleEntityClick}
               onRouteFound={handleRouteFound} 
+              floodLayerUrl={showFloodLayer ? floodUrl : null}
+              satelliteLayerUrl={showFloodLayer ? satelliteUrl : null}
             />
           </div>
         </div>
@@ -577,7 +624,6 @@ export function CitizenMapView() {
             className="bg-white rounded-[14px] p-5 shadow-sm flex-1 flex flex-col overflow-hidden relative" 
             style={borderStyle}
           >
-            {/* TRẠNG THÁI 1: ĐÃ CHỌN ĐỊA ĐIỂM */}
             {selectedRealEntity ? (
               <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300">
                 {/* Header & Back Button */}
@@ -598,9 +644,10 @@ export function CitizenMapView() {
                      <p className="text-sm text-gray-500 mt-2 flex items-start gap-2">
                         <MapPin className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" /> 
                         <span className="line-clamp-3 italic">
-                          {selectedRealEntity.type?.includes('Bus') 
-                            ? 'Đang cập nhật' 
-                            : formatAddress(getSafeAddressString(selectedRealEntity).replace('Unknown Street', 'Đang cập nhật') || 'Đang cập nhật')
+                          {/* [FIXED] Sửa logic hiển thị địa chỉ để không hiện "Đang cập nhật" khi tìm kiếm */}
+                          {selectedRealEntity.type === 'SearchResult' 
+                            ? getSafeAddressString(selectedRealEntity)
+                            : (selectedRealEntity.type?.includes('Bus') ? 'Đang cập nhật' : formatAddress(getSafeAddressString(selectedRealEntity).replace('Unknown Street', 'Đang cập nhật') || 'Đang cập nhật'))
                           }
                         </span>
                     </p>
@@ -663,11 +710,6 @@ export function CitizenMapView() {
                                                 ))}
                                             </div>
                                         )}
-                                    </div>
-                                )}
-                                {startPointMode === 'gps' && (
-                                    <div className="text-xs text-green-600 flex items-center gap-1 mt-1 font-medium">
-                                        <Activity className="w-3 h-3 animate-pulse" /> Sẽ cập nhật theo vị trí thực của bạn
                                     </div>
                                 )}
                             </div>
@@ -749,7 +791,7 @@ export function CitizenMapView() {
                        </div>
                     )}
 
-                    {/* Danh sách hướng dẫn (ĐÃ DỊCH) */}
+                    {/* Danh sách hướng dẫn */}
                     <div className="flex-1 overflow-y-auto pr-1 -mr-2 space-y-2 relative">
                         {routeInfos?.instructions?.map((step: any, idx: number) => {
                            const translatedText = translateInstruction(step.text);
@@ -774,7 +816,7 @@ export function CitizenMapView() {
                           onClick={() => { 
                               setRouteCoords(null); 
                               setRouteInfos(null); 
-                              stopRealtimeTracking(); // Stop GPS watch
+                              stopRealtimeTracking(); 
                           }}
                           className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-[12px] font-medium hover:bg-gray-200 transition-colors text-sm"
                         >
@@ -789,8 +831,12 @@ export function CitizenMapView() {
                         {(() => {
                         const isWeather = selectedRealEntity.type?.includes('Weather') || getVal(selectedRealEntity.temperature) !== undefined;
                         const isAir = selectedRealEntity.type?.includes('Air') || getVal(selectedRealEntity.airQualityIndex) !== undefined;
-                        // [NEW] Xác định xem có phải Bus không
-                        const isBus = selectedRealEntity.type?.includes('Bus') || layerDomain === 'bus';
+                        
+                        // [CRITICAL FIX] Logic phân loại chặt chẽ hơn:
+                        // Chỉ hiển thị UI đặc biệt nếu KHÔNG PHẢI là kết quả tìm kiếm (SearchResult)
+                        const isSearchResult = selectedRealEntity.type === 'SearchResult';
+                        const isBus = !isSearchResult && (selectedRealEntity.type?.includes('Bus') || layerDomain === 'bus');
+                        const isParking = !isSearchResult && (selectedRealEntity.type?.includes('Parking') || layerDomain === 'parking');
 
                         if (isWeather) {
                             const valTemp = getVal(selectedRealEntity.temperature);
@@ -936,7 +982,6 @@ export function CitizenMapView() {
                             );
                         }
 
-                        // [NEW] Hiển thị thông tin xe Bus (Tên bến & Toạ độ)
                         if (isBus) {
                             const coords = getEntityCoordinates(selectedRealEntity);
                             const lon = coords ? coords[0] : 0;
@@ -945,7 +990,6 @@ export function CitizenMapView() {
                             return (
                                 <div className="space-y-4">
                                     <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-[14px] p-6 text-white shadow-lg shadow-blue-200 relative overflow-hidden">
-                                        {/* Icon & Label */}
                                         <div className="relative z-10">
                                             <div className="flex items-center gap-3 mb-2">
                                                 <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
@@ -954,18 +998,15 @@ export function CitizenMapView() {
                                                 <span className="text-sm font-bold uppercase tracking-wider opacity-90">Trạm xe buýt</span>
                                             </div>
                                             
-                                            {/* [UPDATED] Hiển thị tên đường (getEntityName đã xử lý) */}
                                             <h2 className="text-2xl font-bold leading-tight mb-4">
                                                 {getEntityName()}
                                             </h2>
 
-                                            {/* [UPDATED] Xoá nền và viền đen (bars) quanh toạ độ. Thay bằng viền mỏng */}
                                             <div className="flex items-center gap-2 text-sm text-white/90 font-medium border border-white/30 rounded-lg px-3 py-1.5 w-fit">
                                                 <MapPin className="w-4 h-4 shrink-0" />
                                                 <span className="font-mono">{lat.toFixed(6)}, {lon.toFixed(6)}</span>
                                             </div>
                                         </div>
-                                        {/* Decorative BG Icon */}
                                         <div className="absolute -bottom-4 -right-4 opacity-10 rotate-12">
                                             <Bus size={120} />
                                         </div>
@@ -984,52 +1025,155 @@ export function CitizenMapView() {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* [FIXED] Nút chỉ đường cho BUS */}
+                                    <div className="mt-2 pt-2 border-t border-gray-100">
+                                        <button 
+                                            onClick={openNavigationSetup}
+                                            disabled={isRoutingLoading}
+                                            className="w-full py-3 bg-blue-600 text-white rounded-[14px] font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
+                                        >
+                                            <Navigation className="w-5 h-5" />
+                                            Chỉ đường tới đây
+                                        </button>
+                                    </div>
                                 </div>
                             );
                         }
 
+                        if (isParking) {
+                            const available = Number(getVal(selectedRealEntity.availableSpotNumber) ?? 0);
+                            const total = Number(getVal(selectedRealEntity.totalSpotNumber) ?? 100); 
+                            const occupancy = total > 0 ? Math.round(((total - available) / total) * 100) : 0;
+                            const price = getVal(selectedRealEntity.price) ?? 'Miễn phí';
+                            const openingHours = getVal(selectedRealEntity.openingHours) ?? '24/7';
+                            
+                            let statusColor = { gradient: 'from-blue-600 to-indigo-600', text: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' };
+                            if (available === 0) statusColor = { gradient: 'from-red-600 to-rose-600', text: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' };
+                            else if (available < 10) statusColor = { gradient: 'from-orange-500 to-amber-500', text: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' };
+                            else statusColor = { gradient: 'from-emerald-500 to-green-600', text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' };
+
+                            return (
+                                <div className="space-y-4">
+                                    {/* Header Status Card */}
+                                    <div className={`bg-gradient-to-br ${statusColor.gradient} rounded-[14px] p-6 text-white shadow-lg relative overflow-hidden`}>
+                                        <div className="relative z-10">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                                                    <Car className="w-6 h-6 text-white" />
+                                                </div>
+                                                <span className="text-sm font-bold uppercase tracking-wider opacity-90">Bãi đỗ xe</span>
+                                            </div>
+                                            
+                                            <div className="flex items-end gap-2 mb-1">
+                                                <span className="text-6xl font-bold tracking-tighter">{available}</span>
+                                                <span className="text-xl font-medium mb-2 opacity-90">chỗ trống</span>
+                                            </div>
+                                            <p className="text-sm text-white/80">Tổng sức chứa: {total} xe</p>
+                                        </div>
+                                        <div className="absolute -bottom-4 -right-4 opacity-10 rotate-12">
+                                            <Car size={140} />
+                                        </div>
+                                    </div>
+
+                                    {/* Occupancy Progress */}
+                                    <div className="bg-white border border-gray-100 rounded-[14px] p-4 shadow-sm">
+                                        <div className="flex justify-between text-sm mb-2">
+                                            <span className="text-gray-500 font-medium">Trạng thái lấp đầy</span>
+                                            <span className={`font-bold ${statusColor.text}`}>{occupancy}%</span>
+                                        </div>
+                                        <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                                            <div 
+                                                className={`h-full rounded-full transition-all duration-500 ${available === 0 ? 'bg-red-500' : available < 10 ? 'bg-orange-500' : 'bg-emerald-500'}`} 
+                                                style={{ width: `${occupancy}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Detail Grid */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-100">
+                                            <div className="flex items-center gap-2 text-gray-500 mb-1">
+                                                <Warehouse className="w-4 h-4" />
+                                                <span className="text-xs font-bold uppercase">Loại hình</span>
+                                            </div>
+                                            <p className="text-sm font-bold text-gray-800 line-clamp-1">
+                                                {getVal(selectedRealEntity.category) || 'Công cộng'}
+                                            </p>
+                                        </div>
+                                        <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-100">
+                                            <div className="flex items-center gap-2 text-gray-500 mb-1">
+                                                <CircleDollarSign className="w-4 h-4" />
+                                                <span className="text-xs font-bold uppercase">Giá vé</span>
+                                            </div>
+                                            <p className="text-sm font-bold text-gray-800 truncate" title={price}>
+                                                {price}
+                                            </p>
+                                        </div>
+                                        <div className="bg-gray-50 p-3 rounded-[14px] border border-gray-100 col-span-2">
+                                            <div className="flex items-center gap-2 text-gray-500 mb-1">
+                                                <Clock className="w-4 h-4" />
+                                                <span className="text-xs font-bold uppercase">Giờ mở cửa</span>
+                                            </div>
+                                            <p className="text-sm font-bold text-gray-800">
+                                                {openingHours}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Navigation Button */}
+                                    <div className="mt-2 pt-2 border-t border-gray-100">
+                                        <button 
+                                            onClick={openNavigationSetup}
+                                            disabled={isRoutingLoading}
+                                            className="w-full py-3 bg-blue-600 text-white rounded-[14px] font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
+                                        >
+                                            <Navigation className="w-5 h-5" />
+                                            Dẫn đường đến bãi đỗ
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        // [FIXED] Default Return: Chỉ dùng cho Search Result hoặc Point Marker thông thường
+                        // (Không bị lặp nút bấm do dùng if/else if)
                         return (
                           <>
                             <div className="bg-blue-50 rounded-[14px] p-4 mb-4 border border-blue-100">
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-100 rounded-[10px]">
-                                  <Navigation className="w-5 h-5 text-blue-600" />
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-100 rounded-[10px]">
+                                        <Navigation className="w-5 h-5 text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-900">Điều hướng thông minh</p>
+                                        <p className="text-xs text-blue-600">
+                                            {routeCoords ? 'Đang dẫn đường...' : 'Sẵn sàng tính toán lộ trình'}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                  <p className="text-sm font-semibold text-gray-900">Điều hướng thông minh</p>
-                                  <p className="text-xs text-blue-600">
-                                    {routeCoords ? 'Đang dẫn đường...' : 'Sẵn sàng tính toán lộ trình'}
-                                  </p>
-                                </div>
-                              </div>
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-gray-100">
+                                <button 
+                                    onClick={openNavigationSetup}
+                                    disabled={isRoutingLoading}
+                                    className="w-full py-3 bg-blue-600 text-white rounded-[14px] font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100 disabled:opacity-70 disabled:bg-gray-400"
+                                >
+                                    <Compass className="w-5 h-5" />
+                                    Chỉ đường tới đây
+                                </button>
                             </div>
                           </>
                         );
                         })()}
-                        
-                        {/* BUTTON MỞ MENU CHỈ ĐƯỜNG */}
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                            <button 
-                            onClick={openNavigationSetup}
-                            disabled={isRoutingLoading}
-                            className="w-full py-3 bg-blue-600 text-white rounded-[14px] font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100 disabled:opacity-70 disabled:bg-gray-400"
-                            >
-                            <Compass className="w-5 h-5" />
-                            Chỉ đường tới đây
-                            </button>
-                        </div>
                     </div>
                   )
                 )}
               </div>
             ) : (
-              // TRẠNG THÁI 2: CHƯA CHỌN GÌ - HIỂN THỊ DASHBOARD
+              // TRẠNG THÁI 2: DASHBOARD (Giữ nguyên)
               <div className="flex flex-col h-full space-y-4 animate-in fade-in duration-500">
-                {/* 1. CARD TRẠNG THÁI HỆ THỐNG */}
-                <div 
-                    className="rounded-[14px] p-4 bg-white shadow-sm"
-                    style={borderStyle}
-                >
+                <div className="rounded-[14px] p-4 bg-white shadow-sm" style={borderStyle}>
                   <h3 className="text-blue-900 font-bold flex items-center gap-2 mb-3">
                     <Activity className="w-5 h-5 text-blue-600" /> 
                     Trạng thái hệ thống
@@ -1049,11 +1193,7 @@ export function CitizenMapView() {
                   </div>
                 </div>
 
-                {/* 2. CARD BẢNG CHÚ GIẢI */}
-                <div 
-                  className="flex-1 bg-white rounded-[14px] p-4 overflow-y-auto shadow-sm" 
-                  style={borderStyle}
-                >
+                <div className="flex-1 bg-white rounded-[14px] p-4 overflow-y-auto shadow-sm" style={borderStyle}>
                   <h3 className="text-gray-900 font-bold flex items-center gap-2 mb-4">
                     <Map className="w-5 h-5 text-gray-600" /> 
                     Chú giải ký hiệu

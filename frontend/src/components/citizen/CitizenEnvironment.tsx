@@ -199,10 +199,10 @@ export function CitizenEnvironment() {
           'thunderstorm': 'Dông bão',
           'mist': 'Sương mù',
           'haze': 'Sương mù nhẹ',
-          'fog': 'Sương dày'
+          'fog': 'Sương dày',
+          'light intensity shower rain': 'Mưa rào nhẹ'
       };
 
-      // Trả về kết quả dịch hoặc trả về giá trị gốc nếu không tìm thấy (có viết hoa chữ cái đầu)
       return map[lowerType] || (type.charAt(0).toUpperCase() + type.slice(1));
   };
 

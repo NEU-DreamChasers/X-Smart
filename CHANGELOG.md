@@ -1,6 +1,20 @@
 # Changelog
 Mọi thay đổi đáng chú ý của dự án sẽ được ghi lại trong tệp này.
 
+# 2025-12-10
+**Tính năng mới**
+- Triển khai Worker tự động đồng bộ dữ liệu  định kỳ 10 phút/lần.
+- Hỗ trợ thu thập đa nguồn dữ liệu: Thời tiết và Chất lượng không khí từ OpenWeatherMap.
+
+# 2025-12-09
+**Tính năng mới**
+- Hoàn thiện hệ thống cảnh báo (Persistent Alerts): Tích hợp lưu trữ cảnh báo vào CSDL trước khi phát tin qua Socket.
+- Thêm cơ chế "Cooldown" (4 giờ) cho các cảnh báo nhiệt độ và chất lượng không khí để tránh spam.
+- Triển khai logic thông báo toàn cục (Global Alerts) hiển thị cho tất cả người dùng.
+
+**Tái cấu trúc & Sửa lỗi**
+- Refactor luồng dữ liệu: Chuyển logic xử lý thông báo từ MonitorService sang NotificationsService.
+- Khắc phục lỗi thông báo realtime không được lưu lại lịch sử.
 # 2025-12-08
 **Tính năng mới**
 - Triển khai phần đăng nhập cảm biến cho admin

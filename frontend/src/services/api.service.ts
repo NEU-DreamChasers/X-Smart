@@ -7,6 +7,10 @@ LICENSE file in the root directory of this source tree.
 */
 import axios from 'axios';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const getAuthHeader = () => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -50,13 +54,13 @@ const parseNgsi = (item: any) => {
 };
 
 // --- HELPER: Create GetAll ---
-const createNgsiGetAll = (domain: string) => 
+const createNgsiGetAll = (domain: string) =>
   async (limit?: number, offset?: number): Promise<{ data: any[]; totalCount: number }> => {
     const url = `/${domain}/status`;
     const params: any = {};
     if (limit !== undefined) {
-        params.limit = limit;
-        params.count = 'true';
+      params.limit = limit;
+      params.count = 'true';
     }
     if (offset !== undefined) params.offset = offset;
 
@@ -74,12 +78,12 @@ const createNgsiGetAll = (domain: string) =>
 export const ApiService = {
   map: {
     searchNearby: async (lat: number, lon: number, radius: number = 5000) => {
-       try {
-         const res = await api.get('/map/search-nearby', { params: { lat, lon, radius } });
-         return res.data; 
-       } catch (error) {
-         return [];
-       }
+      try {
+        const res = await api.get('/map/search-nearby', { params: { lat, lon, radius } });
+        return res.data;
+      } catch (error) {
+        return [];
+      }
     }
   },
 
@@ -96,7 +100,7 @@ export const ApiService = {
 
   weather: {
     getAll: createNgsiGetAll('weather'),
-    getForecast: (entityId: string) => 
+    getForecast: (entityId: string) =>
       api.get(`/weather/forecast`, { params: { entityId } }).then(res => res.data),
   },
   air: {
@@ -111,34 +115,46 @@ export const ApiService = {
 
   history: {
     getTemperatureChart: async (location: string) => {
-        try { const res = await api.get(`/history/chart/temperature/${location}`); return res.data; } catch (e) { return []; }
+      try { const res = await api.get(`/history/chart/temperature/${location}`); return res.data; } catch (e) { return []; }
     },
     getAqiChart: async (location: string) => {
-        try { const res = await api.get(`/history/chart/aqi/${location}`); return res.data; } catch (e) { return []; }
+      try { const res = await api.get(`/history/chart/aqi/${location}`); return res.data; } catch (e) { return []; }
     },
     getRainChart: async (location: string) => {
-        try { const res = await api.get(`/history/chart/precipitation/${location}`); return res.data; } catch (e) { return []; }
+      try { const res = await api.get(`/history/chart/precipitation/${location}`); return res.data; } catch (e) { return []; }
     }
   },
 
   reports: {
     getMyReports: async () => {
-        try {
-            const res = await api.get('/reports/my-reports');
-            return { 
-                data: Array.isArray(res.data) ? res.data : [], 
-                totalCount: Array.isArray(res.data) ? res.data.length : 0 
-            };
-        } catch (error) {
-            console.warn('Lỗi lấy báo cáo:', error);
-            return { data: [], totalCount: 0 };
-        }
+      try {
+        const res = await api.get('/reports/my-reports');
+        return {
+          data: Array.isArray(res.data) ? res.data : [],
+          totalCount: Array.isArray(res.data) ? res.data.length : 0
+        };
+      } catch (error) {
+        console.warn('Lỗi lấy báo cáo:', error);
+        return { data: [], totalCount: 0 };
+      }
     },
     create: async (formData: FormData) => {
-        const res = await api.post('/reports', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        return res.data;
+      const res = await api.post('/reports', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return res.data;
+    }
+  },
+  notifications: {
+    getAll: async () => {
+      return axios.get(`${API_URL}/notifications`, {
+        headers: getAuthHeader()
+      });
+    },
+    markRead: async (id: string) => {
+      return axios.patch(`${API_URL}/notifications/${id}/read`, {}, {
+        headers: getAuthHeader()
+      });
     }
   }
 };

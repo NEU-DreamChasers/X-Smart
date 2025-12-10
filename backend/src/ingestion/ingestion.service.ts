@@ -16,6 +16,7 @@ import { ConfigService } from '@nestjs/config';
 import { SourcesService } from '../sources/sources.service';
 import { ScorpioService } from '../scorpio/scorpio.service';
 import { HistoryService } from '../history/history.service';
+import { MonitorService } from './monitor.service';
 import { raw } from 'express';
 
 @Injectable()
@@ -31,6 +32,7 @@ export class IngestionService {
     private readonly configService: ConfigService,
     private readonly scorpioService: ScorpioService,
     private readonly historyService: HistoryService,
+    private readonly monitorService: MonitorService,
   ) {
     const key = this.configService.get<string>('OPENWEATHER_API_KEY');
     this.overpassUrl = 'https://maps.mail.ru/osm/tools/overpass/api/interpreter';
@@ -78,8 +80,8 @@ export class IngestionService {
 
         // --- LƯU LỊCH SỬ ---
         if (source.adapterType === 'openweathermap') {
-             const owmId = rawData.id || rawData.name; 
-             entityId = `urn:ngsi-ld:WeatherObserved:OpenWeatherMap:${owmId}`;
+          const owmId = rawData.id || rawData.name;
+          entityId = `urn:ngsi-ld:WeatherObserved:OpenWeatherMap:${owmId}`;
         } else {
              const lat = Number(source.latitude).toFixed(4);
              const lon = Number(source.longitude).toFixed(4);
@@ -89,8 +91,13 @@ export class IngestionService {
             await this.historyService.saveHistoryFromRaw(entityId, source.adapterType, rawData);
         }
 
-        await new Promise((r) => setTimeout(r, 3000));
+        if (source.adapterType === 'openweathermap') {
+          this.monitorService.checkHeatAlert(rawData.main.temp);
+        } else {
+          this.monitorService.checkAqiAlert(rawData.list[0].main.aqi);
+        }
 
+        await new Promise((r) => setTimeout(r, 2000));
       } catch (error) {
         const err = error as Error;
         this.logger.error(`Lỗi nguồn ${source.name}: ${err.message}`);

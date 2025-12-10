@@ -153,3 +153,6 @@ backend/.env
 # MinIO Data
 minio_data/
 .minio.sys/
+
+#google earth engine
+flood-engine/service-account.json
