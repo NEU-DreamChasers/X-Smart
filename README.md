@@ -129,6 +129,7 @@ Dự án tập trung vào xây dựng một nền tảng toàn diện, kết h�
 
 - **Backend Framework**: NestJS (TypeScript)
 - **Frontend Framework**: Next.js (React 19, TypeScript), Tailwind CSS
+- **Python (flood analysis service)**: Python 3.10+
 - **Database**: PostgreSQL 16 + PostGIS
 - **NGSI-LD Broker**: Scorpio
 - **Message Queue**: Kafka (KRaft mode)
@@ -176,6 +177,9 @@ cp .env.example .env
 # - OPENWEATHER_API_KEY
 # - DATABASE_PASSWORD
 # - JWT_SECRET
+# - Tạo Service Account Key trên Google Cloud Console (nếu dùng Google APIs):
+# - Vào Google Cloud Console → IAM & Admin → Service Accounts → Create Service Account.
+# - Tạo key (JSON) và tải về file: service-account.json
 ```
 
 ### Bước 3: Khởi động Services
