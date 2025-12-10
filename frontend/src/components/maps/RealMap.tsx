@@ -24,21 +24,42 @@ if (typeof window !== 'undefined') {
 import { renderToStaticMarkup } from 'react-dom/server';
 import { 
   CloudSun, Wind, Car, Bus, MapPin, Navigation, Store, 
-  Thermometer, CloudRain, Gauge, Cloud, EyeOff, Layers, Waves
+  Thermometer, Gauge, EyeOff, Layers, 
+  ScanEye, CloudLightning 
 } from 'lucide-react';
 import { formatAddress } from '@/lib/utils';
 
-// [UPDATED] API KEY cho OpenWeatherMap
+// API KEY cho OpenWeatherMap
 const OWM_API_KEY = 'eb3a4947904547285aa7bdecca8cc396';
 
-// [UPDATED] Định nghĩa các lớp bản đồ chuẩn (Weather Maps 1.0 compatible)
-// Sử dụng các mã _new để đảm bảo tương thích với API Key tiêu chuẩn
-const OWM_LAYERS = [
-    { id: 'temp_new', name: 'Nhiệt độ', icon: <Thermometer size={18} /> },
-    { id: 'precipitation_new', name: 'Lượng mưa', icon: <CloudRain size={18} /> },
-    { id: 'wind_new', name: 'Sức gió', icon: <Wind size={18} /> },
-    { id: 'clouds_new', name: 'Mây phủ', icon: <Cloud size={18} /> },
-    { id: 'pressure_new', name: 'Áp suất', icon: <Gauge size={18} /> },
+const MAP_LAYERS = [
+    // --- RainViewer ---
+    { 
+        id: 'rainviewer_radar', 
+        source: 'rainviewer',
+        name: 'Radar Mưa (Real-time)', 
+        icon: <CloudLightning size={18} />,
+        color: 2 
+    },
+    { 
+        id: 'rainviewer_satellite', 
+        source: 'rainviewer',
+        name: 'Mây Vệ Tinh', 
+        icon: <CloudSun size={18} />,
+        isSatellite: true 
+    },
+    { 
+        id: 'rainviewer_coverage', 
+        source: 'rainviewer',
+        name: 'Vùng phủ Radar', 
+        icon: <ScanEye size={18} />,
+        isCoverage: true
+    },
+    // --- OpenWeatherMap ---
+    { id: 'temp_new', source: 'owm', name: 'Nhiệt độ', icon: <Thermometer size={18} /> },
+    { id: 'wind_new', source: 'owm', name: 'Sức gió', icon: <Wind size={18} /> },
+    // [ĐÃ XÓA] Lớp Mây phủ (clouds_new)
+    { id: 'pressure_new', source: 'owm', name: 'Áp suất', icon: <Gauge size={18} /> },
 ];
 
 export interface NgsiEntity {
@@ -63,7 +84,6 @@ interface RealMapProps {
   onRouteFound?: (summary: any, instructions: any[]) => void;
 }
 
-// --- Helper Functions ---
 function RoutingMachine({ routeCoords, onRouteFound }: { 
   routeCoords: { start: [number, number]; end: [number, number] } | null | undefined,
   onRouteFound?: (summary: any, instructions: any[]) => void
@@ -73,7 +93,6 @@ function RoutingMachine({ routeCoords, onRouteFound }: {
 
   useEffect(() => {
     if (!map) return;
-    
     if (!routeCoords) {
       if (routingControlRef.current) {
         map.removeControl(routingControlRef.current);
@@ -81,7 +100,6 @@ function RoutingMachine({ routeCoords, onRouteFound }: {
       }
       return;
     }
-
     const startLatLng = L.latLng(routeCoords.start[0], routeCoords.start[1]);
     const endLatLng = L.latLng(routeCoords.end[0], routeCoords.end[1]);
     const waypoints = [startLatLng, endLatLng];
@@ -97,9 +115,7 @@ function RoutingMachine({ routeCoords, onRouteFound }: {
       routeWhileDragging: false, 
       showAlternatives: false,
       fitSelectedRoutes: true,
-      lineOptions: { 
-        styles: [{ color: '#2563eb', weight: 6, opacity: 0.8 }] 
-      },
+      lineOptions: { styles: [{ color: '#2563eb', weight: 6, opacity: 0.8 }] },
       draggableWaypoints: false,
       addWaypoints: false,      
       createMarker: function(i: number, waypoint: any, n: number) {
@@ -174,7 +190,6 @@ function FilterAutoPan({ entities, searchTerm }: { entities: NgsiEntity[], searc
   return null;
 }
 
-// --- CONFIG MÀU SẮC ---
 const DOMAIN_CONFIG: Record<string, { color: string, icon: any }> = {
   weather: { color: '#f97316', icon: <CloudSun size={20} color="white" /> },
   air: { color: '#10b981', icon: <Wind size={20} color="white" /> },
@@ -201,7 +216,6 @@ const createCustomIcon = (domain: string, entity?: any) => {
   if (domain === 'parking' && entity) {
     const available = entity.availableSpotNumber?.value ?? entity.availableSpotNumber ?? 0;
     const bgColor = available === 0 ? '#ef4444' : (available < 10 ? '#f59e0b' : config.color); 
-
     const iconHtml = renderToStaticMarkup(
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -211,9 +225,7 @@ const createCustomIcon = (domain: string, entity?: any) => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {config.icon}
-          <span style={{ color: 'white', fontWeight: '800', fontSize: '14px', lineHeight: '1', paddingTop: '1px' }}>
-            {available}
-          </span>
+          <span style={{ color: 'white', fontWeight: '800', fontSize: '14px', lineHeight: '1', paddingTop: '1px' }}>{available}</span>
         </div>
         <div style={{
           position: 'absolute', bottom: '-5px', left: '50%', transform: 'translateX(-50%) rotate(45deg)',
@@ -271,7 +283,13 @@ export default function RealMap({
 }: RealMapProps) {
   
   const [internalEntities, setInternalEntities] = useState<NgsiEntity[]>([]);
-  const [activeOwmLayer, setActiveOwmLayer] = useState<string | null>(null);
+  const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
+  
+  // Dùng tile-cache làm mặc định
+  const [rainViewerTs, setRainViewerTs] = useState<number | null>(null);
+  const [rainViewerHost, setRainViewerHost] = useState<string>('https://tilecache.rainviewer.com');
+  const [radarPath, setRadarPath] = useState<string | null>(null);
+  const [satellitePath, setSatellitePath] = useState<string | null>(null);
 
   const getValue = (prop: any) => {
     if (prop === undefined || prop === null) return 'N/A';
@@ -283,17 +301,62 @@ export default function RealMap({
   const isExternalMode = !!externalEntities;
   const activeEntities = isExternalMode ? externalEntities : internalEntities;
 
-  // [UPDATED] Tự động bật layer phù hợp khi chuyển Domain (Tabs)
+  // Auto-switch layer based on domain
   useEffect(() => {
-    if (domain === 'weather') setActiveOwmLayer('precipitation_new'); // Mưa/Mây
-    else if (domain === 'air') setActiveOwmLayer('wind_new'); // Gió (khuếch tán không khí)
-    else setActiveOwmLayer(null);
+    if (domain === 'weather') setActiveLayerId('rainviewer_radar');
+    else if (domain === 'air') setActiveLayerId('wind_new');
+    else setActiveLayerId(null);
   }, [domain]);
+
+  // Fetch RainViewer Config
+  useEffect(() => {
+    const fetchRainConfig = async () => {
+      try {
+        const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+        const data = await res.json();
+        
+        if (data.host) setRainViewerHost(data.host);
+
+        // Radar Path
+        if (data.radar?.past?.length > 0) {
+          const latestRadar = data.radar.past[data.radar.past.length - 1];
+          setRadarPath(latestRadar.path);
+          setRainViewerTs(latestRadar.time);
+        }
+
+        // Satellite Path
+        if (data.satellite?.infrared?.length > 0) {
+            const latestSat = data.satellite.infrared[data.satellite.infrared.length - 1];
+            setSatellitePath(latestSat.path);
+        }
+
+      } catch (e) {
+        console.error("Lỗi tải cấu hình RainViewer:", e);
+      }
+    };
+    fetchRainConfig();
+  }, []);
+
+  const filteredEntities = useMemo(() => {
+    let result = activeEntities || [];
+    if (searchTerm && searchTerm.trim()) {
+      const lowerTerm = searchTerm.toLowerCase();
+      result = result.filter(entity => {
+        const name = String(entity.name?.value || entity.name || '').toLowerCase(); 
+        return name.includes(lowerTerm);
+      });
+    }
+    return result;
+  }, [activeEntities, searchTerm]);
+
+  useEffect(() => {
+    if (onDataLoaded) onDataLoaded(filteredEntities.length, false);
+  }, [filteredEntities.length]);
 
   const fetchEntities = async () => {
     if (isExternalMode || !domain || domain === 'default') return;
-
     if (onDataLoaded) onDataLoaded(0, true);
+    
     try {
       let rawData: any[] = [];
       switch (domain) {
@@ -313,7 +376,6 @@ export default function RealMap({
           else if (domain === 'bus') displayType = 'BusStop';
           return { ...item, type: displayType };
       });
-
       setInternalEntities(normalizedData);
     } catch (error) {
       console.error("[RealMap] Lỗi thu thập dữ liệu:", error);
@@ -330,25 +392,11 @@ export default function RealMap({
     }
   }, [domain, isExternalMode]);
 
-  const filteredEntities = useMemo(() => {
-    let result = activeEntities || [];
-    if (searchTerm && searchTerm.trim()) {
-      const lowerTerm = searchTerm.toLowerCase();
-      result = result.filter(entity => {
-        const name = String(entity.name?.value || entity.name || '').toLowerCase(); 
-        return name.includes(lowerTerm);
-      });
-    }
-    if (onDataLoaded) onDataLoaded(result.length, false);
-    return result;
-  }, [activeEntities, searchTerm]);
-
   const validMarkers = useMemo(() => {
     if (!filteredEntities) return [];
     
     return filteredEntities.map((entity) => {
       let position: [number, number] | null = null;
-      
       if (entity.location?.coordinates && Array.isArray(entity.location.coordinates)) {
            const coords = entity.location.coordinates;
            position = [coords[1], coords[0]];
@@ -378,11 +426,7 @@ export default function RealMap({
       const icon = createCustomIcon(iconDomain, entity);
 
       return {
-        entity,
-        position,
-        icon,
-        displayName,
-        rawAddress,
+        entity, position, icon, displayName, rawAddress,
         temperature: getValue(entity.temperature),
         availableSpots: getValue(entity.availableSpotNumber)
       };
@@ -397,23 +441,56 @@ export default function RealMap({
         >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             
-            {/* [UPDATED] TileLayer ĐỘNG cho OpenWeatherMap */}
-            {activeOwmLayer && (
-                <TileLayer
-                    url={`https://tile.openweathermap.org/map/${activeOwmLayer}/{z}/{x}/{y}.png?appid=${OWM_API_KEY}`}
-                    attribution='&copy; OpenWeatherMap'
-                    zIndex={10}
-                    opacity={0.7}
-                />
-            )}
+            {activeLayerId && (() => {
+                const activeLayer = MAP_LAYERS.find(l => l.id === activeLayerId);
+                if (!activeLayer) return null;
+
+                // 1. RainViewer Logic
+                if (activeLayer.source === 'rainviewer' && rainViewerHost) {
+                    let url = '';
+                    
+                    if (activeLayer.isCoverage) {
+                        url = `${rainViewerHost}/v2/coverage/0/256/{z}/{x}/{y}/0/0_0.png`;
+                    } else if (activeLayer.isSatellite && satellitePath) {
+                        url = `${rainViewerHost}${satellitePath}/256/{z}/{x}/{y}/0/0_1.png`;
+                    } else if (radarPath) { // Radar
+                        const color = (activeLayer as any).color || 2;
+                        url = `${rainViewerHost}${radarPath}/256/{z}/{x}/{y}/${color}/1_1.png`;
+                    } else {
+                        return null; 
+                    }
+                    
+                    return (
+                        <TileLayer
+                            key={`${activeLayer.id}_${rainViewerTs}`}
+                            url={url}
+                            attribution='&copy; <a href="https://www.rainviewer.com" target="_blank">RainViewer</a>'
+                            zIndex={10}
+                            opacity={0.8}
+                            maxNativeZoom={10} 
+                        />
+                    );
+                }
+
+                // 2. OpenWeatherMap Logic
+                if (activeLayer.source === 'owm') {
+                    return (
+                        <TileLayer
+                            key={activeLayer.id}
+                            url={`https://tile.openweathermap.org/map/${activeLayer.id}/{z}/{x}/{y}.png?appid=${OWM_API_KEY}`}
+                            attribution='&copy; OpenWeatherMap'
+                            zIndex={10}
+                            opacity={0.7}
+                            maxNativeZoom={18} 
+                        />
+                    );
+                }
+                return null;
+            })()}
             
             <MapController center={center} zoom={zoom} />
             <FilterAutoPan entities={filteredEntities} searchTerm={searchTerm} />
-            
-            <RoutingMachine 
-                routeCoords={routeCoordinates} 
-                onRouteFound={onRouteFound}
-            />
+            <RoutingMachine routeCoords={routeCoordinates} onRouteFound={onRouteFound} />
 
             {searchMarker && (
                 <Marker position={searchMarker} icon={searchResultIcon} zIndexOffset={1000} eventHandlers={{
@@ -423,13 +500,8 @@ export default function RealMap({
                         id: 'search:result',
                         type: 'SearchResult',
                         name: { value: 'Vị trí tìm kiếm' },
-                        location: {
-                            type: 'GeoProperty',
-                            value: { type: 'Point', coordinates: [searchMarker[1], searchMarker[0]] } 
-                        },
-                        address: {
-                            value: { streetAddress: `Tọa độ: ${searchMarker[0].toFixed(4)}, ${searchMarker[1].toFixed(4)}` },
-                        }
+                        location: { type: 'GeoProperty', value: { type: 'Point', coordinates: [searchMarker[1], searchMarker[0]] } },
+                        address: { value: { streetAddress: `Tọa độ: ${searchMarker[0].toFixed(4)}, ${searchMarker[1].toFixed(4)}` } }
                         };
                         onSelectEntity(fakeEntity);
                     }
@@ -439,17 +511,10 @@ export default function RealMap({
                 </Marker>
             )}
 
-            <MarkerClusterGroup
-                chunkedLoading
-                spiderfyOnMaxZoom={false}
-                maxClusterRadius={40}
-                disableClusteringAtZoom={16}
-            >
+            <MarkerClusterGroup chunkedLoading spiderfyOnMaxZoom={false} maxClusterRadius={40} disableClusteringAtZoom={16}>
             {validMarkers.map(({ entity, position, icon, displayName, rawAddress, temperature, availableSpots }) => (
                 <Marker 
-                    key={entity.id} 
-                    position={position} 
-                    icon={icon}
+                    key={entity.id} position={position} icon={icon}
                     eventHandlers={{ click: () => { if (onSelectEntity) onSelectEntity(entity); } }}
                 >
                     <Popup className="custom-popup">
@@ -460,7 +525,7 @@ export default function RealMap({
                         <div className="text-xs text-gray-500 mb-2 flex items-start gap-1.5">
                             <MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />
                             <span className="italic leading-tight">{typeof rawAddress === 'string' ? rawAddress : formatAddress(rawAddress)}</span>
-                            </div>
+                        </div>
                         <div className="text-sm space-y-1">
                             {entity.type === 'Weather' && <p className="text-orange-600 font-bold">{temperature}°C</p>}
                             {entity.type === 'Parking' && <p className="text-blue-600 font-bold">Trống: {availableSpots}</p>}
@@ -472,30 +537,28 @@ export default function RealMap({
             </MarkerClusterGroup>
         </MapContainer>
 
-        {/* [NEW] THANH CÔNG CỤ ĐIỀU KHIỂN LAYER BÊN PHẢI */}
-        <div className="absolute top-4 right-4 z-[400] bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden flex flex-col transition-all duration-300">
+        <div className="absolute top-4 right-4 z-[400] bg-white rounded-lg shadow-lg border border-gray-200 flex flex-col transition-all duration-300">
             <div className="p-2 bg-gray-50 border-b border-gray-100 flex items-center justify-center cursor-default" title="Lớp bản đồ">
                 <Layers className="w-4 h-4 text-gray-500" />
             </div>
             
             <div className="flex flex-col">
                 <button
-                    onClick={() => setActiveOwmLayer(null)}
-                    className={`p-2.5 flex items-center justify-center transition-colors hover:bg-gray-100 border-b border-gray-100 ${!activeOwmLayer ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}
+                    onClick={() => setActiveLayerId(null)}
+                    className={`p-2.5 flex items-center justify-center transition-colors hover:bg-gray-100 border-b border-gray-100 ${!activeLayerId ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}
                     title="Tắt lớp phủ (None)"
                 >
                     <EyeOff size={18} />
                 </button>
 
-                {OWM_LAYERS.map((layer) => (
+                {MAP_LAYERS.map((layer) => (
                     <button
                         key={layer.id}
-                        onClick={() => setActiveOwmLayer(layer.id)}
-                        className={`p-2.5 flex items-center justify-center transition-all hover:bg-gray-100 relative group/btn ${activeOwmLayer === layer.id ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-inner' : 'text-gray-600'}`}
+                        title={layer.name}
+                        onClick={() => setActiveLayerId(layer.id)}
+                        className={`p-2.5 flex items-center justify-center transition-all hover:bg-gray-100 relative group/btn ${activeLayerId === layer.id ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-inner' : 'text-gray-600'}`}
                     >
                         {layer.icon}
-                        
-                        {/* Tooltip khi hover */}
                         <span className="absolute right-full mr-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
                             {layer.name}
                         </span>

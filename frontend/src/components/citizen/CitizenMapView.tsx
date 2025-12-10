@@ -532,14 +532,15 @@ export function CitizenMapView() {
           <div className="p-4 flex flex-col xl:flex-row gap-3 justify-between items-center">
             <div className="flex gap-3 w-full xl:w-auto">
               <select
+                title="Chọn lớp dữ liệu bản đồ muốn hiển thị"
                 value={layerDomain}
                 onChange={(e) => { setLayerDomain(e.target.value); setMarkerFilter(''); }}
                 className="pl-3 pr-8 py-2.5 bg-gray-50 rounded-[14px] text-sm font-medium border-transparent focus:ring-2 focus:ring-blue-500 cursor-pointer outline-none transition-all hover:bg-gray-100 w-full xl:w-auto"
               >
-                <option value="weather">⛈️ Thời tiết</option>
-                <option value="air">🌫 Không khí</option>
-                <option value="parking">🅿️ Bãi đỗ xe</option>
-                <option value="bus">🚌 Trạm Bus</option>
+                <option value="weather" title="Xem nhiệt độ, độ ẩm và sức gió hiện tại">⛈️ Thời tiết</option>
+                <option value="air" title="Xem chỉ số chất lượng không khí (AQI) và bụi mịn">🌫 Không khí</option>
+                <option value="parking" title="Tìm kiếm bãi đỗ xe và xem số lượng chỗ trống">🅿️ Bãi đỗ xe</option>
+                <option value="bus" title="Hiển thị mạng lưới trạm dừng xe buýt">🚌 Trạm Bus</option>
               </select>
             </div>
             <div className={`px-3 py-1.5 rounded-[10px] flex items-center gap-1.5 text-xs font-medium border ${isMapLoading ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
