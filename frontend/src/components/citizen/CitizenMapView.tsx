@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { NgsiEntity } from '../maps/RealMap';
 import { formatAddress } from '@/lib/utils';
+import { Button } from '../ui/button';
 
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
@@ -1067,7 +1068,7 @@ export function CitizenMapView() {
                                     </div>
 
                                     {/* Navigation Button */}
-                                    <div className="mt-2 pt-2 border-t border-gray-100">
+                                    <div className="mt-2 pt-2 border-t border-gray-100 flex flex-col gap-3">
                                         <button 
                                             onClick={openNavigationSetup}
                                             disabled={isRoutingLoading}
@@ -1076,6 +1077,10 @@ export function CitizenMapView() {
                                             <Navigation className="w-5 h-5" />
                                             Dẫn đường đến bãi đỗ
                                         </button>
+                                        <Button className="w-full py-3 bg-blue-600 text-white rounded-[14px] font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100">
+                                            <Navigation className="w-5 h-5" />
+                                            Chỉ đường tối ưu
+                                        </Button>
                                     </div>
                                 </div>
                             );

@@ -343,8 +343,13 @@ export function CitizenEnvironment() {
           </div>
           <div style={{ width: '100%', height: '250px' }}>
             {loading ? <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500"/></div> : 
-             rainChart.length > 0 ? (
-                <SimpleBarChart data={rainChart} xAxisKey="name" bars={rainChartConfig} height={250} />
+            rainChart.length > 0 ? (
+                <SimpleBarChart 
+                    data={rainChart} 
+                    xAxisKey="time"  // <--- SỬA TẠI ĐÂY (Cũ là "name")
+                    bars={rainChartConfig} 
+                    height={250} 
+                />
             ) : <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa có dữ liệu mưa</div>}
           </div>
         </div>
