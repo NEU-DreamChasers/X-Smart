@@ -6,9 +6,7 @@ This source code is licensed under the MIT license found in the
 LICENSE file in the root directory of this source tree.
 */
 import axios from 'axios';
-
-// Export URL để dùng chung cho Socket bên Component
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const getAuthHeader = () => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -32,7 +30,6 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interceptor Response: Xử lý lỗi chung
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -148,13 +145,16 @@ export const ApiService = {
       return res.data;
     }
   },
-
   notifications: {
     getAll: async () => {
-      return api.get('/notifications');
+      return axios.get(`${API_URL}/notifications`, {
+        headers: getAuthHeader()
+      });
     },
     markRead: async (id: string) => {
-      return api.patch(`/notifications/${id}/read`);
+      return axios.patch(`${API_URL}/notifications/${id}/read`, {}, {
+        headers: getAuthHeader()
+      });
     }
   }
 };

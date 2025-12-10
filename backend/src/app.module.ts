@@ -22,6 +22,7 @@ import { MinioClientModule } from './minio-client/minio-client.module';
 import { UploadModule } from './upload/upload.module';
 import { WeatherService } from './weather/weather.service';
 import { WeatherController } from './weather/weather.controller';
+import { FloodModule } from './flood/flood.module';
 
 @Module({
   imports: [
@@ -40,9 +41,9 @@ import { WeatherController } from './weather/weather.controller';
         type: 'postgres',
         host: config.get<string>('DB_HOST') || 'localhost',
         port: config.get<number>('DB_PORT') || 5432,
-        username: config.get<string>('DB_USERNAME') || 'ngb',
-        password: config.get<string>('DB_PASSWORD') || 'ngb',
-        database: config.get<string>('DB_DATABASE') || 'ngb',
+        username: config.get<string>('DB_USERNAME'),
+        password: config.get<string>('DB_PASSWORD'),
+        database: config.get<string>('DB_DATABASE'),
         autoLoadEntities: true,
         synchronize: true,
         logging: false,
@@ -59,6 +60,7 @@ import { WeatherController } from './weather/weather.controller';
     ReportsModule,
     MinioClientModule,
     UploadModule,
+    FloodModule
   ],
   controllers: [WeatherController],
   providers: [
