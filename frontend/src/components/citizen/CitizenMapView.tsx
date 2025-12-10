@@ -1158,7 +1158,7 @@ export function CitizenMapView() {
                                     </div>
                                 </div>
                             </div>
-                            <div className="mt-4 pt-4 border-t border-gray-100">
+                            <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col gap-3">
                                 <button 
                                     onClick={openNavigationSetup}
                                     disabled={isRoutingLoading}
@@ -1167,6 +1167,10 @@ export function CitizenMapView() {
                                     <Compass className="w-5 h-5" />
                                     Chỉ đường tới đây
                                 </button>
+                                <Button className="w-full py-3 bg-blue-600 text-white rounded-[14px] font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100">
+                                      <Navigation className="w-5 h-5" />
+                                        Chỉ đường tối ưu
+                                  </Button>
                             </div>
                           </>
                         );

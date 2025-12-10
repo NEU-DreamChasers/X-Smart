@@ -58,7 +58,6 @@ const MAP_LAYERS = [
     // --- OpenWeatherMap ---
     { id: 'temp_new', source: 'owm', name: 'Nhiệt độ', icon: <Thermometer size={18} /> },
     { id: 'wind_new', source: 'owm', name: 'Sức gió', icon: <Wind size={18} /> },
-    // [ĐÃ XÓA] Lớp Mây phủ (clouds_new)
     { id: 'pressure_new', source: 'owm', name: 'Áp suất', icon: <Gauge size={18} /> },
 ];
 
@@ -192,7 +191,6 @@ function FilterAutoPan({ entities, searchTerm }: { entities: NgsiEntity[], searc
   return null;
 }
 
-// --- CONFIG MÀU SẮC ---
 const DOMAIN_CONFIG: Record<string, { color: string, icon: any }> = {
   weather: { color: '#f97316', icon: <CloudSun size={20} color="white" /> },
   air: { color: '#10b981', icon: <Wind size={20} color="white" /> },
@@ -299,12 +297,22 @@ export default function RealMap({
   const [internalEntities, setInternalEntities] = useState<NgsiEntity[]>([]);
   const [activeOwmLayer, setActiveOwmLayer] = useState<string | null>(null);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
+  
+  // Flood & Satellite States
   const [showSatellite, setShowSatellite] = useState(false);
+  const [showFloodLayer, setShowFloodLayer] = useState(!!floodLayerUrl);
   const [satelliteUrl, setSatelliteUrl] = useState<string | null>(null);
+  
+  // RainViewer States
   const [rainViewerTs, setRainViewerTs] = useState<number | null>(null);
   const [rainViewerHost, setRainViewerHost] = useState<string>('https://tilecache.rainviewer.com');
   const [radarPath, setRadarPath] = useState<string | null>(null);
   const [satellitePath, setSatellitePath] = useState<string | null>(null);
+
+  // Sync prop changes to state
+  useEffect(() => {
+    if (floodLayerUrl) setShowFloodLayer(true);
+  }, [floodLayerUrl]);
 
   const toggleSatellite = async () => {
     if (!showSatellite) {
@@ -312,7 +320,6 @@ export default function RealMap({
       if (!satelliteUrl) {
         try {
           const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-          // Gọi qua Backend NestJS (hoặc trực tiếp Python nếu dev local)
           const res = await axios.get(`${API_URL}/flood/satellite`);
           setSatelliteUrl(res.data.url);
         } catch (e) {
@@ -320,7 +327,7 @@ export default function RealMap({
         }
       }
     }
-    setShowSatellite(!showSatellite); // Đảo trạng thái
+    setShowSatellite(!showSatellite); 
   };
 
   const getValue = (prop: any) => {
@@ -349,14 +356,12 @@ export default function RealMap({
         
         if (data.host) setRainViewerHost(data.host);
 
-        // Radar Path
         if (data.radar?.past?.length > 0) {
           const latestRadar = data.radar.past[data.radar.past.length - 1];
           setRadarPath(latestRadar.path);
           setRainViewerTs(latestRadar.time);
         }
 
-        // Satellite Path
         if (data.satellite?.infrared?.length > 0) {
             const latestSat = data.satellite.infrared[data.satellite.infrared.length - 1];
             setSatellitePath(latestSat.path);
@@ -469,9 +474,8 @@ export default function RealMap({
 
   const handleMapClick = async (lat: number, lon: number) => {
       // Chỉ hoạt động khi đang bật lớp Cảnh báo ngập
-      if (!floodLayerUrl) return; 
+      if (!floodLayerUrl || !showFloodLayer) return; 
 
-      // Reset state để hiện loading
       setClickInfo({ lat, lon, data: null }); 
 
       try {
@@ -524,7 +528,6 @@ export default function RealMap({
                 const activeLayer = MAP_LAYERS.find(l => l.id === activeLayerId);
                 if (!activeLayer) return null;
 
-                // 1. RainViewer Logic
                 if (activeLayer.source === 'rainviewer' && rainViewerHost) {
                     let url = '';
                     
@@ -532,7 +535,7 @@ export default function RealMap({
                         url = `${rainViewerHost}/v2/coverage/0/256/{z}/{x}/{y}/0/0_0.png`;
                     } else if (activeLayer.isSatellite && satellitePath) {
                         url = `${rainViewerHost}${satellitePath}/256/{z}/{x}/{y}/0/0_1.png`;
-                    } else if (radarPath) { // Radar
+                    } else if (radarPath) { 
                         const color = (activeLayer as any).color || 2;
                         url = `${rainViewerHost}${radarPath}/256/{z}/{x}/{y}/${color}/1_1.png`;
                     } else {
@@ -551,7 +554,6 @@ export default function RealMap({
                     );
                 }
 
-                // 2. OpenWeatherMap Logic
                 if (activeLayer.source === 'owm') {
                     return (
                         <TileLayer
@@ -666,12 +668,54 @@ export default function RealMap({
             )}
         </MapContainer>
 
+        {/* --- PHẦN LEGEND (CHÚ GIẢI) MỚI --- */}
+        {floodLayerUrl && showFloodLayer && (
+            <div className="absolute bottom-6 left-4 z-[400] bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-lg border border-gray-200 animate-in slide-in-from-bottom-2">
+                <h4 className="text-xs font-bold text-gray-700 mb-2 flex items-center gap-2">
+                    <Waves size={14} className="text-blue-500" />
+                    Mức độ cảnh báo ngập
+                </h4>
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-red-600 shadow-sm ring-1 ring-red-200"></span>
+                        <span className="text-xs text-gray-600">Nguy hiểm (&gt; 1.0m)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-orange-500 shadow-sm ring-1 ring-orange-200"></span>
+                        <span className="text-xs text-gray-600">Cảnh báo (0.2 - 1.0m)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-blue-500 shadow-sm ring-1 ring-blue-200"></span>
+                        <span className="text-xs text-gray-600">An toàn / Thấp (&lt; 0.2m)</span>
+                    </div>
+                </div>
+                <div className="mt-2 pt-2 border-t border-gray-100 text-[10px] text-gray-400 italic">
+                    Nguồn: Sentinel-1 & ALOS PALSAR
+                </div>
+            </div>
+        )}
+
         <div className="absolute top-4 right-4 z-[400] bg-white rounded-lg shadow-lg border border-gray-200 flex flex-col transition-all duration-300">
             <div className="p-2 bg-gray-50 border-b border-gray-100 flex items-center justify-center cursor-default" title="Lớp bản đồ">
                 <Layers className="w-4 h-4 text-gray-500" />
             </div>
 
             <div className="flex flex-col">
+                {/* --- NÚT BẬT/TẮT LỚP NGẬP MỚI --- */}
+                {floodLayerUrl && (
+                    <button
+                        onClick={() => setShowFloodLayer(!showFloodLayer)}
+                        className={`p-2.5 flex items-center justify-center transition-all hover:bg-gray-100 relative group/btn border-b border-gray-100 ${
+                            showFloodLayer ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-inner' : 'text-gray-600'
+                        }`}
+                    >
+                        <Waves size={18} />
+                        <span className="absolute right-full mr-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                            Bản đồ ngập lụt
+                        </span>
+                    </button>
+                )}
+
                 <button
                     onClick={toggleSatellite}
                     className={`p-2.5 flex items-center justify-center transition-all hover:bg-gray-100 relative group/btn border-b border-gray-100 ${
@@ -689,9 +733,10 @@ export default function RealMap({
                     setActiveLayerId(null);
                     setShowSatellite(false);
                     setActiveOwmLayer(null);
+                    setShowFloodLayer(false); // Tắt luôn flood khi bấm nút tắt hết
                   }}
                   className={`p-2.5 flex items-center justify-center transition-colors hover:bg-gray-100 border-b border-gray-100 ${
-                  (!activeLayerId && !showSatellite) ? 'bg-blue-50 text-blue-600' : 'text-gray-500'
+                  (!activeLayerId && !showSatellite && !showFloodLayer) ? 'bg-blue-50 text-blue-600' : 'text-gray-500'
                   }`}
                   title="Tắt tất cả lớp phủ"
                 >
