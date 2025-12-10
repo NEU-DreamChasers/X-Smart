@@ -37,9 +37,7 @@
 - [Update Policy](#-update-policy)
 - [License Information](#-license-information)
 - [Dependency Tree](#-dependency-tree)
-- [Troubleshooting](#-troubleshooting)
 - [Available Scripts](#-available-scripts)
-- [Liên Kết & Tài Liệu](#-liên-kết--tài-liệu)
 
 ---
 
@@ -53,7 +51,7 @@
 | **ORM**               | TypeORM                            | 0.3.27          | MIT       | Object-relational mapping framework        |
 | **Context Broker**    | Scorpio NGSI-LD                    | latest          | BSD       | Smart city context information management  |
 | **Message Bus**       | Apache Kafka (KRaft)               | 7.5.0           | Apache 2.0| Event streaming platform                   |
-| **Object Storage**    | MinIO                              | latest          | AGPL v3   | S3-compatible file storage                 |
+| **Object Storage**    | MinIO                              | latest          | Apache 2.0| S3-compatible file storage                 |
 | **Container**         | Docker + Docker Compose            | 27+ + 2.29+     | Apache 2.0| Containerization & orchestration           |
 | **Language**          | TypeScript                         | 5.7.3           | Apache 2.0| Static type checking for JavaScript        |
 

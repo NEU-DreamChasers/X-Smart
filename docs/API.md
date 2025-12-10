@@ -17,7 +17,6 @@
 - [Map Search API](#-map-search-api)
 - [Admin Endpoints](#-admin-endpoints)
 - [Error Handling](#-error-handling)
-- [Ví dụ thực tế](#-ví-dụ-thực-tế)
 
 ---
 

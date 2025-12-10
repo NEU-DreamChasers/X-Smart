@@ -1,6 +1,23 @@
 # 🌍 X-Smart — Nền tảng dữ liệu mở cho đô thị thông minh
 
-![GitHub License](https://img.shields.io/badge/license-MIT-green) ![Node.js](https://img.shields.io/badge/node-18+-brightgreen) ![Docker](https://img.shields.io/badge/docker-20.10+-blue) ![TypeScript](https://img.shields.io/badge/typescript-5.0+-blue)
+<p align="center">
+   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
+   <img src="https://img.shields.io/badge/version-1.0.0-orange" alt="Version" />
+   <img src="https://img.shields.io/badge/node-18+-brightgreen" alt="Node.js" />
+   <img src="https://img.shields.io/badge/docker-20.10%2B-blue" alt="Docker" />
+   <img src="https://img.shields.io/badge/typescript-5.0+-blue" alt="TypeScript" />
+   <img src="https://img.shields.io/badge/Fiware-Scorpio%20LD-0A9EDC" alt="Fiware Scorpio-LD" />
+   <img src="https://img.shields.io/badge/NGSI--LD-Smart%20Data%20Models-0A9EDC" alt="NGSI-LD Smart Data Models" />
+</p>
+
+<p align="center" style="margin-top: 6px;">
+   <a href="http://101.96.66.225:8000/api" style="margin-right:8px;">
+      <img src="https://img.shields.io/badge/API-Swagger%20Docs-6C63FF?logo=swagger&logoColor=white&labelColor=4b4b7f&style=for-the-badge" alt="Swagger Docs" height="32" />
+   </a>
+   <a href="http://101.96.66.225:8000">
+      <img src="https://img.shields.io/badge/Web-Demo-22c55e?logo=vercel&logoColor=white&labelColor=166534&style=for-the-badge" alt="Web Demo" height="32" />
+   </a>
+</p>
 
 ---
 
@@ -39,23 +56,22 @@ Dự án tập trung vào xây dựng một nền tảng toàn diện, kết h�
 
 ### 👤 Người Dùng
 
-- 🗺️ **Xem bản đồ tương tác** — Hiển thị vị trí các cảm biến, tìm kiếm địa điểm
-- 🌡️ **Kiểm tra thời tiết & AQI** — Xem nhiệt độ, độ ẩm, chất lượng không khí real-time
-- 🚗 **Tìm bãi đỗ xe** — Xem số chỗ trống, vị trí bãi đỗ gần nhất
-- 🚌 **Tra cứu xe bus** — Xem tuyến đường, lịch trình, vị trí xe
-- 📝 **Báo cáo sự cố** — Gửi báo cáo về tình trạng đô thị (môi trường, giao thông, cơ sở hạ tầng, v.v)
-- 📱 **Responsive design** — Sử dụng trên điện thoại, tablet, máy tính
-- 🔍 **Tìm kiếm & Lọc** — Tìm cảm biến, điểm quan tâm theo vị trí, loại
+- **Xem bản đồ tương tác** — Hiển thị vị trí các cảm biến, tìm kiếm địa điểm
+- **Kiểm tra thời tiết & AQI** — Xem nhiệt độ, độ ẩm, chất lượng không khí real-time
+- **Tìm bãi đỗ xe** — Xem số chỗ trống, vị trí bãi đỗ gần nhất
+- **Tra cứu xe bus** — Xem vị trí xe
+- **Báo cáo sự cố** — Gửi báo cáo về tình trạng đô thị (môi trường, giao thông, cơ sở hạ tầng, v.v)
+- **Tìm kiếm & Lọc** — Tìm cảm biến, điểm quan tâm theo vị trí, loại
 
 ### 👨‍💼 Admin / Quản Trị Viên
 
-- 📊 **Dashboard thống kê** — Xem tổng quan entity, cảm biến, báo cáo hệ thống
-- 📈 **Biểu đồ phân tích** — Trực quan hoá dữ liệu nhiệt độ, AQI, lượng mưa
-- 🗺️ **Quản lý bản đồ** — Thêm/sửa/xoá marker, điều chỉnh layer hiển thị
-- 📋 **Quản lý dữ liệu** — CRUD tất cả entity (thời tiết, không khí, bãi đỗ, xe bus)
-- 👥 **Quản lý báo cáo** — Xem, duyệt, từ chối báo cáo từ công dân
-- 🔔 **Thông báo & Cảnh báo** — Theo dõi bất thường, gửi cảnh báo tới người dân
-- 💾 **Lưu trữ báo cáo** — Lưu file PDF, hình ảnh trong MinIO storage
+- **Dashboard thống kê** — Xem tổng quan entity, cảm biến, báo cáo hệ thống
+- **Biểu đồ phân tích** — Trực quan hoá dữ liệu nhiệt độ, AQI, lượng mưa
+- **Quản lý bản đồ** — Thêm/sửa/xoá marker, điều chỉnh layer hiển thị
+- **Quản lý dữ liệu** — Xem dữ liệu tất cả entity (thời tiết, không khí, bãi đỗ, xe bus)
+- **Quản lý báo cáo** — Xem, duyệt, từ chối báo cáo từ công dân
+- **Thông báo & Cảnh báo** — Theo dõi bất thường, gửi cảnh báo tới người dân
+- **Lưu trữ báo cáo** — Lưu file PDF, hình ảnh trong MinIO storage
 
 ---
 

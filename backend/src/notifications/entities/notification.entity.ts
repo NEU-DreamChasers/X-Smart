@@ -19,14 +19,20 @@ export class Notification {
   @Column()
   message: string;
 
+  @Column({ default: 'INFO' })
+  type: string;
+
+  @Column({ nullable: true })
+  source: string;
+
   @Column({ default: false })
   isRead: boolean;
 
   @Column({ nullable: true })
   reportId: string;
 
-  @Column()
-  userId: number; 
+  @Column({ nullable: true })
+  userId: number | null;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'userId' })
