@@ -19,7 +19,7 @@ import {
 import { 
   MapPin, Clock, AlertCircle, CheckCircle2, XCircle, 
   Search, Loader2, ShieldCheck, Check, X, RefreshCw,
-  ImageIcon, Calendar, Eye, FileText, Filter
+  ImageIcon, FileText, Filter, Eye
 } from 'lucide-react';
 
 const cardStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
@@ -75,11 +75,13 @@ export default function AdminReportList() {
 
   const parseDescription = (rawVal: any) => {
     const raw = safeString(rawVal);
-    if (raw.includes(']')) {
+    // Fix: Xử lý trường hợp không có ngoặc vuông để không bị mất nội dung
+    if (raw.includes(']') && raw.includes('[')) {
         const parts = raw.split(']');
         return { title: parts[0].replace('[', ''), desc: parts[1].trim() };
     }
-    return { title: raw, desc: '' };
+    // Fallback nếu format không đúng chuẩn: Title mặc định, nội dung giữ nguyên
+    return { title: raw.length > 50 ? 'Chi tiết phản ánh' : raw, desc: raw.length > 50 ? raw : '' };
   };
 
   const handleAction = async (id: any, action: 'approve' | 'reject' | 'resolve') => {
@@ -157,7 +159,7 @@ export default function AdminReportList() {
             <button 
                 onClick={fetchData} 
                 disabled={isLoading} 
-                className="p-2.5 bg-white text-gray-700 rounded-[10px] hover:bg-gray-50 border border-gray-200 shadow-sm active:scale-95 transition-all"
+                className="p-2.5 bg-white text-gray-700 rounded-[10px] hover:bg-gray-50 border border-gray-200 shadow-sm active:scale-95 transition-all cursor-pointer"
                 title="Làm mới danh sách"
             >
                 <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -218,7 +220,10 @@ export default function AdminReportList() {
                                         {getStatusBadge(statusVal)}
                                     </div>
 
-                                    <p className="text-sm text-gray-600 line-clamp-2 mb-3">{desc}</p>
+                                    {/* Fix: Hiển thị desc ngay cả khi không có, hoặc hiển thị title nếu desc rỗng để tránh khoảng trắng */}
+                                    <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                                        {desc || (title !== 'Báo cáo không tiêu đề' && title.length > 50 ? '' : 'Không có nội dung chi tiết')}
+                                    </p>
 
                                     <div className="flex flex-wrap gap-4 text-xs text-gray-500">
                                         <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
@@ -235,20 +240,20 @@ export default function AdminReportList() {
                                 <div className="pt-4 mt-2 flex gap-2 justify-end">
                                     {statusVal === 'PENDING' && (
                                         <>
-                                            <button onClick={() => handleAction(idStr, 'approve')} disabled={!!processingId} className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-[10px] text-xs font-bold hover:bg-indigo-700 shadow-sm transition-all active:scale-95">
+                                            <button onClick={() => handleAction(idStr, 'approve')} disabled={!!processingId} className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-[10px] text-xs font-bold hover:bg-indigo-700 shadow-sm transition-all active:scale-95 cursor-pointer">
                                                 <Check className="w-3.5 h-3.5"/> Duyệt
                                             </button>
-                                            <button onClick={() => handleAction(idStr, 'reject')} disabled={!!processingId} className="flex items-center gap-1.5 px-3.5 py-2 bg-white text-red-600 border border-red-200 rounded-[10px] text-xs font-bold hover:bg-red-50 transition-all active:scale-95">
+                                            <button onClick={() => handleAction(idStr, 'reject')} disabled={!!processingId} className="flex items-center gap-1.5 px-3.5 py-2 bg-white text-red-600 border border-red-200 rounded-[10px] text-xs font-bold hover:bg-red-50 transition-all active:scale-95 cursor-pointer">
                                                 <X className="w-3.5 h-3.5"/> Từ chối
                                             </button>
                                         </>
                                     )}
                                     {statusVal === 'APPROVED' && (
-                                        <button onClick={() => handleAction(idStr, 'resolve')} disabled={!!processingId} className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white rounded-[10px] text-xs font-bold hover:bg-emerald-700 shadow-sm transition-all active:scale-95">
+                                        <button onClick={() => handleAction(idStr, 'resolve')} disabled={!!processingId} className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 text-white rounded-[10px] text-xs font-bold hover:bg-emerald-700 shadow-sm transition-all active:scale-95 cursor-pointer">
                                             <ShieldCheck className="w-3.5 h-3.5"/> Đã xử lý
                                         </button>
                                     )}
-                                    <button onClick={() => handleViewDetail(idStr)} className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-100 text-gray-700 rounded-[10px] text-xs font-bold hover:bg-gray-200 transition-all active:scale-95">
+                                    <button onClick={() => handleViewDetail(idStr)} className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-100 text-gray-700 rounded-[10px] text-xs font-bold hover:bg-gray-200 transition-all active:scale-95 cursor-pointer">
                                         <Eye className="w-3.5 h-3.5"/> Chi tiết
                                     </button>
                                 </div>
@@ -261,8 +266,14 @@ export default function AdminReportList() {
       </div>
 
       {selectedReport && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-           <div className="bg-white w-full max-w-2xl rounded-[20px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div 
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200 cursor-pointer"
+            onClick={() => setSelectedReport(null)} // Fix: Click ra ngoài để đóng modal
+        >
+           <div 
+                className="bg-white w-full max-w-2xl rounded-[20px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 cursor-default" 
+                onClick={(e) => e.stopPropagation()} // Chặn sự kiện nổi bọt để không đóng khi click vào nội dung
+           >
               <div className="p-5 border-b border-gray-100 flex justify-between items-start bg-gray-50/50">
                  <div>
                     <h3 className="text-lg font-bold text-gray-900 line-clamp-1">
@@ -270,17 +281,21 @@ export default function AdminReportList() {
                     </h3>
                     <p className="text-xs text-gray-500 mt-1">Người gửi: {safeString(selectedReport.reporter?.value) || 'Ẩn danh'}</p>
                  </div>
-                 <button onClick={() => setSelectedReport(null)} className="p-2 bg-white rounded-full hover:bg-gray-100 shadow-sm border border-gray-100"><X className="w-5 h-5 text-gray-500"/></button>
+                 <button onClick={() => setSelectedReport(null)} className="p-2 bg-white rounded-full hover:bg-gray-100 shadow-sm border border-gray-100 cursor-pointer"><X className="w-5 h-5 text-gray-500"/></button>
               </div>
               <div className="p-6 overflow-y-auto space-y-6">
                  <div className="grid grid-cols-1 gap-4">
                     <div className="bg-gray-50 p-4 rounded-[14px] border border-gray-100" style={cardStyle}>
-                        <h4 className="font-bold text-sm mb-2 text-gray-900">Nội dung báo cáo</h4>
-                        <p className="text-sm text-gray-700 leading-relaxed">{parseDescription(selectedReport.description?.value).desc || 'Không có nội dung'}</p>
+                        <h4 className="font-bold text-sm mb-2 text-gray-900">
+                            {parseDescription(selectedReport.description?.value).title}
+                        </h4>
+                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                            {parseDescription(selectedReport.description?.value).desc || 'Không có nội dung chi tiết'}
+                        </p>
                     </div>
                     {safeString(selectedReport.media?.value) && (
                         <div className="rounded-[14px] overflow-hidden border border-gray-100 shadow-sm">
-                            <img src={safeString(selectedReport.media?.value)} className="w-full h-auto object-contain bg-gray-50" />
+                            <img src={safeString(selectedReport.media?.value)} className="w-full h-auto object-contain bg-gray-50" alt="Chi tiết hình ảnh" />
                         </div>
                     )}
                  </div>
