@@ -8,7 +8,7 @@ LICENSE file in the root directory of this source tree.
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import L from 'leaflet';
@@ -24,10 +24,10 @@ if (typeof window !== 'undefined') {
 import { renderToStaticMarkup } from 'react-dom/server';
 import { 
   CloudSun, Wind, Car, Bus, MapPin, Navigation, Store, 
-  Thermometer, Gauge, EyeOff, Layers, 
-  ScanEye, CloudLightning 
+  Thermometer, CloudRain, Gauge, Cloud, EyeOff, Layers, Waves, Loader2, AlertTriangle, Globe, ScanEye, CloudLightning 
 } from 'lucide-react';
 import { formatAddress } from '@/lib/utils';
+import axios from 'axios';
 
 // API KEY cho OpenWeatherMap
 const OWM_API_KEY = 'eb3a4947904547285aa7bdecca8cc396';
@@ -82,6 +82,8 @@ interface RealMapProps {
   onSelectEntity?: (entity: NgsiEntity) => void; 
   entities?: NgsiEntity[];
   onRouteFound?: (summary: any, instructions: any[]) => void;
+  floodLayerUrl?: string | null;
+  satelliteLayerUrl?: string | null;
 }
 
 function RoutingMachine({ routeCoords, onRouteFound }: { 
@@ -269,6 +271,15 @@ function MapController({ center, zoom }: { center?: [number, number]; zoom?: num
   return null;
 }
 
+function MapClickHandler({ onClick }: { onClick: (lat: number, lon: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
 export default function RealMap({ 
   domain = 'default', 
   searchTerm = '',
@@ -279,17 +290,37 @@ export default function RealMap({
   routeCoordinates, 
   onSelectEntity,
   entities: externalEntities,
-  onRouteFound 
+  onRouteFound,
+  floodLayerUrl,
+  satelliteLayerUrl,
 }: RealMapProps) {
   
   const [internalEntities, setInternalEntities] = useState<NgsiEntity[]>([]);
+  const [activeOwmLayer, setActiveOwmLayer] = useState<string | null>(null);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
-  
-  // Dùng tile-cache làm mặc định
+  const [showSatellite, setShowSatellite] = useState(false);
+  const [satelliteUrl, setSatelliteUrl] = useState<string | null>(null);
   const [rainViewerTs, setRainViewerTs] = useState<number | null>(null);
   const [rainViewerHost, setRainViewerHost] = useState<string>('https://tilecache.rainviewer.com');
   const [radarPath, setRadarPath] = useState<string | null>(null);
   const [satellitePath, setSatellitePath] = useState<string | null>(null);
+
+  const toggleSatellite = async () => {
+    if (!showSatellite) {
+      // Nếu chưa có URL thì mới gọi API lấy
+      if (!satelliteUrl) {
+        try {
+          const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+          // Gọi qua Backend NestJS (hoặc trực tiếp Python nếu dev local)
+          const res = await axios.get(`${API_URL}/flood/satellite`);
+          setSatelliteUrl(res.data.url);
+        } catch (e) {
+          console.error("Lỗi tải ảnh vệ tinh", e);
+        }
+      }
+    }
+    setShowSatellite(!showSatellite); // Đảo trạng thái
+  };
 
   const getValue = (prop: any) => {
     if (prop === undefined || prop === null) return 'N/A';
@@ -433,6 +464,27 @@ export default function RealMap({
     }).filter((item) => item !== null) as any[];
   }, [filteredEntities, domain, isExternalMode]);
 
+  const [clickInfo, setClickInfo] = useState<{lat: number, lon: number, data: any} | null>(null);
+
+  const handleMapClick = async (lat: number, lon: number) => {
+      // Chỉ hoạt động khi đang bật lớp Cảnh báo ngập
+      if (!floodLayerUrl) return; 
+
+      // Reset state để hiện loading
+      setClickInfo({ lat, lon, data: null }); 
+
+      try {
+          const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+          const res = await axios.get(`${API_URL}/flood/check`, {
+              params: { lat, lon }
+          });
+          setClickInfo({ lat, lon, data: res.data });
+      } catch (e) {
+          console.error("Lỗi check flood:", e);
+          setClickInfo(null);
+      }
+  };
+
   return (
     <div className="relative w-full h-full group">
         <MapContainer 
@@ -440,7 +492,33 @@ export default function RealMap({
             style={{ height: '100%', width: '100%', borderRadius: '0 0 14px 14px' }}
         >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
+            {showSatellite && satelliteUrl && (
+              <TileLayer 
+                url={satelliteUrl} 
+                opacity={1}
+                zIndex={5}
+                attribution="&copy; Copernicus Sentinel Data"  
+              />
+            )}
             
+            {floodLayerUrl && (
+              <TileLayer 
+                url={floodLayerUrl} 
+                opacity={0.8}
+                zIndex={10} 
+              />
+            )}
+
+            {/* TileLayer ĐỘNG cho OpenWeatherMap */}
+            {activeOwmLayer && (
+                <TileLayer
+                    url={`https://tile.openweathermap.org/map/${activeOwmLayer}/{z}/{x}/{y}.png?appid=${OWM_API_KEY}`}
+                    attribution='&copy; OpenWeatherMap'
+                    zIndex={10}
+                    opacity={0.7}
+                />
+            )}
             {activeLayerId && (() => {
                 const activeLayer = MAP_LAYERS.find(l => l.id === activeLayerId);
                 if (!activeLayer) return null;
@@ -535,20 +613,88 @@ export default function RealMap({
                 </Marker>
             ))}
             </MarkerClusterGroup>
+            <MapClickHandler onClick={handleMapClick} />
+
+            {clickInfo && (
+                <Popup 
+                    position={[clickInfo.lat, clickInfo.lon]} 
+                    eventHandlers={{
+                        remove: () => setClickInfo(null)
+                    }}
+                >
+                    <div className="p-2 text-center min-w-[160px]">
+                        {!clickInfo.data ? (
+                            <div className="flex flex-col items-center gap-2 text-gray-500 py-3">
+                                <Loader2 className="w-5 h-5 animate-spin text-blue-500"/> 
+                                <span className="text-xs font-medium">Đang phân tích vệ tinh...</span>
+                            </div>
+                        ) : (
+                            <div className="animate-in fade-in zoom-in duration-300">
+                                <div className="flex items-center justify-center gap-2 mb-2">
+                                    {clickInfo.data.depth > 0.5 ? (
+                                        <AlertTriangle className="w-5 h-5 text-red-500" />
+                                    ) : (
+                                        <Waves className="w-5 h-5 text-blue-500" />
+                                    )}
+                                    <span className={`font-bold text-sm ${
+                                        clickInfo.data.depth > 1.0 ? 'text-red-600' : 
+                                        clickInfo.data.depth > 0.2 ? 'text-orange-600' : 'text-blue-600'
+                                    }`}>
+                                        {clickInfo.data.status}
+                                    </span>
+                                </div>
+
+                                {clickInfo.data.depth > 0 ? (
+                                    <div className="bg-gray-50 rounded-lg p-2 border border-gray-100 mb-2">
+                                        <p className="text-xs text-gray-500 mb-0.5">Mực nước ước tính</p>
+                                        <p className="text-xl font-extrabold text-gray-900">
+                                            {clickInfo.data.depth} <span className="text-sm font-normal text-gray-500">m</span>
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-gray-400 mb-2">Khu vực an toàn</p>
+                                )}
+                                
+                                <p className="text-[10px] text-gray-400 italic border-t border-gray-100 pt-1 mt-1">
+                                    Dữ liệu Sentinel-1 & ALOS
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </Popup>
+            )}
         </MapContainer>
 
         <div className="absolute top-4 right-4 z-[400] bg-white rounded-lg shadow-lg border border-gray-200 flex flex-col transition-all duration-300">
             <div className="p-2 bg-gray-50 border-b border-gray-100 flex items-center justify-center cursor-default" title="Lớp bản đồ">
                 <Layers className="w-4 h-4 text-gray-500" />
             </div>
-            
+
             <div className="flex flex-col">
                 <button
-                    onClick={() => setActiveLayerId(null)}
-                    className={`p-2.5 flex items-center justify-center transition-colors hover:bg-gray-100 border-b border-gray-100 ${!activeLayerId ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}
-                    title="Tắt lớp phủ (None)"
+                    onClick={toggleSatellite}
+                    className={`p-2.5 flex items-center justify-center transition-all hover:bg-gray-100 relative group/btn border-b border-gray-100 ${
+                        showSatellite ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-inner' : 'text-gray-600'
+                    }`}
                 >
-                    <EyeOff size={18} />
+                    <Globe size={18} />
+                    <span className="absolute right-full mr-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                        Bản đồ Vệ tinh (Sentinel-2)
+                    </span>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setActiveLayerId(null);
+                    setShowSatellite(false);
+                    setActiveOwmLayer(null);
+                  }}
+                  className={`p-2.5 flex items-center justify-center transition-colors hover:bg-gray-100 border-b border-gray-100 ${
+                  (!activeLayerId && !showSatellite) ? 'bg-blue-50 text-blue-600' : 'text-gray-500'
+                  }`}
+                  title="Tắt tất cả lớp phủ"
+                >
+                <EyeOff size={18} />
                 </button>
 
                 {MAP_LAYERS.map((layer) => (
