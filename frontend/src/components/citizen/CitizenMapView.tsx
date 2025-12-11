@@ -582,6 +582,20 @@ export function CitizenMapView() {
                 <option value="parking" title="Tìm kiếm bãi đỗ xe và xem số lượng chỗ trống">🅿️ Bãi đỗ xe</option>
                 <option value="bus" title="Hiển thị mạng lưới trạm dừng xe buýt">🚌 Trạm Bus</option>
               </select>
+
+              <button
+                onClick={toggleFloodLayer}
+                disabled={isLoadingFlood}
+                className={`px-3 py-2.5 rounded-[14px] text-sm font-medium border flex items-center gap-2 transition-all whitespace-nowrap ${
+                  showFloodLayer 
+                    ? 'bg-red-50 text-red-600 border-red-200 shadow-sm'
+                    : 'bg-gray-50 text-gray-600 border-transparent hover:bg-gray-100'
+                }`}
+                title="Dữ liệu vệ tinh Sentinel-1"
+              >
+                {isLoadingFlood ? <Loader2 className="w-4 h-4 animate-spin" /> : <Droplets className="w-4 h-4" />}
+                <span className="hidden sm:inline">{showFloodLayer ? 'Tắt cảnh báo ngập' : 'Cảnh báo ngập'}</span>
+              </button>
             </div>
             <div className={`px-3 py-1.5 rounded-[10px] flex items-center gap-1.5 text-xs font-medium border ${isMapLoading ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
               {isMapLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
