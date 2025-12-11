@@ -10,13 +10,16 @@ LICENSE file in the root directory of this source tree.
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { User, LogOut, Map, Leaf, Bell, Building2, MessageSquarePlus, LogIn } from 'lucide-react';
+// 1. Thêm icon Database
+import { User, LogOut, Map, Leaf, Bell, Building2, MessageSquarePlus, LogIn, Database } from 'lucide-react';
 import type { User as UserType } from '../../app/page';
 import { CitizenMapView } from './CitizenMapView';
 import { CitizenEnvironment } from './CitizenEnvironment';
 import { CitizenNotifications } from '@/components/citizen/CitizenNotifications';
 import CitizenReportForm from '@/components/citizen/CitizenReportForm';
 import CitizenReportHistory from '@/components/citizen/CitizenReportHistory';
+// 2. Import component mới
+import CitizenDataLoader from '@/components/citizen/CitizenDataLoader';
 
 interface CitizenDashboardProps {
   user: UserType | null;
@@ -28,7 +31,8 @@ const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
 export function CitizenDashboard({ user: propUser, onLogout, onLogin }: CitizenDashboardProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('environment');
+  // Có thể đổi default tab thành 'data' nếu muốn test ngay
+  const [activeTab, setActiveTab] = useState('environment'); 
   const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState(0);
   
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -74,7 +78,7 @@ export function CitizenDashboard({ user: propUser, onLogout, onLogin }: CitizenD
 
   return (
     <div className="min-h-screen bg-[#f5f5f7]">
-      {/* HEADER: Áp dụng style nhẹ nhàng hơn */}
+      {/* HEADER */}
       <header className="bg-white sticky top-0 z-50">
         <div className="container mx-auto px-6 py-3">
           <div className="flex items-center justify-between">
@@ -140,25 +144,45 @@ export function CitizenDashboard({ user: propUser, onLogout, onLogin }: CitizenD
       <main className="container mx-auto px-6 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
           <div className="flex justify-center w-full">
-            <TabsList className="inline-flex h-14 items-center justify-center rounded-full bg-white p-1.5 w-full max-w-4xl gap-1" style={borderStyle}>
-              <TabsTrigger value="map" className="flex-1 rounded-full text-sm font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 h-full transition-all"><Map className="w-4 h-4 mr-2" />Bản đồ</TabsTrigger>
-              <TabsTrigger value="environment" className="flex-1 rounded-full text-sm font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 h-full transition-all"><Leaf className="w-4 h-4 mr-2" />Môi trường</TabsTrigger>
-              <TabsTrigger value="notifications" className="flex-1 rounded-full text-sm font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 h-full transition-all"><Bell className="w-4 h-4 mr-2" />Thông báo</TabsTrigger>
-              <TabsTrigger value="report" className="flex-1 rounded-full text-sm font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 h-full transition-all"><MessageSquarePlus className="w-4 h-4 mr-2" />Phản ánh</TabsTrigger>
+            <TabsList className="inline-flex h-14 items-center justify-center rounded-full bg-white p-1.5 w-full max-w-5xl gap-1" style={borderStyle}>
+              <TabsTrigger value="map" className="flex-1 rounded-full text-sm font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 h-full transition-all">
+                <Map className="w-4 h-4 mr-2" />Bản đồ
+              </TabsTrigger>
+              
+              <TabsTrigger value="environment" className="flex-1 rounded-full text-sm font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 h-full transition-all">
+                <Leaf className="w-4 h-4 mr-2" />Tổng quan
+              </TabsTrigger>
+
+              {/* 3. Thêm Trigger cho Tab Dữ liệu */}
+              <TabsTrigger value="data" className="flex-1 rounded-full text-sm font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 h-full transition-all">
+                <Database className="w-4 h-4 mr-2" />Tra cứu
+              </TabsTrigger>
+
+              <TabsTrigger value="notifications" className="flex-1 rounded-full text-sm font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 h-full transition-all">
+                <Bell className="w-4 h-4 mr-2" />Thông báo
+              </TabsTrigger>
+              
+              <TabsTrigger value="report" className="flex-1 rounded-full text-sm font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 h-full transition-all">
+                <MessageSquarePlus className="w-4 h-4 mr-2" />Phản ánh
+              </TabsTrigger>
             </TabsList>
           </div>
 
+          {/* Các Content cũ */}
           <TabsContent value="map" className="animate-in fade-in-50 duration-500"><CitizenMapView /></TabsContent>
           <TabsContent value="environment" className="animate-in fade-in-50 duration-500"><CitizenEnvironment /></TabsContent>
+          
+          {/* 4. Thêm Content cho Tab Dữ liệu mới */}
+          <TabsContent value="data" className="animate-in fade-in-50 duration-500">
+             <CitizenDataLoader />
+          </TabsContent>
+
           <TabsContent value="notifications" className="animate-in fade-in-50 duration-500"><CitizenNotifications isGuest={isGuest} /></TabsContent>
           
           <TabsContent value="report" className="w-full pb-10 animate-in fade-in-50 duration-500">
              <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
                
-               <div 
-                  className="lg:col-span-2 bg-white rounded-[14px] shadow-sm overflow-hidden"
-                  style={borderStyle}
-               >
+               <div className="lg:col-span-2 bg-white rounded-[14px] shadow-sm overflow-hidden" style={borderStyle}>
                   <div className="p-6 border-b border-gray-50">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 bg-blue-50 rounded-[12px] flex items-center justify-center text-blue-600">
@@ -175,18 +199,13 @@ export function CitizenDashboard({ user: propUser, onLogout, onLogin }: CitizenD
                   </div>
                </div>
 
-               
                <div className="lg:col-span-1 h-full">
                  {!isGuest ? (
-                   
                    <div className="h-full">
                       <CitizenReportHistory refreshTrigger={refreshHistoryTrigger} />
                    </div>
                  ) : (
-                   <div 
-                      className="bg-white rounded-[14px] p-8 shadow-sm text-center h-fit sticky top-24"
-                      style={borderStyle}
-                   >
+                   <div className="bg-white rounded-[14px] p-8 shadow-sm text-center h-fit sticky top-24" style={borderStyle}>
                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
                         <User className="w-8 h-8" />
                      </div>
