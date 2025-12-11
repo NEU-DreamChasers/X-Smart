@@ -199,10 +199,10 @@ export function CitizenEnvironment() {
           'thunderstorm': 'Dông bão',
           'mist': 'Sương mù',
           'haze': 'Sương mù nhẹ',
-          'fog': 'Sương dày'
+          'fog': 'Sương dày',
+          'light intensity shower rain': 'Mưa rào nhẹ'
       };
 
-      // Trả về kết quả dịch hoặc trả về giá trị gốc nếu không tìm thấy (có viết hoa chữ cái đầu)
       return map[lowerType] || (type.charAt(0).toUpperCase() + type.slice(1));
   };
 
@@ -343,8 +343,13 @@ export function CitizenEnvironment() {
           </div>
           <div style={{ width: '100%', height: '250px' }}>
             {loading ? <div className="h-full flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500"/></div> : 
-             rainChart.length > 0 ? (
-                <SimpleBarChart data={rainChart} xAxisKey="name" bars={rainChartConfig} height={250} />
+            rainChart.length > 0 ? (
+                <SimpleBarChart 
+                    data={rainChart} 
+                    xAxisKey="time"  // <--- SỬA TẠI ĐÂY (Cũ là "name")
+                    bars={rainChartConfig} 
+                    height={250} 
+                />
             ) : <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa có dữ liệu mưa</div>}
           </div>
         </div>

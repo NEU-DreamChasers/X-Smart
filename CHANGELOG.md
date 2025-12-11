@@ -1,6 +1,20 @@
 # Changelog
 Mọi thay đổi đáng chú ý của dự án sẽ được ghi lại trong tệp này.
 
+# 2025-12-11
+**Tính năng mới**
+- Thêm tính năng hiển thị layer dữ liệu vệ tinh về ngập lụt
+
+**Tái cấu trúc & Sửa lỗi**
+- Sửa lỗi thông báo không đẩy về người dùng sau khi được duyệt
+- Sửa lỗi biểu đồ lượng mưa không hiển thị thời gian
+
+# 2025-12-10
+**Tính năng mới**
+- Triển khai Worker tự động đồng bộ dữ liệu  định kỳ 10 phút/lần.
+- Hỗ trợ thu thập đa nguồn dữ liệu: Thời tiết và Chất lượng không khí từ OpenWeatherMap.
+- Tích hợp thêm các lớp bản đồ mới.
+
 # 2025-12-09
 **Tính năng mới**
 - Hoàn thiện hệ thống cảnh báo (Persistent Alerts): Tích hợp lưu trữ cảnh báo vào CSDL trước khi phát tin qua Socket.

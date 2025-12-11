@@ -10,6 +10,8 @@ LICENSE file in the root directory of this source tree.
 import { useRouter } from 'next/navigation';
 // Đảm bảo đường dẫn import component đúng với dự án của bạn
 import { CitizenDashboard } from '@/components/citizen/CitizenDashboard'; 
+// 1. Import Component tải dữ liệu mới
+import CitizenDataLoader from '@/components/citizen/CitizenDataLoader';
 
 export default function CitizenPage() {
   const router = useRouter();
@@ -26,10 +28,13 @@ export default function CitizenPage() {
   };
 
   return (
+    // 2. Truyền CitizenDataLoader làm con (children) của CitizenDashboard
     <CitizenDashboard 
       user={mockUser} 
       onLogout={handleLogout} 
       onLogin={() => {}} 
-    />
+    >
+      <CitizenDataLoader />
+    </CitizenDashboard>
   );
 }

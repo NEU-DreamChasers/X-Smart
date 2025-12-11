@@ -102,6 +102,15 @@ services:
       exit 0;
       "
 
+  flood-engine:
+    build: ./flood-engine
+    container_name: xsmart_flood_engine
+    ports:
+      - "8000:8000"
+    networks:
+      xsmart: {}
+    restart: always
+
   # Dịch vụ Backend (Nest.js)
   backend:
     build:
@@ -116,6 +125,7 @@ services:
       - postgres
       - scorpio
       - kafka
+      - flood-engine
     environment:
       PORT: ${PORT}
       

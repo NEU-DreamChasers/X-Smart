@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { NgsiEntity } from '../maps/RealMap';
 import { formatAddress } from '@/lib/utils';
+import { Button } from '../ui/button';
 
 const borderStyle = { border: '0.8px solid rgba(0, 0, 0, 0.10)' };
 
@@ -197,6 +198,10 @@ export function CitizenMapView() {
   const [realEntityCount, setRealEntityCount] = useState(0);
   const [isMapLoading, setIsMapLoading] = useState(false);
   const [selectedRealEntity, setSelectedRealEntity] = useState<NgsiEntity | null>(null);
+  const [showFloodLayer, setShowFloodLayer] = useState(false);
+  const [floodUrl, setFloodUrl] = useState<string | null>(null);
+  const [isLoadingFlood, setIsLoadingFlood] = useState(false);
+  const [satelliteUrl, setSatelliteUrl] = useState<string | null>(null);
   
   // --- STATES CHO NAVIGATION ---
   const [isPreparingNav, setIsPreparingNav] = useState(false);
@@ -407,6 +412,41 @@ export function CitizenMapView() {
       return () => stopRealtimeTracking();
   }, []);
 
+  // --- LOGIC BẬT/TẮT LỚP NGẬP LỤT ---
+  const toggleFloodLayer = async () => {
+  if (!showFloodLayer) {
+    // BẬT: Gọi cả 2 API cùng lúc
+    setIsLoadingFlood(true);
+    try {
+      // Kiểm tra xem URL đã có chưa (cache lại để đỡ gọi nhiều lần)
+      if (!floodUrl || !satelliteUrl) {
+         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+         // Gọi song song 2 request cho nhanh
+         const [floodRes, satRes] = await Promise.all([
+            fetch(`${API_URL}/flood/layer`),
+            fetch(`${API_URL}/flood/satellite`)
+         ]);
+
+         const floodData = await floodRes.json();
+         const satData = await satRes.json();
+
+         setFloodUrl(floodData.url);
+         setSatelliteUrl(satData.url); // <--- LƯU URL VỆ TINH
+      }
+      setShowFloodLayer(true);
+    } catch (error) {
+      console.error("Lỗi tải bản đồ:", error);
+      alert("Không thể tải dữ liệu vệ tinh.");
+    } finally {
+      setIsLoadingFlood(false);
+    }
+  } else {
+    // TẮT: Chỉ cần ẩn đi
+    setShowFloodLayer(false);
+    }
+  };
+
   // [UPDATED] Hàm lấy tên hiển thị, đã được cập nhật để hiển thị tên chuẩn cho Bus
   const getEntityName = () => {
     if (!selectedRealEntity) return '';
@@ -559,6 +599,8 @@ export function CitizenMapView() {
               routeCoordinates={routeCoords}
               onSelectEntity={handleEntityClick}
               onRouteFound={handleRouteFound} 
+              floodLayerUrl={showFloodLayer ? floodUrl : null}
+              satelliteLayerUrl={showFloodLayer ? satelliteUrl : null}
             />
           </div>
         </div>
@@ -1067,7 +1109,7 @@ export function CitizenMapView() {
                                     </div>
 
                                     {/* Navigation Button */}
-                                    <div className="mt-2 pt-2 border-t border-gray-100">
+                                    <div className="mt-2 pt-2 border-t border-gray-100 flex flex-col gap-3">
                                         <button 
                                             onClick={openNavigationSetup}
                                             disabled={isRoutingLoading}
@@ -1076,6 +1118,10 @@ export function CitizenMapView() {
                                             <Navigation className="w-5 h-5" />
                                             Dẫn đường đến bãi đỗ
                                         </button>
+                                        <Button className="w-full py-3 bg-blue-600 text-white rounded-[14px] font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100">
+                                            <Navigation className="w-5 h-5" />
+                                            Chỉ đường tối ưu
+                                        </Button>
                                     </div>
                                 </div>
                             );
@@ -1098,7 +1144,7 @@ export function CitizenMapView() {
                                     </div>
                                 </div>
                             </div>
-                            <div className="mt-4 pt-4 border-t border-gray-100">
+                            <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col gap-3">
                                 <button 
                                     onClick={openNavigationSetup}
                                     disabled={isRoutingLoading}
@@ -1107,6 +1153,10 @@ export function CitizenMapView() {
                                     <Compass className="w-5 h-5" />
                                     Chỉ đường tới đây
                                 </button>
+                                <Button className="w-full py-3 bg-blue-600 text-white rounded-[14px] font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100">
+                                      <Navigation className="w-5 h-5" />
+                                        Chỉ đường tối ưu
+                                  </Button>
                             </div>
                           </>
                         );
